@@ -5,5 +5,6 @@ seed
 !seed/seed.js
 
 /dist
-
+.env.example
 .env
+cshellscript.bat

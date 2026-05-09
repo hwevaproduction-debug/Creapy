@@ -62,6 +62,7 @@ test.afterEach(() => {
   prisma.user.findUnique = originalPrisma.userFindUnique;
   prisma.user.update = originalPrisma.userUpdate;
   delete process.env.SKIP_EMAIL_VERIFICATION;
+  delete process.env.SKIP_PHONE_VERIFICATION;
 });
 
 test("getUser returns a public-safe payload for anonymous viewers", async () => {
@@ -123,7 +124,7 @@ test("signup removes a newly created user if verification email delivery fails",
   let deletedFilter = null;
 
   emailUtils.sendEmail = async () => {
-    throw new Error("ses down");
+    throw new Error("smtp down");
   };
 
   const authController = loadAuthController();
@@ -151,7 +152,7 @@ test("signup removes a newly created user if verification email delivery fails",
   assert.equal(result.error.statusCode, 503);
   assert.equal(
     result.error.message,
-    "We couldn't send the verification email. Please try signing up again. Provider response: ses down"
+    "We couldn't send the verification email. Please try signing up again. Provider response: smtp down"
   );
   assert.deepEqual(deletedFilter, { id: "new-user-id" });
 });
@@ -458,6 +459,89 @@ test("signup with skipped email verification returns a minimal pending-phone pay
   assert.equal(result.statusCode, 201);
   assert.equal(result.body.status, "pending_phone_verification");
   assert.equal(result.body.data.user.email, "landlord@example.com");
+  assert.equal("phoneOtp" in result.body.data.user, false);
+  assert.equal("phoneOtpExpires" in result.body.data.user, false);
+  assert.equal("emailVerificationToken" in result.body.data.user, false);
+  assert.equal("emailVerificationExpires" in result.body.data.user, false);
+  assert.equal("nationalId" in result.body.data.user, false);
+});
+
+test("signup with skipped email and phone verification returns a landlord token", async () => {
+  process.env.SKIP_EMAIL_VERIFICATION = "true";
+  process.env.SKIP_PHONE_VERIFICATION = "true";
+  let updateArgs = null;
+  let smsCalled = false;
+
+  smsUtils.sendSms = async () => {
+    smsCalled = true;
+    throw new Error("sms should not be sent");
+  };
+
+  const authController = loadAuthController();
+
+  prisma.user.create = async ({ data }) => ({
+    id: "landlord-1",
+    username: data.username,
+    email: data.email,
+    avatar: null,
+    role: data.role,
+    phoneNumber: data.phoneNumber,
+    nationalId: data.nationalId,
+    password: data.password,
+    isEmailVerified: false,
+    isPhoneVerified: false,
+    emailVerificationToken: data.emailVerificationToken,
+    emailVerificationExpires: data.emailVerificationExpires,
+  });
+
+  prisma.user.update = async (args) => {
+    updateArgs = args;
+    return {
+      id: "landlord-1",
+      username: "verified-landlord",
+      email: "landlord@example.com",
+      avatar: null,
+      role: "landlord",
+      phoneNumber: "+263771234567",
+      nationalId: "63-123456-A-12",
+      password: "hashed-password",
+      isEmailVerified: true,
+      isPhoneVerified: true,
+      phoneOtp: null,
+      phoneOtpExpires: null,
+      emailVerificationToken: "hashed-email-token",
+      emailVerificationExpires: new Date(Date.now() + 86400000),
+    };
+  };
+
+  const result = await invokeController(authController.signup, {
+    body: {
+      username: "verified-landlord",
+      email: "landlord@example.com",
+      password: "password123",
+      role: "landlord",
+      phoneNumber: "+263771234567",
+      nationalId: "63-123456-A-12",
+    },
+  });
+
+  assert.equal(result.statusCode, 201);
+  assert.equal(result.body.status, "success");
+  assert.ok(result.body.token);
+  assert.equal(result.body.data.user._id, "landlord-1");
+  assert.equal(result.body.data.user.isEmailVerified, true);
+  assert.equal(result.body.data.user.isPhoneVerified, true);
+  assert.deepEqual(updateArgs, {
+    where: { id: "landlord-1" },
+    data: {
+      isEmailVerified: true,
+      isPhoneVerified: true,
+      phoneOtp: null,
+      phoneOtpExpires: null,
+    },
+  });
+  assert.equal(smsCalled, false);
+  assert.equal(jwt.verify(result.body.token, process.env.JWT_SECRET).id, "landlord-1");
   assert.equal("phoneOtp" in result.body.data.user, false);
   assert.equal("phoneOtpExpires" in result.body.data.user, false);
   assert.equal("emailVerificationToken" in result.body.data.user, false);

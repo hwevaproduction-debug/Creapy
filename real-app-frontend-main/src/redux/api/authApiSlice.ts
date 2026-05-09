@@ -11,7 +11,6 @@ export const authApiSlice = apiSlice.injectEndpoints({
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
-            "Access-Control-Allow-Origin": "*",
           },
         };
       },
@@ -25,7 +24,6 @@ export const authApiSlice = apiSlice.injectEndpoints({
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
-            "Access-Control-Allow-Origin": "*",
           },
         };
       },
@@ -47,7 +45,6 @@ export const authApiSlice = apiSlice.injectEndpoints({
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
-            "Access-Control-Allow-Origin": "*",
           },
         };
       },
@@ -61,7 +58,6 @@ export const authApiSlice = apiSlice.injectEndpoints({
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
-            "Access-Control-Allow-Origin": "*",
           },
         };
       },
@@ -75,7 +71,6 @@ export const authApiSlice = apiSlice.injectEndpoints({
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
-            "Access-Control-Allow-Origin": "*",
           },
         };
       },

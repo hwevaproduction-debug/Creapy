@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "postinstall": "prisma generate",
     "server": "nodemon server.js",
     "seed": "node seed/seed.js",
     "seed:db": "node seed/seed-direct.js",
@@ -17,7 +18,6 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.978.0",
-    "@aws-sdk/client-ses": "^3.978.0",
     "@aws-sdk/s3-request-presigner": "^3.978.0",
     "@prisma/client": "^5.0.0",
     "africastalking": "^0.8.0",
@@ -30,10 +30,9 @@
     "express-validator": "^7.0.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "nodemailer": "^7.0.10",
     "paynow": "^2.0.0",
+    "prisma": "^5.0.0",
     "validator": "^13.11.0"
-  },
-  "devDependencies": {
-    "prisma": "^5.0.0"
   }
 }

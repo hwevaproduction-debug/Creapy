@@ -38,8 +38,9 @@ Amplify backend hosting expects the build output in the following structure:
 | `PAYNOW_RETURN_URL` | Must be the Amplify frontend URL + `/payment-complete` |
 | `LISTING_FEE_AMOUNT` | Per-listing activation fee amount |
 | `TENANT_PREMIUM_AMOUNT` | Tenant premium subscription amount |
+| `GMAIL_USER` | Gmail account used for SMTP delivery |
+| `GMAIL_APP_PASSWORD` | Google App Password for `GMAIL_USER`; the Google account must have 2-Step Verification enabled |
 | `EMAIL_FROM` | From address for outbound emails |
-| `AWS_REGION` | AWS region for SES and default backend AWS service clients |
 | `S3_BUCKET` | Amazon S3 bucket name for stored assets |
 | `S3_REGION` | AWS region that hosts the S3 bucket |
 | `S3_PUBLIC_BASE_URL` | Public base URL used when serving uploaded assets |
@@ -52,11 +53,10 @@ Amplify backend hosting expects the build output in the following structure:
 
 Grant the Amplify backend runtime IAM role permission to:
 
-- Send email through Amazon SES from the configured `EMAIL_FROM` identity.
 - Read and write objects in the configured `S3_BUCKET`.
 - List the configured `S3_BUCKET` when the storage workflow needs bucket-level checks.
 
-Avoid static AWS keys in Amplify. Prefer the Amplify backend runtime IAM role for SES and S3 access, and reserve `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` for local development only.
+Avoid static AWS keys in Amplify. Prefer the Amplify backend runtime IAM role for S3 access, and reserve `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` for local development only.
 
 ### Aurora PostgreSQL Setup
 

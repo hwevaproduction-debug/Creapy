@@ -187,6 +187,30 @@ const Login = () => {
                       <Box
                         sx={{
                           display: "flex",
+                          justifyContent: "flex-end",
+                          marginTop: "8px",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            color: "#1F4D3A",
+                            cursor: "pointer",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            "&:hover": {
+                              textDecoration: "underline",
+                            },
+                          }}
+                          onClick={() => {
+                            navigate("/forgot-password");
+                          }}
+                        >
+                          Forgot password?
+                        </Box>
+                      </Box>
+                      <Box
+                        sx={{
+                          display: "flex",
                           justifyContent: "end",
                           marginTop: "16px",
                         }}

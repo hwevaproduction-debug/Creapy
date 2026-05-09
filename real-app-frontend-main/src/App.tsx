@@ -3,6 +3,7 @@ import Home from "./views/Home";
 import NotFound from "./views/NotFound";
 import Login from "./views/Login";
 import SignUp from "./views/SignUp";
+import ForgotPassword from "./views/ForgotPassword";
 import Profile from "./views/Profile";
 import About from "./views/About";
 import Header from "./components/Header";
@@ -42,6 +43,14 @@ function App() {
           element={
             <PublicRoutes>
               <Login />
+            </PublicRoutes>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <PublicRoutes>
+              <ForgotPassword />
             </PublicRoutes>
           }
         />

@@ -233,7 +233,7 @@ test("bulkReviveListings revives inactive listings, ignores email failure, and r
   };
   emailUtils.sendEmail = async ({ to }) => {
     emailedIds.push(to);
-    throw new Error("ses down");
+    throw new Error("smtp down");
   };
 
   const result = await invokeController(adminController.bulkReviveListings, {

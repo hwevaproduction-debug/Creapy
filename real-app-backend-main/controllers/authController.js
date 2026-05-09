@@ -165,6 +165,21 @@ exports.signup = catchAsync(async (req, res, next) => {
 
   if (process.env.SKIP_EMAIL_VERIFICATION === "true") {
     if (newUser.role === "landlord") {
+      if (process.env.SKIP_PHONE_VERIFICATION === "true") {
+        const verifiedUser = await prisma.user.update({
+          where: { id: newUser.id },
+          data: {
+            isEmailVerified: true,
+            isPhoneVerified: true,
+            phoneOtp: null,
+            phoneOtpExpires: null,
+          },
+        });
+
+        createSendToken(verifiedUser, 201, res);
+        return;
+      }
+
       const phoneVerification = generatePhoneOtp();
       const verifiedUser = await prisma.user.update({
         where: { id: newUser.id },

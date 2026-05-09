@@ -2,11 +2,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const listingController = require("../controllers/listingController");
-const Listing = require("../models/listingModel");
+const prisma = require("../utils/prisma");
 
-const originalFind = Listing.find;
-const originalAggregate = Listing.aggregate;
-const originalUpdateMany = Listing.updateMany;
+const originalListing = {
+  findMany: prisma.listing.findMany,
+  updateMany: prisma.listing.updateMany,
+};
 
 const invokeController = (handler, req) =>
   new Promise((resolve, reject) => {
@@ -29,19 +30,16 @@ const invokeController = (handler, req) =>
   });
 
 test.afterEach(() => {
-  Listing.find = originalFind;
-  Listing.aggregate = originalAggregate;
-  Listing.updateMany = originalUpdateMany;
+  prisma.listing.findMany = originalListing.findMany;
+  prisma.listing.updateMany = originalListing.updateMany;
 });
 
-test("matchesSavedSearch matches city, province, and address line for canonical locations", () => {
+test("matchesSavedSearch matches flat province, city, and address line locations", () => {
   const { matchesSavedSearch } = listingController.__testables;
   const listing = {
-    location: {
-      province: "Harare",
-      city: "Avondale",
-      addressLine: "12 King George Road",
-    },
+    province: "Harare",
+    city: "Avondale",
+    addressLine: "12 King George Road",
     monthlyRent: 650,
     bedrooms: 2,
     totalRooms: 4,
@@ -62,108 +60,104 @@ test("matchesSavedSearch matches city, province, and address line for canonical 
   );
 });
 
-test("matchesSavedSearch preserves legacy string location matching", () => {
+test("matchesSavedSearch applies rent, room, bedroom, and amenity criteria", () => {
   const { matchesSavedSearch } = listingController.__testables;
   const listing = {
-    location: "Borrowdale, Harare",
+    province: "Harare",
+    city: "Avondale",
+    addressLine: "12 King George Road",
     monthlyRent: 650,
     bedrooms: 2,
     totalRooms: 4,
-    amenities: {},
+    amenities: { solar: true, parking: true },
   };
 
   assert.equal(
-    matchesSavedSearch({ criteria: { location: "Borrowdale" } }, listing),
+    matchesSavedSearch({
+      criteria: {
+        minRent: 500,
+        maxRent: 800,
+        minBedrooms: 2,
+        minTotalRooms: 4,
+        amenities: { solar: true },
+      },
+    }, listing),
     true
+  );
+  assert.equal(
+    matchesSavedSearch({ criteria: { amenities: { borehole: true } } }, listing),
+    false
   );
 });
 
-test("getListings uses a legacy-compatible location filter for province queries", async () => {
-  let capturedFilter = null;
-  Listing.updateMany = async () => ({ modifiedCount: 0 });
-
-  Listing.find = (filter) => {
-    capturedFilter = filter;
-    return {
-      skip() {
-        return this;
-      },
-      limit() {
-        return this;
-      },
-      async sort() {
-        return [];
-      },
-    };
+test("getListings uses Prisma-compatible location filters", async () => {
+  let capturedArgs = null;
+  prisma.listing.updateMany = async () => ({ count: 0 });
+  prisma.listing.findMany = async (args) => {
+    capturedArgs = args;
+    return [];
   };
 
   const result = await invokeController(listingController.getListings, {
-    query: { province: "Harare" },
+    query: { location: "Harare" },
   });
 
-  assert.deepEqual(capturedFilter.$and[0].$or, [
-    { "location.province": /Harare/i },
-    { location: /Harare/i },
+  assert.equal(capturedArgs.where.status, "active");
+  assert.deepEqual(capturedArgs.where.AND, [
+    {
+      province: { contains: "Harare", mode: "insensitive" },
+    },
   ]);
   assert.equal(result.statusCode, 200);
 });
 
-test("getHomeGroupedByLocation normalizes legacy string locations before grouping", async () => {
-  let capturedPipeline = null;
-  Listing.updateMany = async () => ({ modifiedCount: 0 });
-
-  Listing.aggregate = async (pipeline) => {
-    capturedPipeline = pipeline;
-    return [];
-  };
-
-  const result = await invokeController(listingController.getHomeGroupedByLocation, {
-    query: {},
-  });
-
-  assert.deepEqual(capturedPipeline[0], {
-    $addFields: {
-      _normalizedProvince: {
-        $ifNull: ["$location.province", "$location"],
+test("getHomeGroupedByLocation groups current flat province locations", async () => {
+  let capturedArgs = null;
+  prisma.listing.updateMany = async () => ({ count: 0 });
+  prisma.listing.findMany = async (args) => {
+    capturedArgs = args;
+    return [
+      {
+        id: "listing_1",
+        name: "Avondale Room",
+        province: "Harare",
+        imageUrls: ["room.jpg"],
+        createdAt: new Date("2025-01-02T00:00:00.000Z"),
+        status: "active",
       },
-    },
-  });
-  assert.deepEqual(capturedPipeline[1], {
-    $match: {
-      status: "active",
-      _normalizedProvince: { $exists: true, $ne: "" },
-    },
-  });
-  assert.equal(capturedPipeline[3].$group._id, "$_normalizedProvince");
-  assert.equal(
-    capturedPipeline[3].$group.listings.$push.location,
-    "$_normalizedProvince"
-  );
-  assert.equal(result.statusCode, 200);
-});
-
-test("backfillLegacyLocations converts string locations to canonical objects", async () => {
-  const originalUpdateMany = Listing.collection.updateMany;
-  let capturedFilter = null;
-  let capturedUpdate = null;
-
-  Listing.collection.updateMany = async (filter, update) => {
-    capturedFilter = filter;
-    capturedUpdate = update;
-    return { modifiedCount: 2 };
+    ];
   };
 
-  try {
-    const result = await Listing.backfillLegacyLocations();
-    assert.equal(result.modifiedCount, 2);
-    assert.deepEqual(capturedFilter, { location: { $type: "string" } });
-    assert.ok(Array.isArray(capturedUpdate));
-    assert.equal(capturedUpdate[0].$set.location.country, "Zimbabwe");
-    assert.deepEqual(capturedUpdate[0].$set.location.coordinates, {
-      lat: null,
-      lng: null,
-    });
-  } finally {
-    Listing.collection.updateMany = originalUpdateMany;
-  }
+  const result = await invokeController(
+    listingController.getHomeGroupedByLocation,
+    {
+      query: {},
+    }
+  );
+
+  assert.deepEqual(capturedArgs.where, {
+    status: "active",
+    province: { not: "" },
+  });
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(result.body.data, [
+    {
+      location: "Harare",
+      listings: [
+        {
+          _id: "listing_1",
+          name: "Avondale Room",
+          monthlyRent: undefined,
+          bedrooms: undefined,
+          totalRooms: undefined,
+          amenities: undefined,
+          status: "active",
+          studentAccommodation: undefined,
+          createdAt: new Date("2025-01-02T00:00:00.000Z"),
+          location: "Harare",
+          image: "room.jpg",
+        },
+      ],
+    },
+  ]);
 });

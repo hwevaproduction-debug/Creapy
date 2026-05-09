@@ -60,7 +60,12 @@ const corsOrigin = (origin, callback) => {
 const corsOptions = {
   origin: corsOrigin,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Accept",
+    "Access-Control-Allow-Origin",
+  ],
   credentials: true,
   optionsSuccessStatus: 204,
 };

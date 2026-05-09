@@ -108,3 +108,24 @@ test("OPTIONS preflight succeeds for configured frontend origins", async () => {
     delete process.env.FRONTEND_URL;
   }
 });
+
+test("OPTIONS preflight allows legacy frontend CORS request header", async () => {
+  const result = await invokeApp("OPTIONS", "/api/v1/users/login", {
+    headers: {
+      Origin: "https://app.townruins.com",
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers":
+        "content-type,access-control-allow-origin",
+    },
+  });
+
+  assert.equal(result.statusCode, 204);
+  assert.equal(
+    result.headers.get("access-control-allow-origin"),
+    "https://app.townruins.com"
+  );
+  assert.match(
+    result.headers.get("access-control-allow-headers"),
+    /Access-Control-Allow-Origin/
+  );
+});

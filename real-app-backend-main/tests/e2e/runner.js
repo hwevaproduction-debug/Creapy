@@ -11,10 +11,18 @@ const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 const results = [];
 let fatalGroupError = false;
 
+const runSuffix = Date.now();
+const runSuffixString = String(runSuffix);
+
 const state = {
   landlordEmail: `landlord_${Date.now()}@test.creapy.com`,
   tenantEmail: `tenant_${Date.now()}@test.creapy.com`,
+  landlordUsername: `landlord_e2e_${runSuffix}`,
+  tenantUsername: `tenant_e2e_${runSuffix}`,
+  landlordPhoneNumber: `+26377${runSuffixString.slice(-7)}`,
+  landlordNationalId: `63-${runSuffixString.slice(-3)}-45-67A`,
   landlordToken: null,
+  landlordTokenFromSignup: false,
   landlordId: null,
   tenantToken: null,
   tenantId: null,

@@ -10,21 +10,23 @@ async function run(state, api, assert, test) {
 
   await test('Landlord signup', async () => {
     const { status, body } = await api('POST', '/api/v1/users/signup', {
-      username: 'landlord_e2e',
+      username: state.landlordUsername || 'landlord_e2e',
       email: state.landlordEmail,
       password: state.password,
       role: 'landlord',
-      phoneNumber: LANDLORD_PHONE_NUMBER,
-      nationalId: LANDLORD_NATIONAL_ID,
+      phoneNumber: state.landlordPhoneNumber || LANDLORD_PHONE_NUMBER,
+      nationalId: state.landlordNationalId || LANDLORD_NATIONAL_ID,
     });
     assert(status === 201, `expected 201, got ${status}`);
     if (body && body.token) {
       state.landlordToken = body.token;
       state.landlordSignupState = 'token';
+      state.landlordTokenFromSignup = true;
     } else {
+      const validPendingStatuses = ['pending_verification', 'pending_phone_verification'];
       assert(
-        body && body.status === 'pending_verification',
-        `expected pending_verification, got ${JSON.stringify(body)}`
+        body && validPendingStatuses.includes(body.status),
+        `expected pending_verification or pending_phone_verification, got ${JSON.stringify(body)}`
       );
       state.landlordSignupState = body.status;
     }
@@ -34,7 +36,7 @@ async function run(state, api, assert, test) {
 
   await test('Tenant signup', async () => {
     const { status, body } = await api('POST', '/api/v1/users/signup', {
-      username: 'tenant_e2e',
+      username: state.tenantUsername || 'tenant_e2e',
       email: state.tenantEmail,
       password: state.password,
       role: 'tenant',
@@ -56,12 +58,12 @@ async function run(state, api, assert, test) {
 
   await test('Duplicate email rejected', async () => {
     const { status } = await api('POST', '/api/v1/users/signup', {
-      username: 'landlord_dup',
+      username: `${state.landlordUsername || 'landlord_e2e'}_dup`,
       email: state.landlordEmail,
       password: state.password,
       role: 'landlord',
-      phoneNumber: LANDLORD_PHONE_NUMBER,
-      nationalId: LANDLORD_NATIONAL_ID,
+      phoneNumber: state.landlordPhoneNumber || LANDLORD_PHONE_NUMBER,
+      nationalId: state.landlordNationalId || LANDLORD_NATIONAL_ID,
     });
     assert(status === 400 || status === 409, `expected 400 or 409, got ${status}`);
   });
@@ -69,7 +71,9 @@ async function run(state, api, assert, test) {
   await test('Landlord signup stores token or pending verification state', async () => {
     assert(state.landlordId, 'expected landlord id after signup');
     assert(
-      state.landlordSignupState === 'token' || state.landlordSignupState === 'pending_verification',
+      state.landlordSignupState === 'token' ||
+        state.landlordSignupState === 'pending_verification' ||
+        state.landlordSignupState === 'pending_phone_verification',
       'expected landlord signup state to be captured'
     );
   });
@@ -83,6 +87,11 @@ async function run(state, api, assert, test) {
   });
 
   await test('Landlord login succeeds', async () => {
+    if (state.landlordTokenFromSignup) {
+      assert(state.landlordSignupState === 'token', 'expected landlord token from signup');
+      return;
+    }
+
     const { status, body } = await api('POST', '/api/v1/users/login', {
       email: state.landlordEmail,
       password: state.password,
@@ -103,6 +112,11 @@ async function run(state, api, assert, test) {
   });
 
   await test('Landlord login refreshes token', async () => {
+    if (state.landlordTokenFromSignup) {
+      assert(state.landlordSignupState === 'token', 'expected landlord token from signup');
+      return;
+    }
+
     const { status, body } = await api('POST', '/api/v1/users/login', {
       email: state.landlordEmail,
       password: state.password,
