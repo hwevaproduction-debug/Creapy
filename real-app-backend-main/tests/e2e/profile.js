@@ -1,5 +1,6 @@
 async function run(state, api, assert, test) {
   let updatedLandlordToken = null;
+  const updatedLandlordUsername = `${state.landlordUsername}_updated`;
 
   await test('GET /me as landlord', async () => {
     const { status, body } = await api('GET', '/api/v1/users/me', undefined, state.landlordToken);
@@ -21,7 +22,7 @@ async function run(state, api, assert, test) {
       `/api/v1/users/update/${state.landlordId}`,
       {
         payload: {
-          username: 'landlord_updated',
+          username: updatedLandlordUsername,
           email: `updated_${Date.now()}@test.creapy.com`,
           password: state.password,
           avatar: '',
@@ -29,8 +30,11 @@ async function run(state, api, assert, test) {
       },
       state.landlordToken
     );
-    assert(status === 200, `expected 200, got ${status}`);
-    assert(body && body.data && body.data.user && body.data.user.username === 'landlord_updated', 'expected updated username');
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(
+      body && body.data && body.data.user && body.data.user.username === updatedLandlordUsername,
+      'expected updated username'
+    );
     assert(body.token, 'expected refreshed token');
     updatedLandlordToken = body.token;
     state.landlordToken = body.token;
@@ -38,8 +42,11 @@ async function run(state, api, assert, test) {
 
   await test('GET /me after update', async () => {
     const { status, body } = await api('GET', '/api/v1/users/me', undefined, updatedLandlordToken);
-    assert(status === 200, `expected 200, got ${status}`);
-    assert(body && body.data && body.data.user && body.data.user.username === 'landlord_updated', 'expected updated username');
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(
+      body && body.data && body.data.user && body.data.user.username === updatedLandlordUsername,
+      'expected updated username'
+    );
   });
 }
 

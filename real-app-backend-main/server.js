@@ -1,4 +1,41 @@
 require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
+const { execFileSync } = require("child_process");
+
+const ensurePrismaClientForRuntime = () => {
+  if (process.env.SKIP_PRISMA_GENERATE_ON_START === "true") {
+    return;
+  }
+
+  if (process.platform !== "linux") {
+    return;
+  }
+
+  const linuxEngine = path.join(
+    __dirname,
+    "node_modules",
+    ".prisma",
+    "client",
+    "libquery_engine-rhel-openssl-3.0.x.so.node"
+  );
+
+  if (fs.existsSync(linuxEngine)) {
+    return;
+  }
+
+  console.log("Generating Prisma Client for the Linux deployment runtime...");
+  execFileSync(
+    "npx",
+    ["prisma", "generate", "--schema=prisma/schema.prisma"],
+    {
+      cwd: __dirname,
+      stdio: "inherit",
+    }
+  );
+};
+
+ensurePrismaClientForRuntime();
 // Custom Imports
 const app = require("./app");
 const prisma = require("./utils/prisma");
