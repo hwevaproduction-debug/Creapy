@@ -2,7 +2,9 @@ const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const prisma = require("../utils/prisma");
 
-const AVAILABILITY_BOOKING_STATUSES = ["confirmed", "pending_confirmation"];
+const AVAILABILITY_BOOKING_STATUSES = ["CONFIRMED", "PENDING_CONFIRMATION", "PENDING_PAYMENT"];
+const ROOM_STATUSES = new Set(["AVAILABLE", "UNAVAILABLE", "MAINTENANCE"]);
+const BOOKING_MODES = new Set(["INSTANT", "REQUEST"]);
 
 const parseRequiredDate = (value, label) => {
   const parsed = new Date(value);
@@ -16,6 +18,14 @@ const parseRequiredDate = (value, label) => {
 
 const getUserId = (user) => user?.id || user?._id?.toString();
 
+const normalizeEnumInput = (value) => {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  return String(value).trim().toUpperCase().replace(/[\s-]+/g, "_");
+};
+
 const mapId = (record) => {
   if (!record) {
     return record;
@@ -26,13 +36,22 @@ const mapId = (record) => {
 };
 
 const ensureProviderOwnsRoom = async (roomId, userId) => {
-  const room = await prisma.room.findUnique({ where: { id: roomId } });
+  const room = await prisma.room.findUnique({
+    where: { id: roomId },
+    include: {
+      accommodation: {
+        select: { ownerId: true },
+      },
+    },
+  });
 
   if (!room) {
     throw new AppError("Room not found", 404);
   }
 
-  if (room.providerId !== userId.toString()) {
+  const ownerId = room.accommodation?.ownerId || room.providerId;
+
+  if (ownerId !== userId.toString()) {
     throw new AppError("You do not own this room", 403);
   }
 
@@ -40,15 +59,44 @@ const ensureProviderOwnsRoom = async (roomId, userId) => {
 };
 
 exports.createRoom = catchAsync(async (req, res, next) => {
-  if (req.user?.providerProfile?.verificationStatus !== "approved") {
+  if (normalizeEnumInput(req.user?.providerProfile?.verificationStatus) !== "APPROVED") {
     return next(new AppError("Provider verification required", 403));
   }
 
   const input = { ...req.body };
   delete input.provider;
   delete input.providerProfile;
+  delete input.providerId;
   delete input._id;
   delete input.id;
+
+  const accommodationId = input.accommodationId;
+  if (!accommodationId) {
+    return next(new AppError("accommodationId is required", 400));
+  }
+
+  const accommodation = await prisma.accommodation.findFirst({
+    where: {
+      id: accommodationId,
+      ownerId: getUserId(req.user),
+      deletedAt: null,
+    },
+  });
+
+  if (!accommodation) {
+    return next(new AppError("You do not own this accommodation", 403));
+  }
+
+  const status = normalizeEnumInput(input.status) || "AVAILABLE";
+  const bookingMode = normalizeEnumInput(input.bookingMode) || "INSTANT";
+
+  if (!ROOM_STATUSES.has(status)) {
+    return next(new AppError("Invalid room status", 400));
+  }
+
+  if (!BOOKING_MODES.has(bookingMode)) {
+    return next(new AppError("Invalid bookingMode", 400));
+  }
 
   const room = await prisma.room.create({
     data: {
@@ -57,14 +105,10 @@ exports.createRoom = catchAsync(async (req, res, next) => {
       roomType: input.roomType,
       capacity: input.capacity,
       basePricePerNight: input.basePricePerNight,
-      pricingRules: input.pricingRules,
-      amenities: input.amenities,
-      imageUrls: input.imageUrls,
-      status: input.status,
-      bookingMode: input.bookingMode,
+      status,
+      bookingMode,
       maxAdvanceBookingDays: input.maxAdvanceBookingDays,
-      cancellationPolicy: input.cancellationPolicy,
-      cancellationPolicyCustomText: input.cancellationPolicyCustomText,
+      accommodationId,
       providerId: getUserId(req.user),
     },
   });
@@ -81,7 +125,7 @@ exports.createRoom = catchAsync(async (req, res, next) => {
 
 exports.getMyRooms = catchAsync(async (req, res) => {
   const rooms = await prisma.room.findMany({
-    where: { providerId: getUserId(req.user) },
+    where: { providerId: getUserId(req.user), deletedAt: null },
     orderBy: { createdAt: "desc" },
   });
 
@@ -96,15 +140,37 @@ exports.getMyRooms = catchAsync(async (req, res) => {
   });
 });
 
-exports.updateRoom = catchAsync(async (req, res) => {
+exports.updateRoom = catchAsync(async (req, res, next) => {
   await ensureProviderOwnsRoom(req.params.id, getUserId(req.user));
 
   const updates = { ...req.body };
   delete updates.provider;
   delete updates.providerProfile;
   delete updates.providerId;
+  delete updates.accommodationId;
+  delete updates.amenities;
+  delete updates.imageUrls;
+  delete updates.pricingRules;
+  delete updates.cancellationPolicy;
+  delete updates.cancellationPolicyCustomText;
   delete updates._id;
   delete updates.id;
+
+  if (Object.prototype.hasOwnProperty.call(updates, "status")) {
+    updates.status = normalizeEnumInput(updates.status);
+
+    if (!ROOM_STATUSES.has(updates.status)) {
+      return next(new AppError("Invalid room status", 400));
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "bookingMode")) {
+    updates.bookingMode = normalizeEnumInput(updates.bookingMode);
+
+    if (!BOOKING_MODES.has(updates.bookingMode)) {
+      return next(new AppError("Invalid bookingMode", 400));
+    }
+  }
 
   const room = await prisma.room.update({
     where: { id: req.params.id },
@@ -126,7 +192,7 @@ exports.deleteRoom = catchAsync(async (req, res) => {
 
   await prisma.room.update({
     where: { id: req.params.id },
-    data: { status: "inactive" },
+    data: { deletedAt: new Date() },
   });
 
   res.status(204).json({
@@ -145,22 +211,23 @@ exports.createRoomBlock = catchAsync(async (req, res, next) => {
     return next(new AppError("startDate must be before endDate", 400));
   }
 
-  const blockedDate = await prisma.blockedDate.create({
+  const availabilityBlock = await prisma.availabilityBlock.create({
     data: {
       roomId: req.params.id,
-      providerId: getUserId(req.user),
+      blockType: "MANUAL",
       startDate,
       endDate,
       reason: req.body.reason || "",
+      createdBy: getUserId(req.user),
     },
   });
 
-  mapId(blockedDate);
+  mapId(availabilityBlock);
 
   res.status(201).json({
     status: "success",
     data: {
-      blockedDate,
+      availabilityBlock,
     },
   });
 });
@@ -168,18 +235,18 @@ exports.createRoomBlock = catchAsync(async (req, res, next) => {
 exports.deleteRoomBlock = catchAsync(async (req, res, next) => {
   await ensureProviderOwnsRoom(req.params.id, getUserId(req.user));
 
-  const blockedDate = await prisma.blockedDate.findFirst({
+  const availabilityBlock = await prisma.availabilityBlock.findFirst({
     where: {
       id: req.params.blockId,
       roomId: req.params.id,
     },
   });
 
-  if (!blockedDate) {
-    return next(new AppError("Blocked date not found", 404));
+  if (!availabilityBlock) {
+    return next(new AppError("Availability block not found", 404));
   }
 
-  await prisma.blockedDate.delete({
+  await prisma.availabilityBlock.delete({
     where: { id: req.params.blockId },
   });
 
@@ -206,7 +273,7 @@ exports.getRoomAvailability = catchAsync(async (req, res, next) => {
     return next(new AppError("from must be before to", 400));
   }
 
-  const [bookings, blockedDates] = await Promise.all([
+  const [bookings, availabilityBlocks] = await Promise.all([
     prisma.booking.findMany({
       where: {
         roomId: req.params.id,
@@ -217,7 +284,7 @@ exports.getRoomAvailability = catchAsync(async (req, res, next) => {
       select: { checkIn: true, checkOut: true },
       orderBy: { checkIn: "asc" },
     }),
-    prisma.blockedDate.findMany({
+    prisma.availabilityBlock.findMany({
       where: {
         roomId: req.params.id,
         startDate: { lt: to },
@@ -235,10 +302,10 @@ exports.getRoomAvailability = catchAsync(async (req, res, next) => {
         checkIn: booking.checkIn,
         checkOut: booking.checkOut,
       })),
-      blockedRanges: blockedDates.map((blockedDate) => ({
-        startDate: blockedDate.startDate,
-        endDate: blockedDate.endDate,
-        reason: blockedDate.reason || "",
+      blockedRanges: availabilityBlocks.map((availabilityBlock) => ({
+        startDate: availabilityBlock.startDate,
+        endDate: availabilityBlock.endDate,
+        reason: availabilityBlock.reason || "",
       })),
     },
   });

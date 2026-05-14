@@ -13,8 +13,8 @@ const {
   bookingSettledProvider,
 } = require("../utils/emailTemplates/stayEmails");
 
-const BOOKING_CANCELLED_STATUSES = ["cancelled", "canceled", "rejected", "declined", "expired"];
-const SETTLEMENT_INELIGIBLE_STATUSES = [...BOOKING_CANCELLED_STATUSES, "settled"];
+const BOOKING_CANCELLED_STATUSES = ["CANCELLED", "DECLINED", "EXPIRED"];
+const SETTLEMENT_INELIGIBLE_STATUSES = [...BOOKING_CANCELLED_STATUSES, "SETTLED"];
 
 const parseDate = (value, label) => {
   const parsed = new Date(value);
@@ -27,6 +27,14 @@ const parseDate = (value, label) => {
 };
 
 const getUserId = (user) => user?.id || user?._id?.toString();
+
+const normalizeEnumInput = (value) => {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  return String(value).trim().toUpperCase().replace(/[\s-]+/g, "_");
+};
 
 const mapId = (record) => {
   if (!record) {
@@ -52,37 +60,44 @@ const getUserPhone = (user, explicitPhone) =>
   explicitPhone || user?.phone || user?.phoneNumber || null;
 
 const getRoomOwnerIdentity = (room) =>
-  [room?.providerId, room?.provider, room?.owner, room?.user]
+  [room?.providerId, room?.accommodation?.ownerId, room?.provider, room?.owner, room?.user]
     .filter(Boolean)
     .map((value) => value.toString());
 
 const getBookingMode = (room, booking) =>
-  booking?.bookingMode ||
-  room?.bookingMode ||
-  room?.bookingSettings?.mode ||
-  room?.settings?.bookingMode ||
-  "request";
+  normalizeEnumInput(
+    booking?.bookingMode ||
+      room?.bookingMode ||
+      room?.bookingSettings?.mode ||
+      room?.settings?.bookingMode
+  ) || "REQUEST";
 
 const getNightCount = (checkIn, checkOut) => {
   const diff = checkOut.getTime() - checkIn.getTime();
   return Math.ceil(diff / (24 * 60 * 60 * 1000));
 };
 
-const normalizeGuestCount = (guestCount, guests) => {
-  const rawGuestCount = guestCount ?? guests;
+const normalizeCount = (value, label, minValue, defaultValue) => {
+  const rawValue = value ?? defaultValue;
 
-  if (rawGuestCount === undefined || rawGuestCount === null || rawGuestCount === "") {
-    return null;
+  if (rawValue === undefined || rawValue === null || rawValue === "") {
+    return defaultValue;
   }
 
-  const normalizedGuestCount = Number(rawGuestCount);
+  const normalizedValue = Number(rawValue);
 
-  if (!Number.isInteger(normalizedGuestCount) || normalizedGuestCount < 1) {
-    throw new AppError("Invalid guestCount", 400);
+  if (!Number.isInteger(normalizedValue) || normalizedValue < minValue) {
+    throw new AppError(`Invalid ${label}`, 400);
   }
 
-  return normalizedGuestCount;
+  return normalizedValue;
 };
+
+const normalizeGuestCounts = (body) => ({
+  adultCount: normalizeCount(body.adultCount ?? body.guestCount ?? body.guests, "adultCount", 1, 1),
+  childCount: normalizeCount(body.childCount, "childCount", 0, 0),
+  infantCount: normalizeCount(body.infantCount, "infantCount", 0, 0),
+});
 
 const resolveBookingPricing = (room, checkIn, checkOut) => {
   const nights = getNightCount(checkIn, checkOut);
@@ -121,7 +136,7 @@ const ensureRoomAvailability = async (roomId, checkIn, checkOut) => {
         checkOut: { gt: checkIn },
       },
     }),
-    prisma.blockedDate.findFirst({
+    prisma.availabilityBlock.findFirst({
       where: {
         roomId,
         startDate: { lt: checkOut },
@@ -139,7 +154,13 @@ const populateBookings = async (where) => {
   const bookings = await prisma.booking.findMany({
     where,
     include: {
-      room: true,
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true },
+          },
+        },
+      },
       guest: {
         select: {
           id: true,
@@ -202,7 +223,15 @@ exports.createBooking = catchAsync(async (req, res, next) => {
   const roomId = req.body.room || req.body.roomId;
   const { checkIn: rawCheckIn, checkOut: rawCheckOut } = req.body;
 
-  const room = await prisma.room.findUnique({ where: { id: roomId } });
+  const room = await prisma.room.findUnique({
+    where: { id: roomId },
+    include: {
+      accommodation: {
+        select: { ownerId: true },
+      },
+      seasonalRates: true,
+    },
+  });
   if (!room) {
     return next(new AppError("Stay not found", 404));
   }
@@ -217,7 +246,7 @@ exports.createBooking = catchAsync(async (req, res, next) => {
   await ensureRoomAvailability(room.id, checkIn, checkOut);
 
   const pricing = resolveBookingPricing(room, checkIn, checkOut);
-  const normalizedGuestCount = normalizeGuestCount(req.body.guestCount, req.body.guests);
+  const guestCounts = normalizeGuestCounts(req.body);
   const bookingMode = getBookingMode(room);
   const booking = await prisma.booking.create({
     data: {
@@ -226,22 +255,30 @@ exports.createBooking = catchAsync(async (req, res, next) => {
       checkIn,
       checkOut,
       bookingMode,
-      providerId: room.providerId || null,
+      providerId: room.providerId || room.accommodation?.ownerId || null,
       nights: pricing.nights,
       pricePerNight: pricing.pricePerNight,
       totalPrice: pricing.totalPrice,
-      totalAmount: pricing.totalPrice,
-      status: bookingMode === "instant" ? "pending_payment" : "pending_confirmation",
-      paymentStatus: "unpaid",
+      status: bookingMode === "INSTANT" ? "PENDING_PAYMENT" : "PENDING_CONFIRMATION",
+      paymentStatus: "UNPAID",
       specialRequests: req.body.specialRequests || "",
-      guestCount: normalizedGuestCount,
+      adultCount: guestCounts.adultCount,
+      childCount: guestCounts.childCount,
+      infantCount: guestCounts.infantCount,
+      cancellationPolicySnapshot: null,
     },
   });
 
   const populatedBooking = await prisma.booking.findUnique({
     where: { id: booking.id },
     include: {
-      room: true,
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true },
+          },
+        },
+      },
       guest: {
         select: {
           id: true,
@@ -264,7 +301,7 @@ exports.createBooking = catchAsync(async (req, res, next) => {
     provider,
   };
 
-  if (bookingMode === "request") {
+  if (bookingMode === "REQUEST") {
     void sendEmailSafe(bookingRequestSubmittedProvider(emailContext));
   }
 
@@ -292,7 +329,13 @@ exports.cancelBooking = catchAsync(async (req, res, next) => {
   const booking = await prisma.booking.findUnique({
     where: { id: req.params.id },
     include: {
-      room: true,
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true },
+          },
+        },
+      },
       guest: {
         select: {
           id: true,
@@ -314,19 +357,25 @@ exports.cancelBooking = catchAsync(async (req, res, next) => {
     return next(new AppError("You do not own this booking", 403));
   }
 
-  if (BOOKING_CANCELLED_STATUSES.includes(String(booking.status).toLowerCase())) {
+  if (BOOKING_CANCELLED_STATUSES.includes(booking.status)) {
     return next(new AppError("Booking is already cancelled", 400));
   }
 
   const updatedBooking = await prisma.booking.update({
     where: { id: booking.id },
     data: {
-      status: "cancelled",
-      cancelledBy: isProviderCancellation ? "provider" : "guest",
+      status: "CANCELLED",
+      cancelledBy: isProviderCancellation ? "PROVIDER" : "GUEST",
       cancelledAt: new Date(),
     },
     include: {
-      room: true,
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true },
+          },
+        },
+      },
       guest: {
         select: {
           id: true,
@@ -364,8 +413,15 @@ exports.cancelBooking = catchAsync(async (req, res, next) => {
 });
 
 exports.getProviderBookings = catchAsync(async (req, res) => {
+  const accommodations = await prisma.accommodation.findMany({
+    where: { ownerId: getUserId(req.user), deletedAt: null },
+    select: { id: true },
+  });
   const rooms = await prisma.room.findMany({
-    where: { providerId: getUserId(req.user) },
+    where: {
+      accommodationId: { in: accommodations.map((accommodation) => accommodation.id) },
+      deletedAt: null,
+    },
     select: { id: true },
   });
 
@@ -385,7 +441,13 @@ exports.confirmBooking = catchAsync(async (req, res, next) => {
   const booking = await prisma.booking.findUnique({
     where: { id: req.params.id },
     include: {
-      room: true,
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true },
+          },
+        },
+      },
       guest: {
         select: {
           id: true,
@@ -401,17 +463,23 @@ exports.confirmBooking = catchAsync(async (req, res, next) => {
 
   ensureProviderOwnsBooking(booking, getUserId(req.user));
 
-  if (SETTLEMENT_INELIGIBLE_STATUSES.includes(String(booking.status).toLowerCase())) {
+  if (SETTLEMENT_INELIGIBLE_STATUSES.includes(booking.status)) {
     return next(new AppError("Booking cannot be confirmed", 400));
   }
 
   const updatedBooking = await prisma.booking.update({
     where: { id: booking.id },
     data: {
-      status: "confirmed",
+      status: "CONFIRMED",
     },
     include: {
-      room: true,
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true },
+          },
+        },
+      },
       guest: {
         select: {
           id: true,
@@ -446,7 +514,13 @@ exports.declineBooking = catchAsync(async (req, res, next) => {
   const booking = await prisma.booking.findUnique({
     where: { id: req.params.id },
     include: {
-      room: true,
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true },
+          },
+        },
+      },
       guest: {
         select: {
           id: true,
@@ -462,18 +536,24 @@ exports.declineBooking = catchAsync(async (req, res, next) => {
 
   ensureProviderOwnsBooking(booking, getUserId(req.user));
 
-  if (SETTLEMENT_INELIGIBLE_STATUSES.includes(String(booking.status).toLowerCase())) {
+  if (SETTLEMENT_INELIGIBLE_STATUSES.includes(booking.status)) {
     return next(new AppError("Booking cannot be declined", 400));
   }
 
   const updatedBooking = await prisma.booking.update({
     where: { id: booking.id },
     data: {
-      status: "declined",
+      status: "DECLINED",
       cancellationReason: req.body.reason || null,
     },
     include: {
-      room: true,
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true },
+          },
+        },
+      },
       guest: {
         select: {
           id: true,
@@ -508,18 +588,19 @@ exports.getAdminBookings = catchAsync(async (req, res) => {
   const where = {};
 
   if (req.query.status) {
-    where.status = req.query.status;
+    where.status = normalizeEnumInput(req.query.status);
   }
 
   if (req.query.paymentStatus) {
-    where.paymentStatus = req.query.paymentStatus;
+    where.paymentStatus = normalizeEnumInput(req.query.paymentStatus);
   }
 
-  if (req.query.settlementStatus === "settled") {
-    where.OR = [{ settlementStatus: "settled" }, { settledAt: { not: null } }];
-  } else if (req.query.settlementStatus === "pending") {
+  const settlementStatus = normalizeEnumInput(req.query.settlementStatus);
+  if (settlementStatus === "SETTLED") {
+    where.OR = [{ settlementStatus: "SETTLED" }, { settledAt: { not: null } }];
+  } else if (settlementStatus === "PENDING") {
     where.AND = [
-      { settlementStatus: { not: "settled" } },
+      { settlementStatus: { not: "SETTLED" } },
       { settledAt: null },
     ];
   }
@@ -533,8 +614,14 @@ exports.getAdminBookings = catchAsync(async (req, res) => {
   }
 
   if (req.query.provider) {
+    const accommodations = await prisma.accommodation.findMany({
+      where: { ownerId: req.query.provider, deletedAt: null },
+      select: { id: true },
+    });
     const rooms = await prisma.room.findMany({
-      where: { providerId: req.query.provider },
+      where: {
+        accommodationId: { in: accommodations.map((accommodation) => accommodation.id) },
+      },
       select: { id: true },
     });
 
@@ -569,16 +656,24 @@ exports.getAdminBookings = catchAsync(async (req, res) => {
 exports.settleBooking = catchAsync(async (req, res, next) => {
   const booking = await prisma.booking.findUnique({
     where: { id: req.params.id },
-    include: { room: true },
+    include: {
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true },
+          },
+        },
+      },
+    },
   });
   if (!booking) {
     return next(new AppError("Booking not found", 404));
   }
 
   if (
-    booking.settlementStatus === "settled" ||
+    booking.settlementStatus === "SETTLED" ||
     booking.settledAt ||
-    SETTLEMENT_INELIGIBLE_STATUSES.includes(String(booking.status || "").toLowerCase())
+    SETTLEMENT_INELIGIBLE_STATUSES.includes(booking.status)
   ) {
     return next(new AppError("Booking is not eligible for settlement", 400));
   }
@@ -586,12 +681,18 @@ exports.settleBooking = catchAsync(async (req, res, next) => {
   const updatedBooking = await prisma.booking.update({
     where: { id: booking.id },
     data: {
-      settlementStatus: "settled",
+      settlementStatus: "SETTLED",
       settledAt: new Date(),
       settlementReference: req.body.settlementReference || null,
     },
     include: {
-      room: true,
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true },
+          },
+        },
+      },
       guest: {
         select: {
           id: true,
@@ -627,7 +728,15 @@ exports.initiateBookingPayment = catchAsync(async (req, res, next) => {
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { room: true },
+    include: {
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true },
+          },
+        },
+      },
+    },
   });
   if (!booking) {
     return next(new AppError("Booking not found", 404));
@@ -635,18 +744,18 @@ exports.initiateBookingPayment = catchAsync(async (req, res, next) => {
 
   ensureBookingOwner(booking, getUserId(req.user));
 
-  if (String(booking.paymentStatus || "").toLowerCase() === "paid") {
+  if (booking.paymentStatus === "PAID") {
     return next(new AppError("Booking is already paid", 400));
   }
 
-  if (BOOKING_CANCELLED_STATUSES.includes(String(booking.status || "").toLowerCase())) {
+  if (BOOKING_CANCELLED_STATUSES.includes(booking.status)) {
     return next(new AppError("Cancelled bookings cannot be paid", 400));
   }
 
   mapId(booking);
   mapId(booking.room);
 
-  const amount = Number(booking.totalPrice || booking.totalAmount || 0);
+  const amount = Number(booking.totalPrice || 0);
   if (!Number.isFinite(amount) || amount <= 0) {
     return next(new AppError("Booking amount is invalid", 400));
   }
@@ -674,7 +783,7 @@ exports.initiateBookingPayment = catchAsync(async (req, res, next) => {
     where: { id: booking.id },
     data: {
       paymentRef: result.transactionRef,
-      paymentStatus: "pending",
+      paymentStatus: "PENDING",
     },
   });
 

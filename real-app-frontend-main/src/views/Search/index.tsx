@@ -469,7 +469,7 @@ const SearchPage = () => {
     };
 
     fetchListings();
-  }, [locationSearch, token]);
+  }, [apiBase, locationSearch, token]);
 
   const handleSubmit = (e: any) => {
     e.preventDefault();

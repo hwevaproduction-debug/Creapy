@@ -6,6 +6,14 @@ const AppError = require("../utils/appError");
 const { sendEmail } = require("../utils/email");
 
 const SELF_RESTRICTED_FIELDS = new Set(["verificationStatus", "commissionRate"]);
+const ACCOMMODATION_TYPES = new Set([
+  "HOTEL",
+  "LODGE",
+  "BNB",
+  "APARTMENT",
+  "GUEST_HOUSE",
+  "HOSTEL",
+]);
 
 const PROVIDER_PROFILE_FIELDS = [
   "businessName",
@@ -34,6 +42,33 @@ const ACCOUNT_FIELDS = [
 
 const hashVerificationToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
+
+const normalizeEnumInput = (value) => {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  return String(value).trim().toUpperCase().replace(/[\s-]+/g, "_");
+};
+
+const normalizeAccommodationType = (value, fallback = null) => {
+  const normalized = normalizeEnumInput(value);
+
+  if (!normalized) {
+    return fallback;
+  }
+
+  if (!ACCOMMODATION_TYPES.has(normalized)) {
+    throw new AppError("Invalid businessType", 400);
+  }
+
+  return normalized;
+};
+
+const generateSlug = (businessName, userId) =>
+  `${String(businessName || "provider")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")}-${String(userId).slice(-6)}`;
 
 const createEmailVerificationToken = () => {
   const rawToken = crypto.randomBytes(32).toString("hex");
@@ -104,6 +139,66 @@ const pickAccountUpdates = (body = {}) => {
   return updates;
 };
 
+const buildAccommodationCreateData = (user, accountUpdates, profileUpdates) => ({
+  ownerId: user.id,
+  type: normalizeAccommodationType(profileUpdates.businessType, "HOTEL"),
+  name: profileUpdates.businessName || accountUpdates.username,
+  slug: generateSlug(profileUpdates.businessName || accountUpdates.username, user.id),
+  description: profileUpdates.description || "",
+  contactPhone: profileUpdates.contactPhone || accountUpdates.phoneNumber || "",
+  province: profileUpdates.location?.province || "",
+  city: profileUpdates.location?.city || "",
+  addressLine: profileUpdates.address || profileUpdates.location?.addressLine || "",
+  registrationNumber: profileUpdates.registrationNumber || null,
+  verificationStatus: "PENDING",
+  commissionRate: 10,
+  isPublished: false,
+});
+
+const buildAccommodationUpdateData = (profileUpdates = {}) => {
+  const updates = {};
+
+  if (Object.prototype.hasOwnProperty.call(profileUpdates, "businessName")) {
+    updates.name = profileUpdates.businessName;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(profileUpdates, "businessType")) {
+    const type = normalizeAccommodationType(profileUpdates.businessType);
+
+    if (type) {
+      updates.type = type;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(profileUpdates, "contactPhone")) {
+    updates.contactPhone = profileUpdates.contactPhone;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(profileUpdates, "location")) {
+    if (Object.prototype.hasOwnProperty.call(profileUpdates.location || {}, "province")) {
+      updates.province = profileUpdates.location?.province || "";
+    }
+
+    if (Object.prototype.hasOwnProperty.call(profileUpdates.location || {}, "city")) {
+      updates.city = profileUpdates.location?.city || "";
+    }
+
+    if (Object.prototype.hasOwnProperty.call(profileUpdates.location || {}, "addressLine")) {
+      updates.addressLine = profileUpdates.location?.addressLine || "";
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(profileUpdates, "address")) {
+    updates.addressLine = profileUpdates.address;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(profileUpdates, "description")) {
+    updates.description = profileUpdates.description;
+  }
+
+  return updates;
+};
+
 const buildProviderResponse = (user) => ({
   _id: user.id,
   username: user.username,
@@ -137,20 +232,29 @@ exports.registerProvider = catchAsync(async (req, res, next) => {
   const accountUpdates = pickAccountUpdates(req.body);
   const profileUpdates = pickAllowedProfileUpdates(rawProfile);
   const hashedPassword = await bcrypt.hash(accountUpdates.password, 12);
-  const user = await prisma.user.create({
-    data: {
-      ...accountUpdates,
-      password: hashedPassword,
-      role: "provider",
-      isEmailVerified: false,
-      emailVerificationToken: verification.hashedToken,
-      emailVerificationExpires: new Date(verification.expiresAt),
-      providerProfile: {
-        ...profileUpdates,
-        verificationStatus: "pending",
-        commissionRate: 10,
+
+  const user = await prisma.$transaction(async (tx) => {
+    const createdUser = await tx.user.create({
+      data: {
+        ...accountUpdates,
+        password: hashedPassword,
+        role: "provider",
+        isEmailVerified: false,
+        emailVerificationToken: verification.hashedToken,
+        emailVerificationExpires: new Date(verification.expiresAt),
+        providerProfile: {
+          ...profileUpdates,
+          verificationStatus: "pending",
+          commissionRate: 10,
+        },
       },
-    },
+    });
+
+    await tx.accommodation.create({
+      data: buildAccommodationCreateData(createdUser, accountUpdates, profileUpdates),
+    });
+
+    return createdUser;
   });
 
   if (process.env.SKIP_EMAIL_VERIFICATION === "true") {
@@ -171,6 +275,7 @@ exports.registerProvider = catchAsync(async (req, res, next) => {
   try {
     await sendVerificationEmail(user, verification.rawToken);
   } catch (error) {
+    await prisma.accommodation.deleteMany({ where: { ownerId: user.id } });
     await prisma.user.delete({ where: { id: user.id } });
 
     return next(
@@ -218,13 +323,24 @@ exports.updateMyProfile = catchAsync(async (req, res) => {
     accountUpdates.password = await bcrypt.hash(accountUpdates.password, 12);
   }
 
-  const updatedProvider = await prisma.user.update({
-    where: { id: provider.id },
-    data: {
-      ...accountUpdates,
-      providerProfile: mergedProfile,
-    },
-  });
+  const accommodationUpdates = buildAccommodationUpdateData(profileUpdates);
+  const [updatedProvider] = await prisma.$transaction([
+    prisma.user.update({
+      where: { id: provider.id },
+      data: {
+        ...accountUpdates,
+        providerProfile: mergedProfile,
+      },
+    }),
+    ...(Object.keys(accommodationUpdates).length
+      ? [
+          prisma.accommodation.updateMany({
+            where: { ownerId: provider.id, deletedAt: null },
+            data: accommodationUpdates,
+          }),
+        ]
+      : []),
+  ]);
   updatedProvider.password = undefined;
 
   res.status(200).json({
@@ -242,10 +358,10 @@ exports.listProviders = catchAsync(async (req, res) => {
   });
 
   if (req.query.verificationStatus) {
+    const requestedStatus = normalizeEnumInput(req.query.verificationStatus);
     providers = providers.filter(
       (provider) =>
-        provider.providerProfile?.verificationStatus ===
-        req.query.verificationStatus
+        normalizeEnumInput(provider.providerProfile?.verificationStatus) === requestedStatus
     );
   }
 
@@ -270,12 +386,30 @@ exports.listProviders = catchAsync(async (req, res) => {
   const roomCountMap = new Map(
     roomCounts.map((entry) => [entry.providerId, entry._count.id])
   );
+  const providerIds = providers.map((provider) => provider.id);
+  const accommodations = providerIds.length
+    ? await prisma.accommodation.findMany({
+        where: { ownerId: { in: providerIds }, deletedAt: null },
+        select: {
+          ownerId: true,
+          verificationStatus: true,
+          type: true,
+          name: true,
+          province: true,
+          city: true,
+        },
+      })
+    : [];
+  const accommodationMap = new Map(
+    accommodations.map((accommodation) => [accommodation.ownerId, accommodation])
+  );
 
   res.status(200).json({
     status: "success",
     total: providers.length,
     data: providers.map((provider) => ({
       ...buildProviderResponse(provider),
+      accommodation: accommodationMap.get(provider.id) || null,
       roomCount: roomCountMap.get(provider.id) || 0,
     })),
   });
@@ -283,21 +417,31 @@ exports.listProviders = catchAsync(async (req, res) => {
 
 exports.verifyProvider = catchAsync(async (req, res, next) => {
   const provider = await getProviderOrFail(req.params.id);
-  const verificationStatus = req.body.verificationStatus || req.body.status;
+  const verificationStatus = String(
+    req.body.verificationStatus || req.body.status || ""
+  )
+    .trim()
+    .toLowerCase();
 
   if (!["approved", "rejected"].includes(verificationStatus)) {
     return next(new AppError("Invalid verification status", 400));
   }
 
-  const updatedProvider = await prisma.user.update({
-    where: { id: provider.id },
-    data: {
-      providerProfile: {
-        ...(provider.providerProfile || {}),
-        verificationStatus,
+  const [updatedProvider] = await prisma.$transaction([
+    prisma.user.update({
+      where: { id: provider.id },
+      data: {
+        providerProfile: {
+          ...(provider.providerProfile || {}),
+          verificationStatus,
+        },
       },
-    },
-  });
+    }),
+    prisma.accommodation.updateMany({
+      where: { ownerId: provider.id, deletedAt: null },
+      data: { verificationStatus: verificationStatus.toUpperCase() },
+    }),
+  ]);
 
   res.status(200).json({
     status: "success",
@@ -315,15 +459,21 @@ exports.updateProviderCommission = catchAsync(async (req, res, next) => {
     return next(new AppError("commissionRate must be between 0 and 100", 400));
   }
 
-  const updatedProvider = await prisma.user.update({
-    where: { id: provider.id },
-    data: {
-      providerProfile: {
-        ...(provider.providerProfile || {}),
-        commissionRate,
+  const [updatedProvider] = await prisma.$transaction([
+    prisma.user.update({
+      where: { id: provider.id },
+      data: {
+        providerProfile: {
+          ...(provider.providerProfile || {}),
+          commissionRate,
+        },
       },
-    },
-  });
+    }),
+    prisma.accommodation.updateMany({
+      where: { ownerId: provider.id, deletedAt: null },
+      data: { commissionRate },
+    }),
+  ]);
 
   res.status(200).json({
     status: "success",

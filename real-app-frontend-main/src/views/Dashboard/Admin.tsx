@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Checkbox,
@@ -256,7 +256,10 @@ const AdminDashboard: React.FC = () => {
     currentPageIds.length > 0 && currentPageSelectedCount === currentPageIds.length;
   const someCurrentPageSelected =
     currentPageSelectedCount > 0 && !allCurrentPageSelected;
-  const providers = providersData?.data ?? [];
+  const providers = useMemo(
+    () => providersData?.data ?? [],
+    [providersData?.data]
+  );
   const allProviders = providerOptionsData?.data ?? [];
   const bookings = bookingsData?.data ?? [];
   const settledBookingsCount = bookings.filter(

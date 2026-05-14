@@ -10,6 +10,14 @@ const {
 
 const SUCCESSFUL_STATUSES = ["paid"];
 
+const normalizeEnumInput = (value) => {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  return String(value).trim().toUpperCase().replace(/[\s-]+/g, "_");
+};
+
 const sendEmailSafe = async (payload) => {
   if (!payload?.to) {
     return;
@@ -113,7 +121,15 @@ exports.handlePaynowWebhook = async (req, res) => {
       if (claimedPayment.type === "booking_payment") {
         const booking = await prisma.booking.findUnique({
           where: { id: claimedPayment.bookingId },
-          include: { room: true },
+          include: {
+            room: {
+              include: {
+                accommodation: {
+                  select: { ownerId: true },
+                },
+              },
+            },
+          },
         });
 
         if (!booking) {
@@ -121,16 +137,24 @@ exports.handlePaynowWebhook = async (req, res) => {
         }
 
         const shouldConfirmInstantBooking =
-          ["pending_payment", "payment_pending"].includes(booking.status) &&
-          booking.room.bookingMode === "instant";
+          normalizeEnumInput(booking.status) === "PENDING_PAYMENT" &&
+          normalizeEnumInput(booking.room.bookingMode) === "INSTANT";
 
         const updatedBooking = await prisma.booking.update({
           where: { id: booking.id },
           data: {
-            paymentStatus: "paid",
-            ...(shouldConfirmInstantBooking ? { status: "confirmed" } : {}),
+            paymentStatus: "PAID",
+            ...(shouldConfirmInstantBooking ? { status: "CONFIRMED" } : {}),
           },
-          include: { room: true },
+          include: {
+            room: {
+              include: {
+                accommodation: {
+                  select: { ownerId: true },
+                },
+              },
+            },
+          },
         });
 
         updatedBooking._id = updatedBooking.id;
@@ -140,10 +164,14 @@ exports.handlePaynowWebhook = async (req, res) => {
           where: { id: updatedBooking.guestId },
           select: { id: true, email: true, username: true },
         });
-        const bookingProvider = await prisma.user.findUnique({
-          where: { id: updatedBooking.room.providerId },
-          select: { id: true, email: true, providerProfile: true },
-        });
+        const bookingProviderId =
+          updatedBooking.room.providerId || updatedBooking.room.accommodation?.ownerId;
+        const bookingProvider = bookingProviderId
+          ? await prisma.user.findUnique({
+              where: { id: bookingProviderId },
+              select: { id: true, email: true, providerProfile: true },
+            })
+          : null;
 
         if (guest) {
           guest._id = guest.id;

@@ -85,7 +85,7 @@ const ListingPayment = () => {
 
       return () => clearTimeout(timer);
     }
-  }, [uiState]);
+  }, [uiState, navigate]);
 
   useEffect(() => {
     if (uiState !== "polling") {

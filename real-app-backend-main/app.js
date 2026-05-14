@@ -17,6 +17,7 @@ const stayRouter = require("./routes/stayRoutes");
 const { globalLimiter } = require("./middleware/rateLimiter");
 
 const listingRoutes = require("./routes/listingRoutes");
+const listingDraftRoutes = require("./routes/listingDraftRoutes");
 const adminRouter = require("./routes/adminRoutes");
 const bookingRouter = require("./routes/bookingRoutes");
 
@@ -105,6 +106,7 @@ app.use("/api/v1/providers", providerRouter);
 app.use("/api/v1/listings", listingRoutes);
 // Backwards-compatible alias (older code may still call /api/listings)
 app.use("/api/listings", listingRoutes);
+app.use("/api/v1/listing-drafts", listingDraftRoutes);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/bookings", bookingRouter);
 app.use("/api/v1/stays", stayRouter);

@@ -12,6 +12,7 @@
     "build": "npm install --legacy-peer-deps && cd ../client && npm install --legacy-peer-deps && npm run build",
     "test:home-feeds": "node --test tests/listingHomeFeeds.test.js",
     "test:monetization": "node --test tests/monetizationRules.test.js",
+    "test:unit": "node --test tests/*.test.js",
     "test:e2e": "node tests/e2e/runner.js"
   },
   "author": "Salman Muazam",

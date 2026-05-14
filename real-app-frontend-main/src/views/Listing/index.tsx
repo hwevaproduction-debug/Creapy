@@ -24,11 +24,7 @@ import {
   useGetR2SignedUrlMutation,
   type R2SignedUrlData,
 } from "../../redux/api/uploadApiSlice";
-import {
-  selectedUserId,
-  selectedUserRole,
-  selectedUserToken,
-} from "../../redux/auth/authSlice";
+import { selectedUserId, selectedUserToken } from "../../redux/auth/authSlice";
 // Hooks Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Custom Imports
@@ -95,7 +91,6 @@ const CreateListing = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const userId = useTypedSelector(selectedUserId);
-  const userRole = useTypedSelector(selectedUserRole);
   const token = useTypedSelector(selectedUserToken);
   const [getR2SignedUrl] = useGetR2SignedUrlMutation();
   const has401FiredRef = useRef(false);
@@ -416,7 +411,7 @@ const CreateListing = () => {
       });
       setImageUrls(listingData?.data?.imageUrls);
     }
-  }, [listingData, listingSuccess]);
+  }, [id, listingData, listingSuccess]);
 
   useEffect(() => {
     if (id) return;

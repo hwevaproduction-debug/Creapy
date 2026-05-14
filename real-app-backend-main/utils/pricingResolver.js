@@ -1,4 +1,11 @@
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const RATE_TYPE_PRIORITY = {
+  SEASONAL: 5,
+  HOLIDAY: 4,
+  WEEKEND: 3,
+  WEEKDAY: 2,
+  LONG_STAY: 1,
+};
 
 const startOfDay = (value) => {
   const date = new Date(value);
@@ -23,14 +30,29 @@ const eachNight = (checkIn, checkOut) => {
   return nights;
 };
 
-const isWeekend = (night) => {
-  const day = night.getDay();
-  return day === 0 || day === 6;
-};
+const normalizeRateType = (rateType) => String(rateType || "").toUpperCase();
 
-const matchesDateRange = (night, rule) => {
-  const start = startOfDay(rule?.startDate);
-  const end = startOfDay(rule?.endDate);
+const sortRates = (rates) =>
+  [...rates].sort((left, right) => {
+    const priorityDiff = Number(right?.priority || 0) - Number(left?.priority || 0);
+
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    return (
+      (RATE_TYPE_PRIORITY[normalizeRateType(right?.rateType)] || 0) -
+      (RATE_TYPE_PRIORITY[normalizeRateType(left?.rateType)] || 0)
+    );
+  });
+
+const matchesDateRange = (night, rate) => {
+  if (!rate?.startDate || !rate?.endDate) {
+    return true;
+  }
+
+  const start = startOfDay(rate.startDate);
+  const end = startOfDay(rate.endDate);
 
   if (!start || !end) {
     return false;
@@ -39,49 +61,51 @@ const matchesDateRange = (night, rule) => {
   return night >= start && night <= end;
 };
 
-const isWeekday = (night) => !isWeekend(night);
-
-const getRulesByType = (pricingRules, type) =>
-  pricingRules.filter((rule) => rule?.type === type && rule?.pricePerNight != null);
-
-const resolveNightPrice = (night, pricingRules) => {
-  const seasonalRule = getRulesByType(pricingRules, "seasonal").find((rule) =>
-    matchesDateRange(night, rule)
-  );
-  if (seasonalRule) {
-    return seasonalRule.pricePerNight;
-  }
-
-  const holidayRule = getRulesByType(pricingRules, "holiday").find((rule) => {
-    if (rule.startDate && rule.endDate) {
-      return matchesDateRange(night, rule);
-    }
-
+const matchesDayOfWeek = (night, rate) => {
+  if (!Array.isArray(rate?.daysOfWeek) || rate.daysOfWeek.length === 0) {
     return true;
-  });
-  if (holidayRule) {
-    return holidayRule.pricePerNight;
   }
 
-  const weekendRule = getRulesByType(pricingRules, "weekend").find(() => isWeekend(night));
-  if (weekendRule) {
-    return weekendRule.pricePerNight;
+  return rate.daysOfWeek.map(Number).includes(night.getDay());
+};
+
+const matchesMinimumStay = (rate, totalNights) => {
+  if (normalizeRateType(rate?.rateType) !== "LONG_STAY") {
+    return true;
   }
 
-  const weekdayRule = getRulesByType(pricingRules, "weekday").find(() => isWeekday(night));
-  if (weekdayRule) {
-    return weekdayRule.pricePerNight;
+  const minNightsToApply = Number(rate?.minNightsToApply || 1);
+  return totalNights >= minNightsToApply;
+};
+
+const rateMatchesNight = (rate, night, totalNights) => {
+  if (rate?.pricePerNight == null || !matchesMinimumStay(rate, totalNights)) {
+    return false;
   }
 
-  return null;
+  const hasDateConstraint = Boolean(rate.startDate && rate.endDate);
+  const hasDayConstraint = Array.isArray(rate.daysOfWeek) && rate.daysOfWeek.length > 0;
+
+  if (!hasDateConstraint && !hasDayConstraint) {
+    return true;
+  }
+
+  return matchesDateRange(night, rate) && matchesDayOfWeek(night, rate);
+};
+
+const resolveNightPrice = (night, rates, totalNights) => {
+  const matchedRate = rates.find((rate) => rateMatchesNight(rate, night, totalNights));
+
+  return matchedRate?.pricePerNight ?? null;
 };
 
 exports.resolvePrice = (room, checkIn, checkOut) => {
   const nights = eachNight(checkIn, checkOut);
-  const pricingRules = Array.isArray(room?.pricingRules) ? room.pricingRules : [];
+  const seasonalRates = Array.isArray(room?.seasonalRates) ? room.seasonalRates : [];
+  const sortedRates = sortRates(seasonalRates);
 
   for (const night of nights) {
-    const matchedPrice = resolveNightPrice(night, pricingRules);
+    const matchedPrice = resolveNightPrice(night, sortedRates, nights.length);
     if (matchedPrice != null) {
       return matchedPrice;
     }

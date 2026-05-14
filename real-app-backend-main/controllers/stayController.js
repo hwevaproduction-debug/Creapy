@@ -3,6 +3,17 @@ const AppError = require("../utils/appError");
 const prisma = require("../utils/prisma");
 const { resolvePrice } = require("../utils/pricingResolver");
 
+const AVAILABLE_BOOKING_STATUSES = ["CONFIRMED", "PENDING_CONFIRMATION", "PENDING_PAYMENT"];
+const ACCOMMODATION_TYPES = new Set([
+  "HOTEL",
+  "LODGE",
+  "BNB",
+  "APARTMENT",
+  "GUEST_HOUSE",
+  "HOSTEL",
+]);
+const BOOKING_MODES = new Set(["INSTANT", "REQUEST"]);
+
 const parseDate = (value, label) => {
   if (value == null || value === "") {
     return null;
@@ -24,6 +35,14 @@ const mapId = (record) => {
 
   record._id = record.id;
   return record;
+};
+
+const normalizeEnumInput = (value) => {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  return String(value).trim().toUpperCase().replace(/[\s-]+/g, "_");
 };
 
 const decorateStay = (room, checkIn, checkOut) => {
@@ -52,18 +71,6 @@ const AMENITY_LABEL_TO_FLAG = {
   "Conference Room": "conferenceRoom",
   "Airport Pickup": "airportPickup",
   "Family Friendly": "familyFriendly",
-};
-
-const matchesLocation = (providerProfile, location) => {
-  if (!location) {
-    return true;
-  }
-
-  const normalized = location.toLowerCase();
-  return (
-    providerProfile?.location?.province?.toLowerCase?.().includes(normalized) ||
-    providerProfile?.location?.city?.toLowerCase?.().includes(normalized)
-  );
 };
 
 const matchesAmenityFilters = (room, reqQuery) => {
@@ -98,7 +105,9 @@ const matchesAmenityFilters = (room, reqQuery) => {
     }
   });
 
-  return [...requiredFlags].every((flag) => room.amenities?.[flag] === true);
+  return [...requiredFlags].every((flag) =>
+    room.amenities?.some((roomAmenity) => roomAmenity?.amenity?.slug === flag)
+  );
 };
 
 exports.searchStays = catchAsync(async (req, res, next) => {
@@ -108,31 +117,43 @@ exports.searchStays = catchAsync(async (req, res, next) => {
     return next(new AppError("Valid checkIn and checkOut are required together", 400));
   }
 
-  const providers = await prisma.user.findMany({
-    where: { role: "provider" },
-  });
-
   const location = req.query.location?.trim();
-  const filteredProviders = providers.filter((user) => {
-    if (user.providerProfile?.verificationStatus !== "approved") {
-      return false;
-    }
+  const businessType = normalizeEnumInput(req.query.businessType);
+  const bookingMode = normalizeEnumInput(req.query.bookingMode);
 
-    if (
-      req.query.businessType &&
-      user.providerProfile?.businessType !== req.query.businessType
-    ) {
-      return false;
-    }
+  if (businessType && !ACCOMMODATION_TYPES.has(businessType)) {
+    return next(new AppError("Invalid businessType", 400));
+  }
 
-    return matchesLocation(user.providerProfile, location);
+  if (bookingMode && !BOOKING_MODES.has(bookingMode)) {
+    return next(new AppError("Invalid bookingMode", 400));
+  }
+
+  const approvedAccommodations = await prisma.accommodation.findMany({
+    where: {
+      verificationStatus: "APPROVED",
+      isPublished: true,
+      deletedAt: null,
+      ...(businessType ? { type: businessType } : {}),
+      ...(location
+        ? {
+            OR: [
+              { province: { contains: location, mode: "insensitive" } },
+              { city: { contains: location, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    },
+    select: { id: true },
   });
 
-  const approvedProviderIds = filteredProviders.map((user) => user.id);
+  const approvedAccommodationIds = approvedAccommodations.map(
+    (accommodation) => accommodation.id
+  );
 
   let rooms = [];
 
-  if (approvedProviderIds.length) {
+  if (approvedAccommodationIds.length) {
     const minPrice = Number.parseFloat(req.query.minPrice);
     const maxPrice = Number.parseFloat(req.query.maxPrice);
     const basePricePerNight = {};
@@ -147,19 +168,20 @@ exports.searchStays = catchAsync(async (req, res, next) => {
 
     rooms = await prisma.room.findMany({
       where: {
-        providerId: { in: approvedProviderIds },
-        status: "available",
+        accommodationId: { in: approvedAccommodationIds },
+        status: "AVAILABLE",
+        deletedAt: null,
         ...(req.query.guests ? { capacity: { gte: Number(req.query.guests) } } : {}),
         ...(Object.keys(basePricePerNight).length ? { basePricePerNight } : {}),
-        ...(req.query.bookingMode ? { bookingMode: req.query.bookingMode } : {}),
+        ...(bookingMode ? { bookingMode } : {}),
       },
       include: {
-        provider: {
-          select: {
-            id: true,
-            providerProfile: true,
-          },
+        accommodation: true,
+        amenities: {
+          include: { amenity: true },
         },
+        images: { orderBy: { sortOrder: "asc" } },
+        seasonalRates: true,
       },
     });
 
@@ -169,16 +191,16 @@ exports.searchStays = catchAsync(async (req, res, next) => {
   if (checkIn && checkOut && rooms.length) {
     const roomIds = rooms.map((room) => room.id);
 
-    const [bookings, blockedDates] = await Promise.all([
+    const [bookings, availabilityBlocks] = await Promise.all([
       prisma.booking.findMany({
         where: {
           roomId: { in: roomIds },
-          status: { in: ["confirmed", "pending_confirmation"] },
+          status: { in: AVAILABLE_BOOKING_STATUSES },
           checkIn: { lt: checkOut },
           checkOut: { gt: checkIn },
         },
       }),
-      prisma.blockedDate.findMany({
+      prisma.availabilityBlock.findMany({
         where: {
           roomId: { in: roomIds },
           startDate: { lt: checkOut },
@@ -189,7 +211,7 @@ exports.searchStays = catchAsync(async (req, res, next) => {
 
     const unavailableRoomIds = new Set([
       ...bookings.map((booking) => booking.roomId),
-      ...blockedDates.map((blockedDate) => blockedDate.roomId),
+      ...availabilityBlocks.map((availabilityBlock) => availabilityBlock.roomId),
     ]);
 
     rooms = rooms.filter((room) => !unavailableRoomIds.has(room.id));
@@ -197,7 +219,7 @@ exports.searchStays = catchAsync(async (req, res, next) => {
 
   rooms.forEach((room) => {
     mapId(room);
-    mapId(room.provider);
+    mapId(room.accommodation);
   });
 
   const stays = rooms.map((room) => decorateStay(room, checkIn, checkOut));
@@ -219,31 +241,47 @@ exports.getProviderStays = catchAsync(async (req, res, next) => {
     select: { id: true, providerProfile: true },
   });
 
-  if (!provider || provider.providerProfile?.verificationStatus !== "approved") {
+  if (!provider) {
+    return next(new AppError("Provider not approved", 404));
+  }
+
+  const accommodations = await prisma.accommodation.findMany({
+    where: {
+      ownerId: providerId,
+      verificationStatus: "APPROVED",
+      isPublished: true,
+      deletedAt: null,
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (!accommodations.length) {
     return next(new AppError("Provider not approved", 404));
   }
 
   mapId(provider);
+  accommodations.forEach(mapId);
 
   const rooms = await prisma.room.findMany({
     where: {
-      providerId: provider.id,
-      status: "available",
+      accommodationId: { in: accommodations.map((accommodation) => accommodation.id) },
+      status: "AVAILABLE",
+      deletedAt: null,
     },
     include: {
-      provider: {
-        select: {
-          id: true,
-          providerProfile: true,
-        },
+      accommodation: true,
+      amenities: {
+        include: { amenity: true },
       },
+      images: { orderBy: { sortOrder: "asc" } },
+      seasonalRates: true,
     },
     orderBy: { createdAt: "desc" },
   });
 
   rooms.forEach((room) => {
     mapId(room);
-    mapId(room.provider);
+    mapId(room.accommodation);
   });
 
   const decoratedRooms = rooms.map((room) => decorateStay(room));
@@ -254,6 +292,8 @@ exports.getProviderStays = catchAsync(async (req, res, next) => {
       provider: {
         ...provider.providerProfile,
         _id: provider.id,
+        accommodation: accommodations[0],
+        accommodations,
       },
       rooms: decoratedRooms,
     },

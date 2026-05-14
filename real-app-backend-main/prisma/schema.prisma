@@ -8,32 +8,136 @@ generator client {
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
+enum AccommodationType {
+  HOTEL
+  LODGE
+  BNB
+  APARTMENT
+  GUEST_HOUSE
+  HOSTEL
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RoomType {
+  SINGLE
+  DOUBLE
+  TWIN
+  SUITE
+  DORMITORY
+  STUDIO
+  ENTIRE_UNIT
+}
+
+enum RoomStatus {
+  AVAILABLE
+  UNAVAILABLE
+  MAINTENANCE
+}
+
+enum BookingMode {
+  INSTANT
+  REQUEST
+}
+
+enum RateType {
+  SEASONAL
+  WEEKEND
+  WEEKDAY
+  HOLIDAY
+  LONG_STAY
+}
+
+enum BlockType {
+  MANUAL
+  MAINTENANCE
+  EXTERNAL_SYNC
+}
+
+enum BookingStatus {
+  PENDING_CONFIRMATION
+  PENDING_PAYMENT
+  CONFIRMED
+  DECLINED
+  CANCELLED
+  CHECKED_IN
+  COMPLETED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PENDING
+  PAID
+  REFUNDED
+  PARTIALLY_REFUNDED
+  FAILED
+}
+
+enum SettlementStatus {
+  PENDING
+  SETTLED
+  DISPUTED
+}
+
+enum CancelledBy {
+  GUEST
+  PROVIDER
+  ADMIN
+  SYSTEM
+}
+
+enum CancellationPolicyType {
+  FLEXIBLE
+  MODERATE
+  STRICT
+  NON_REFUNDABLE
+  CUSTOM
+}
+
+enum AmenityCategory {
+  CONNECTIVITY
+  COMFORT
+  SAFETY
+  RECREATION
+  FOOD
+  TRANSPORT
+  ACCESSIBILITY
+}
+
 model User {
-  id                       String         @id @default(cuid())
-  username                 String         @unique
-  email                    String         @unique
-  password                 String
-  avatar                   String         @default("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5jifLXKb2qo_5aXh54USNlvxI34oPpG3zTw&usqp=CAU")
-  role                     String         @default("tenant")
-  phoneNumber              String?
-  nationalId               String?
-  isEmailVerified          Boolean        @default(false)
-  isPhoneVerified          Boolean        @default(false)
-  phoneOtp                 String?
-  phoneOtpExpires          DateTime?
-  emailVerificationToken   String?
-  emailVerificationExpires DateTime?
-  premiumExpiry            DateTime?
-  providerProfile          Json?
-  listings                 Listing[]
-  payments                 Payment[]
-  rooms                    Room[]
-  guestBookings            Booking[]      @relation("GuestBookings")
-  providerBookings         Booking[]      @relation("ProviderBookings")
-  savedSearches            SavedSearch[]
-  blockedDates             BlockedDate[]
-  createdAt                DateTime       @default(now())
-  updatedAt                DateTime       @updatedAt
+  id                        String              @id @default(cuid())
+  username                  String              @unique
+  email                     String              @unique
+  password                  String
+  avatar                    String              @default("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5jifLXKb2qo_5aXh54USNlvxI34oPpG3zTw&usqp=CAU")
+  role                      String              @default("tenant")
+  phoneNumber               String?
+  nationalId                String?
+  isEmailVerified           Boolean             @default(false)
+  isPhoneVerified           Boolean             @default(false)
+  phoneOtp                  String?
+  phoneOtpExpires           DateTime?
+  emailVerificationToken    String?
+  emailVerificationExpires  DateTime?
+  premiumExpiry             DateTime?
+  providerProfile           Json?
+  listings                  Listing[]
+  listingDrafts             ListingDraft[]
+  payments                  Payment[]
+  rooms                     Room[]
+  guestBookings             Booking[]           @relation("GuestBookings")
+  providerBookings          Booking[]           @relation("ProviderBookings")
+  savedSearches             SavedSearch[]
+  accommodations            Accommodation[]
+  availabilityBlocksCreated AvailabilityBlock[]
+  reviews                   Review[]
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
 }
 
 model Listing {
@@ -70,66 +174,121 @@ model Listing {
   @@index([userId, status])
 }
 
+model ListingDraft {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  data      Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+model Accommodation {
+  id                  String                 @id @default(cuid())
+  ownerId             String
+  owner               User                   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  type                AccommodationType
+  name                String
+  slug                String                 @unique
+  description         String
+  registrationNumber  String?
+  contactPhone        String
+  province            String
+  city                String
+  addressLine         String
+  lat                 Float?
+  lng                 Float?
+  verificationStatus  VerificationStatus
+  commissionRate      Decimal                @default(10)
+  isPublished         Boolean                @default(false)
+  deletedAt           DateTime?
+  rooms               Room[]
+  images              AccommodationImage[]
+  amenities           AccommodationAmenity[]
+  cancellationPolicy  CancellationPolicy?
+  checkInOutRules     CheckInOutRules?
+  reviews             Review[]
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@index([ownerId])
+  @@index([province, city])
+  @@index([type, verificationStatus, isPublished])
+}
+
 model Room {
-  id                            String        @id @default(cuid())
-  providerId                    String
-  provider                      User          @relation(fields: [providerId], references: [id])
-  name                          String
-  description                   String?
-  roomType                      String?
-  capacity                      Int?
-  basePricePerNight             Float
-  pricingRules                  Json          @default("[]")
-  amenities                     Json          @default("{}")
-  imageUrls                     Json          @default("[]")
-  status                        String        @default("available")
-  bookingMode                   String        @default("instant")
-  maxAdvanceBookingDays         Int           @default(90)
-  cancellationPolicy            String?
-  cancellationPolicyCustomText  String?
-  bookings                      Booking[]
-  blockedDates                  BlockedDate[]
-  createdAt                     DateTime      @default(now())
-  updatedAt                     DateTime      @updatedAt
+  id                    String              @id @default(cuid())
+  providerId            String
+  provider              User                @relation(fields: [providerId], references: [id])
+  accommodationId       String?
+  accommodation         Accommodation?      @relation(fields: [accommodationId], references: [id], onDelete: Restrict)
+  name                  String
+  description           String?
+  roomType              RoomType?
+  capacity              Int?
+  basePricePerNight     Decimal
+  status                RoomStatus          @default(AVAILABLE)
+  bookingMode           BookingMode         @default(INSTANT)
+  maxAdvanceBookingDays Int                 @default(90)
+  minNights             Int                 @default(1)
+  maxNights             Int?
+  deletedAt             DateTime?
+  images                RoomImage[]
+  amenities             RoomAmenity[]
+  seasonalRates         SeasonalRate[]
+  availabilityBlocks    AvailabilityBlock[]
+  occupancyRule         OccupancyRule?
+  bookings              Booking[]
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
 
   @@index([providerId, status])
+  @@index([accommodationId, status])
+  @@index([status, bookingMode])
 }
 
 model Booking {
-  id                 String    @id @default(cuid())
-  roomId             String
-  providerId         String?
-  guestId            String
-  checkIn            DateTime
-  checkOut           DateTime
-  nights             Int?
-  pricePerNight      Float?
-  subtotal           Float?
-  commissionRate     Float?
-  commissionAmount   Float?
-  totalAmount        Float?
-  totalPrice         Float?
-  netPayout          Float?
-  status             String    @default("pending_confirmation")
-  bookingMode        String?
-  guestCount         Int?
-  paymentStatus      String    @default("unpaid")
-  paymentRef         String?
-  settlementStatus   String    @default("pending")
-  specialRequests    String    @default("")
-  cancelledBy        String?
-  cancellationReason String?
-  cancellationPolicy String?
-  refundAmount       Float     @default(0)
-  cancelledAt        DateTime?
-  settledAt          DateTime?
-  settlementReference String?
-  room               Room      @relation(fields: [roomId], references: [id])
-  guest              User      @relation("GuestBookings", fields: [guestId], references: [id])
-  providerUser       User?     @relation("ProviderBookings", fields: [providerId], references: [id])
-  payments           Payment[]
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                         String            @id @default(cuid())
+  roomId                     String
+  providerId                 String?
+  guestId                    String
+  appliedRateId              String?
+  checkIn                    DateTime
+  checkOut                   DateTime
+  nights                     Int?
+  pricePerNight              Decimal?
+  subtotal                   Decimal?
+  commissionRate             Decimal?
+  commissionAmount           Decimal?
+  totalPrice                 Decimal?
+  netPayout                  Decimal?
+  status                     BookingStatus     @default(PENDING_CONFIRMATION)
+  bookingMode                String?
+  adultCount                 Int               @default(1)
+  childCount                 Int               @default(0)
+  infantCount                Int               @default(0)
+  paymentStatus              PaymentStatus     @default(UNPAID)
+  paymentRef                 String?
+  settlementStatus           SettlementStatus  @default(PENDING)
+  specialRequests            String            @default("")
+  cancelledBy                CancelledBy?
+  cancellationReason         String?
+  cancellationPolicySnapshot Json?
+  refundAmount               Decimal           @default(0)
+  cancelledAt                DateTime?
+  settledAt                  DateTime?
+  settlementReference        String?
+  deletedAt                  DateTime?
+  room                       Room              @relation(fields: [roomId], references: [id])
+  guest                      User              @relation("GuestBookings", fields: [guestId], references: [id])
+  providerUser               User?             @relation("ProviderBookings", fields: [providerId], references: [id])
+  appliedRate                SeasonalRate?     @relation(fields: [appliedRateId], references: [id], onDelete: SetNull)
+  review                     Review?
+  payments                   Payment[]
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
 
   @@index([roomId, checkIn, checkOut, status])
   @@index([guestId, createdAt])
@@ -169,17 +328,152 @@ model SavedSearch {
   @@index([isActive])
 }
 
-model BlockedDate {
-  id         String    @id @default(cuid())
-  roomId     String
-  providerId String?
-  startDate  DateTime
-  endDate    DateTime
-  reason     String    @default("")
-  room       Room      @relation(fields: [roomId], references: [id])
-  provider   User?     @relation(fields: [providerId], references: [id])
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+model OccupancyRule {
+  id          String @id @default(cuid())
+  roomId      String @unique
+  room        Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  maxGuests   Int
+  maxAdults   Int
+  maxChildren Int    @default(0)
+  maxInfants  Int    @default(0)
+  minGuests   Int    @default(1)
+}
+
+model SeasonalRate {
+  id                String    @id @default(cuid())
+  roomId            String
+  room              Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  label             String
+  rateType          RateType
+  pricePerNight     Decimal
+  startDate         DateTime?
+  endDate           DateTime?
+  daysOfWeek        Int[]
+  minNightsToApply  Int       @default(1)
+  priority          Int       @default(0)
+  bookings          Booking[]
+  createdAt         DateTime  @default(now())
+
+  @@index([roomId, rateType])
+  @@index([roomId, startDate, endDate])
+}
+
+model AvailabilityBlock {
+  id            String    @id @default(cuid())
+  roomId        String
+  room          Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  blockType     BlockType
+  startDate     DateTime
+  endDate       DateTime
+  reason        String?
+  createdBy     String?
+  createdByUser User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([roomId, startDate, endDate])
+}
+
+model CancellationPolicy {
+  id                    String                 @id @default(cuid())
+  accommodationId       String                 @unique
+  accommodation         Accommodation          @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+  policyType            CancellationPolicyType
+  freeCancellationHours Int?
+  refundPercentage      Decimal?
+  customDescription     String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+}
+
+model CheckInOutRules {
+  id                String        @id @default(cuid())
+  accommodationId   String        @unique
+  accommodation     Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+  checkInFrom       String
+  checkInUntil      String
+  checkOutBy        String
+  selfCheckIn       Boolean       @default(false)
+  selfCheckInMethod String?
+  lateCheckOutFee   Decimal?
+  instructions      String?
+}
+
+model Amenity {
+  id             String                 @id @default(cuid())
+  slug           String                 @unique
+  label          String
+  category       AmenityCategory
+  icon           String?
+  accommodations AccommodationAmenity[]
+  rooms          RoomAmenity[]
+}
+
+model AccommodationAmenity {
+  accommodationId String
+  amenityId       String
+  accommodation   Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+  amenity         Amenity       @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+  isHighlighted   Boolean       @default(false)
+
+  @@id([accommodationId, amenityId])
+}
+
+model RoomAmenity {
+  roomId    String
+  amenityId String
+  room      Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  amenity   Amenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, amenityId])
+}
+
+model AccommodationImage {
+  id              String        @id @default(cuid())
+  accommodationId String
+  accommodation   Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+  url             String
+  altText         String?
+  isCover         Boolean       @default(false)
+  sortOrder       Int           @default(0)
+  createdAt       DateTime      @default(now())
+
+  @@index([accommodationId, sortOrder])
+}
+
+model RoomImage {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  url       String
+  altText   String?
+  isCover   Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([roomId, sortOrder])
+}
+
+model Review {
+  id                String        @id @default(cuid())
+  bookingId         String        @unique
+  booking           Booking       @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  guestId           String
+  guest             User          @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  accommodationId   String
+  accommodation     Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Restrict)
+  overallRating     Int
+  cleanlinessRating Int?
+  locationRating    Int?
+  valueRating       Int?
+  serviceRating     Int?
+  comment           String?
+  providerResponse  String?
+  isPublished       Boolean       @default(true)
+  deletedAt         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([accommodationId, isPublished])
+  @@index([guestId])
 }

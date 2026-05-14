@@ -18,11 +18,7 @@ import useTypedSelector from "../../hooks/useTypedSelector";
 import { AiOutlineEyeInvisible, AiOutlineEye } from "react-icons/ai";
 import { MdOutlineDeleteSweep } from "react-icons/md";
 // Redux Imports
-import {
-  useDeleteMutation,
-  useUpdateMutation,
-  useGetMeQuery,
-} from "../../redux/api/userApiSlice";
+import { useDeleteMutation, useUpdateMutation } from "../../redux/api/userApiSlice";
 import {
   useGetR2SignedUrlMutation,
   type R2SignedUrlData,
@@ -33,7 +29,6 @@ import {
   selectedUserEmail,
   setUser,
   selectedUserId,
-  selectedUserRole,
   selectedUserToken,
 } from "../../redux/auth/authSlice";
 // MUI Imports
@@ -72,10 +67,7 @@ const Profile = () => {
   const userEmail = useTypedSelector(selectedUserEmail);
   const userAvatar = useTypedSelector(selectedUserAvatar);
   const userId = useTypedSelector(selectedUserId);
-  const userRole = useTypedSelector(selectedUserRole);
   const token = useTypedSelector(selectedUserToken);
-  const authBlob = useTypedSelector((state: any) => state.auth?.user);
-  const { data: meData } = useGetMeQuery(undefined, { skip: !userId });
   const [getR2SignedUrl] = useGetR2SignedUrlMutation();
 
   // states
