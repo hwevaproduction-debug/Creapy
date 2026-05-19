@@ -17,8 +17,11 @@ import { onKeyDown } from "../../utils";
 // Redux Imports
 import {
   useCreateListingMutation,
+  useDeleteListingDraftMutation,
+  useGetListingDraftQuery,
   useGetSingleListingQuery,
   useUpdateListingMutation,
+  useUpdateListingDraftMutation,
 } from "../../redux/api/listingApiSlice";
 import {
   useGetR2SignedUrlMutation,
@@ -71,11 +74,95 @@ interface listingForm {
   files?: null | any[];
 }
 
+const INITIAL_LISTING_FORM: listingForm = {
+  name: "",
+  phoneNumber: "263",
+  description: "",
+  address: "",
+  location: {
+    province: "",
+    city: "",
+    addressLine: "",
+    country: "Zimbabwe",
+  },
+  regularPrice: 25000,
+  discountedPrice: 0,
+  bathrooms: 1,
+  bedrooms: "",
+  totalRooms: 1,
+  furnished: false,
+  offer: false,
+  studentAccommodation: false,
+  type: "rent",
+  amenities: {
+    solar: false,
+    borehole: false,
+    security: false,
+    parking: false,
+    internet: false,
+  },
+  files: [],
+};
+
 const LISTING_DRAFT_KEY = "listing_draft";
 const DRAFT_TTL_MS = 30 * 60 * 1000;
 
-const saveListingDraft = (formValues: listingForm) => {
+const stripListingFiles = (formValues: listingForm) => {
   const { files, ...form } = formValues;
+  return form;
+};
+
+const normalizeDraftForm = (form: any): listingForm => ({
+  ...INITIAL_LISTING_FORM,
+  ...(form || {}),
+  location: {
+    ...INITIAL_LISTING_FORM.location,
+    ...(form?.location || {}),
+  },
+  amenities: {
+    ...INITIAL_LISTING_FORM.amenities,
+    ...(form?.amenities || {}),
+  },
+  files: [],
+});
+
+const hasDraftContent = (
+  form: ReturnType<typeof stripListingFiles>,
+  imageUrls: string[]
+) =>
+  Boolean(
+    form.name?.trim() ||
+      form.description?.trim() ||
+      form.address?.trim() ||
+      form.location?.province?.trim() ||
+      form.location?.city?.trim() ||
+      imageUrls.length
+  );
+
+const getDraftId = (response: any) =>
+  response?.data?.draft?._id ||
+  response?.data?.draft?.id ||
+  response?.draft?._id ||
+  response?.draft?.id ||
+  response?.data?._id ||
+  response?.data?.id;
+
+const formatDraftTimestamp = (value?: string) => {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const saveListingDraft = (formValues: listingForm) => {
+  const form = stripListingFiles(formValues);
 
   sessionStorage.setItem(
     LISTING_DRAFT_KEY,
@@ -94,42 +181,24 @@ const CreateListing = () => {
   const token = useTypedSelector(selectedUserToken);
   const [getR2SignedUrl] = useGetR2SignedUrlMutation();
   const has401FiredRef = useRef(false);
+  const formikRef = useRef<FormikProps<listingForm>>(null);
+  const draftIdRef = useRef<string | undefined>(undefined);
+  const autosaveSnapshotRef = useRef("");
+  const autosaveInFlightRef = useRef(false);
+  const hasHydratedServerDraftRef = useRef(false);
   const restoredDraftRef = useRef(false);
   const shouldClearStaleDraftRef = useRef(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [formValues, setFormValues] = useState<listingForm>({
-    name: "",
-    phoneNumber: "263",
-    description: "",
-    address: "",
-    location: {
-      province: "",
-      city: "",
-      addressLine: "",
-      country: "Zimbabwe",
-    },
-    regularPrice: 25000,
-    discountedPrice: 0,
-    bathrooms: 1,
-    bedrooms: "",
-    totalRooms: 1,
-    furnished: false,
-    offer: false,
-    studentAccommodation: false,
-    type: "rent",
-    amenities: {
-      solar: false,
-      borehole: false,
-      security: false,
-      parking: false,
-      internet: false,
-    },
-    files: [],
-  });
+  const [formValues, setFormValues] =
+    useState<listingForm>(INITIAL_LISTING_FORM);
   const [listingImages, setListingImages] = useState<any[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [imageError, setImageError] = useState<boolean | string>(false);
   const [imageLoading, setImageLoading] = useState<boolean>(false);
+  const [draftStatus, setDraftStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const [draftSavedAt, setDraftSavedAt] = useState("");
   const [toast, setToast] = useState({
     message: "",
     appearence: false,
@@ -230,6 +299,29 @@ const CreateListing = () => {
   // Update Listing API bind
   const [updateListing, { isLoading: updatingLoading }] =
     useUpdateListingMutation();
+  const { data: serverDraft, isLoading: serverDraftLoading } =
+    useGetListingDraftQuery(undefined, {
+      skip: !!id || !token,
+    });
+  const [updateListingDraft] = useUpdateListingDraftMutation();
+  const [deleteListingDraft] = useDeleteListingDraftMutation();
+  const serverDraftId = serverDraft?._id || serverDraft?.id;
+
+  useEffect(() => {
+    draftIdRef.current = serverDraftId;
+  }, [serverDraftId]);
+
+  const clearServerDraft = async () => {
+    const draftId = draftIdRef.current;
+    if (!draftId) return;
+
+    try {
+      await deleteListingDraft(draftId).unwrap();
+      draftIdRef.current = undefined;
+    } catch (error) {
+      console.error("Listing draft cleanup failed:", error);
+    }
+  };
 
   const listingHandler = async (data: listingForm) => {
     const resolvedUserId = userId;
@@ -320,6 +412,7 @@ const CreateListing = () => {
       const listing: any = await createListing(payload);
       if (listing?.data?.status) {
         sessionStorage.removeItem(LISTING_DRAFT_KEY);
+        await clearServerDraft();
         setToast({
           ...toast,
           message: "Listing Created Successfully",
@@ -414,6 +507,41 @@ const CreateListing = () => {
   }, [id, listingData, listingSuccess]);
 
   useEffect(() => {
+    if (
+      id ||
+      !serverDraft ||
+      restoredDraftRef.current ||
+      hasHydratedServerDraftRef.current
+    ) {
+      return;
+    }
+
+    const draftPayload = serverDraft?.data || {};
+    if (!draftPayload?.form) {
+      return;
+    }
+
+    const restoredForm = normalizeDraftForm(draftPayload.form);
+    const restoredImageUrls = Array.isArray(draftPayload.imageUrls)
+      ? draftPayload.imageUrls
+      : [];
+
+    setFormValues(restoredForm);
+    setImageUrls(restoredImageUrls);
+    setDraftSavedAt(
+      serverDraft?.updatedAt || draftPayload?.savedAt || new Date().toISOString()
+    );
+    setDraftStatus("saved");
+    setDraftRestored(true);
+    restoredDraftRef.current = true;
+    hasHydratedServerDraftRef.current = true;
+    autosaveSnapshotRef.current = JSON.stringify({
+      form: stripListingFiles(restoredForm),
+      imageUrls: restoredImageUrls,
+    });
+  }, [id, serverDraft]);
+
+  useEffect(() => {
     if (id) return;
 
     const storedDraft = sessionStorage.getItem(LISTING_DRAFT_KEY);
@@ -429,7 +557,8 @@ const CreateListing = () => {
         draft?.version === 1 && Date.now() - savedAt <= DRAFT_TTL_MS;
 
       if (isValidDraft) {
-        setFormValues(draft.form);
+        setFormValues(normalizeDraftForm(draft.form));
+        setDraftSavedAt(draft?.savedAt || "");
         restoredDraftRef.current = true;
         setDraftRestored(true);
       } else {
@@ -446,6 +575,58 @@ const CreateListing = () => {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (id || !token || !userId) {
+      return undefined;
+    }
+
+    const interval = window.setInterval(async () => {
+      const currentValues = formikRef.current?.values;
+      if (!currentValues || autosaveInFlightRef.current) {
+        return;
+      }
+
+      const form = stripListingFiles(currentValues);
+      const snapshot = JSON.stringify({ form, imageUrls });
+      if (
+        snapshot === autosaveSnapshotRef.current ||
+        !hasDraftContent(form, imageUrls)
+      ) {
+        return;
+      }
+
+      const savedAt = new Date().toISOString();
+      autosaveInFlightRef.current = true;
+      setDraftStatus("saving");
+
+      try {
+        const response = await updateListingDraft({
+          id: draftIdRef.current,
+          payload: {
+            version: 1,
+            source: "listing-form",
+            savedAt,
+            form,
+            imageUrls,
+          },
+        }).unwrap();
+
+        draftIdRef.current = getDraftId(response) || draftIdRef.current;
+        autosaveSnapshotRef.current = snapshot;
+        setDraftSavedAt(savedAt);
+        setDraftStatus("saved");
+        sessionStorage.removeItem(LISTING_DRAFT_KEY);
+      } catch (error) {
+        console.error("Listing draft autosave failed:", error);
+        setDraftStatus("error");
+      } finally {
+        autosaveInFlightRef.current = false;
+      }
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [id, imageUrls, token, updateListingDraft, userId]);
+
   return (
     <Box sx={{ mt: { xs: 5, md: 6 } }}>
       {listingLoading && <OverlayLoader />}
@@ -453,6 +634,28 @@ const CreateListing = () => {
         <Box sx={{ textAlign: "center" }}>
           <Heading>{id ? "Update" : "Create"} a Listing</Heading>
         </Box>
+        {!id && token && (serverDraftLoading || draftStatus !== "idle") && (
+          <Box
+            sx={{
+              mt: 1,
+              textAlign: "center",
+              color: draftStatus === "error" ? "#b91c1c" : "#64748b",
+              fontSize: "14px",
+            }}
+          >
+            {serverDraftLoading
+              ? "Checking saved draft..."
+              : draftStatus === "saving"
+              ? "Saving draft..."
+              : draftStatus === "saved"
+              ? `Draft saved${
+                  formatDraftTimestamp(draftSavedAt)
+                    ? ` ${formatDraftTimestamp(draftSavedAt)}`
+                    : ""
+                }`
+              : "Draft save failed"}
+          </Box>
+        )}
         {!id && draftRestored && (
           <Box
             sx={{
@@ -467,7 +670,12 @@ const CreateListing = () => {
               borderRadius: "10px",
             }}
           >
-            <Box>We restored your unsaved listing. Images must be re-uploaded.</Box>
+            <Box>
+              We restored your saved listing draft.
+              {draftSavedAt && formatDraftTimestamp(draftSavedAt)
+                ? ` Last saved ${formatDraftTimestamp(draftSavedAt)}.`
+                : ""}
+            </Box>
             <AppButton
               variant="outlined"
               color="inherit"
@@ -476,12 +684,13 @@ const CreateListing = () => {
                 sessionStorage.removeItem(LISTING_DRAFT_KEY);
               }}
             >
-              X
+              Dismiss
             </AppButton>
           </Box>
         )}
         <AppCard sx={{ my: { xs: 3, md: 4 }, p: { xs: 2, md: 3 } }}>
           <Formik
+            innerRef={formikRef}
             initialValues={formValues}
             onSubmit={(values: listingForm) => {
               listingHandler(values);

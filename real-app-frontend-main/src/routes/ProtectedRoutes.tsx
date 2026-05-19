@@ -12,7 +12,7 @@ const ProtectedRoutes = ({ allowedRoles, children }: ProtectedRoutesProps) => {
   const authUser = useTypedSelector((state) => state.auth?.user);
   const role = useTypedSelector(selectedUserRole);
   const destination =
-    role === "admin"
+    role === "admin" || role === "super_admin"
       ? "/dashboard/admin"
       : role === "landlord"
         ? "/dashboard/landlord"

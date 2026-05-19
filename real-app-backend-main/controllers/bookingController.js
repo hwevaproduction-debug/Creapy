@@ -1,19 +1,26 @@
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const prisma = require("../utils/prisma");
-const { getProvider } = require("../utils/paymentProvider");
-const { resolvePrice } = require("../utils/pricingResolver");
-const { sendEmail } = require("../utils/email");
+const { toLocalDateString } = require("../utils/dateUtils");
+const { getProvider, getProviderByName } = require("../utils/paymentProvider");
+const { computeQuote } = require("../utils/pricingEngine");
+const { incrementUseCount } = require("../utils/promotionService");
 const {
-  bookingRequestSubmittedProvider,
-  bookingRequestAcceptedGuest,
-  bookingRequestDeclinedGuest,
-  bookingCancelledByGuestProvider,
-  bookingCancelledByProviderGuest,
-  bookingSettledProvider,
-} = require("../utils/emailTemplates/stayEmails");
+  computeBookingFinancials,
+  computeCancellationFee,
+  computeRefundAmount,
+  snapshotCancellationPolicy,
+} = require("../utils/bookingService");
+const {
+  BOOKING_CANCELLED_STATUSES,
+  collectRuleViolations,
+  createViolation,
+  getRoomTimezone,
+  normalizeStayDates,
+  throwViolation,
+} = require("../utils/reservationRules");
+const notificationService = require("../utils/notificationService");
 
-const BOOKING_CANCELLED_STATUSES = ["CANCELLED", "DECLINED", "EXPIRED"];
 const SETTLEMENT_INELIGIBLE_STATUSES = [...BOOKING_CANCELLED_STATUSES, "SETTLED"];
 
 const parseDate = (value, label) => {
@@ -53,6 +60,24 @@ const mapBooking = (booking) => {
   mapId(booking);
   mapId(booking.room);
   mapId(booking.guest);
+  mapId(booking.guestInfo);
+  mapId(booking.feeSnapshot);
+  if (Array.isArray(booking.payments)) {
+    booking.payments.forEach(mapId);
+  }
+  const timezone = getRoomTimezone(booking.room);
+
+  booking.timezone = timezone;
+  if (booking.room) {
+    booking.room.timezone = booking.room.timezone || timezone;
+  }
+  if (booking.checkIn) {
+    booking.checkInDate = toLocalDateString(booking.checkIn, timezone);
+  }
+  if (booking.checkOut) {
+    booking.checkOutDate = toLocalDateString(booking.checkOut, timezone);
+  }
+
   return booking;
 };
 
@@ -72,9 +97,15 @@ const getBookingMode = (room, booking) =>
       room?.settings?.bookingMode
   ) || "REQUEST";
 
-const getNightCount = (checkIn, checkOut) => {
-  const diff = checkOut.getTime() - checkIn.getTime();
-  return Math.ceil(diff / (24 * 60 * 60 * 1000));
+const isBookingConflictError = (err) => {
+  const message = String(err?.message || "");
+
+  return (
+    err?.code === "P2034" ||
+    err?.code === "P2004" ||
+    message.includes("no_overlapping_bookings") ||
+    message.toLowerCase().includes("exclusion constraint")
+  );
 };
 
 const normalizeCount = (value, label, minValue, defaultValue) => {
@@ -98,33 +129,6 @@ const normalizeGuestCounts = (body) => ({
   childCount: normalizeCount(body.childCount, "childCount", 0, 0),
   infantCount: normalizeCount(body.infantCount, "infantCount", 0, 0),
 });
-
-const resolveBookingPricing = (room, checkIn, checkOut) => {
-  const nights = getNightCount(checkIn, checkOut);
-
-  if (nights <= 0) {
-    throw new AppError("checkOut must be after checkIn", 400);
-  }
-
-  const pricePerNight = Number(
-    resolvePrice(room, checkIn, checkOut) ??
-      room?.pricePerNight ??
-      room?.basePricePerNight ??
-      room?.nightlyRate ??
-      room?.price ??
-      0
-  );
-
-  if (!Number.isFinite(pricePerNight) || pricePerNight <= 0) {
-    throw new AppError("Stay pricing is not configured", 400);
-  }
-
-  return {
-    nights,
-    pricePerNight,
-    totalPrice: Number((pricePerNight * nights).toFixed(2)),
-  };
-};
 
 const ensureRoomAvailability = async (roomId, checkIn, checkOut) => {
   const [bookingOverlap, blockedOverlap] = await Promise.all([
@@ -153,24 +157,7 @@ const ensureRoomAvailability = async (roomId, checkIn, checkOut) => {
 const populateBookings = async (where) => {
   const bookings = await prisma.booking.findMany({
     where,
-    include: {
-      room: {
-        include: {
-          accommodation: {
-            select: { ownerId: true },
-          },
-        },
-      },
-      guest: {
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          phoneNumber: true,
-          avatar: true,
-        },
-      },
-    },
+    include: bookingRelationInclude,
     orderBy: { createdAt: "desc" },
   });
 
@@ -192,18 +179,6 @@ const ensureProviderOwnsBooking = (booking, userId) => {
   }
 };
 
-const sendEmailSafe = async (payload) => {
-  if (!payload?.to) {
-    return;
-  }
-
-  try {
-    await sendEmail(payload);
-  } catch (err) {
-    console.error("[email] send failed:", err.message);
-  }
-};
-
 const resolveProviderEmail = async (room) => {
   const [providerId] = getRoomOwnerIdentity(room);
 
@@ -213,82 +188,305 @@ const resolveProviderEmail = async (room) => {
 
   const provider = await prisma.user.findUnique({
     where: { id: providerId },
-    select: { id: true, email: true, providerProfile: true },
+    select: {
+      id: true,
+      email: true,
+      username: true,
+      phoneNumber: true,
+      providerProfile: true,
+    },
   });
 
   return mapId(provider);
+};
+
+const getPaymentMethod = () => String(process.env.PAYMENT_PROVIDER || "mock").trim().toLowerCase();
+
+const roundCurrency = (value) => Math.round(Number(value || 0) * 100) / 100;
+
+const getRefundablePaymentAmount = (payment) => {
+  const paidAmount =
+    payment?.amountPaid === undefined || payment?.amountPaid === null
+      ? Number(payment?.amountDue || payment?.amount || 0)
+      : Number(payment.amountPaid);
+
+  return Number.isFinite(paidAmount) && paidAmount > 0 ? roundCurrency(paidAmount) : 0;
+};
+
+const getSuccessfulRefundablePayments = (payments = []) =>
+  payments
+    .filter((payment) => payment.status === "success")
+    .filter((payment) => getRefundablePaymentAmount(payment) > 0)
+    .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt));
+
+const issueBookingRefunds = async ({ booking, payments, amount, reason, initiatedBy }) => {
+  const refundAmount = roundCurrency(amount);
+
+  if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+    throw new AppError("Refund amount is invalid", 400);
+  }
+
+  const refundablePayments = getSuccessfulRefundablePayments(payments);
+
+  if (refundablePayments.length === 0) {
+    throw new AppError("No successful payment found for this booking", 400);
+  }
+
+  const totalRefundable = roundCurrency(
+    refundablePayments.reduce((total, payment) => total + getRefundablePaymentAmount(payment), 0)
+  );
+
+  if (totalRefundable < refundAmount) {
+    throw new AppError("Refund amount exceeds the refundable payment balance", 400);
+  }
+
+  const refunds = [];
+  let remainingAmount = refundAmount;
+
+  for (const payment of refundablePayments) {
+    if (remainingAmount <= 0) {
+      break;
+    }
+
+    const paidAmount = getRefundablePaymentAmount(payment);
+    const paymentRefundAmount = roundCurrency(Math.min(paidAmount, remainingAmount));
+
+    if (paymentRefundAmount <= 0) {
+      continue;
+    }
+
+    const provider = getProviderByName(payment.method);
+    const refundResult = await provider.issueRefund(
+      payment,
+      paymentRefundAmount,
+      reason || "refund"
+    );
+    const refund = await prisma.refund.create({
+      data: {
+        paymentId: payment.id,
+        bookingId: booking.id,
+        amount: paymentRefundAmount,
+        reason: reason || null,
+        status: refundResult.status,
+        providerRefId: refundResult.providerRefId || null,
+        initiatedBy,
+      },
+    });
+
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        amountPaid: roundCurrency(Math.max(0, paidAmount - paymentRefundAmount)),
+      },
+    });
+
+    refunds.push(refund);
+    remainingAmount = roundCurrency(remainingAmount - paymentRefundAmount);
+  }
+
+  if (remainingAmount > 0) {
+    throw new AppError("Refund amount could not be fully applied", 400);
+  }
+
+  return refunds;
+};
+
+const bookingRelationInclude = {
+  room: {
+    include: {
+      occupancyRule: true,
+      accommodation: {
+        select: { ownerId: true, timezone: true },
+      },
+    },
+  },
+  guest: {
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      phoneNumber: true,
+      avatar: true,
+    },
+  },
+  guestInfo: true,
+  feeSnapshot: true,
+};
+
+const bookingDetailInclude = {
+  ...bookingRelationInclude,
+  payments: true,
 };
 
 exports.createBooking = catchAsync(async (req, res, next) => {
   const roomId = req.body.room || req.body.roomId;
   const { checkIn: rawCheckIn, checkOut: rawCheckOut } = req.body;
 
-  const room = await prisma.room.findUnique({
-    where: { id: roomId },
-    include: {
-      accommodation: {
-        select: { ownerId: true },
+  if (!roomId) {
+    return next(new AppError("room is required", 400));
+  }
+
+  let booking;
+  let quote;
+
+  try {
+    booking = await prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "Room" WHERE "id" = ${roomId} FOR UPDATE`;
+
+        const room = await tx.room.findUnique({
+          where: { id: roomId },
+          include: {
+            occupancyRule: true,
+            fees: true,
+            occupancyPricingRule: true,
+            accommodation: {
+              select: {
+                ownerId: true,
+                timezone: true,
+                checkInOutRules: true,
+                cancellationPolicy: true,
+                commissionRate: true,
+                taxRule: true,
+              },
+            },
+            provider: {
+              select: {
+                id: true,
+                providerProfile: true,
+              },
+            },
+            seasonalRates: true,
+          },
+        });
+
+        if (!room) {
+          throw new AppError("Stay not found", 404);
+        }
+
+        if (room.provider?.providerProfile?.suspendedAt) {
+          throw new AppError("This provider is currently suspended", 403);
+        }
+
+        const timezone = getRoomTimezone(room);
+        const stayDates = normalizeStayDates(rawCheckIn, rawCheckOut, timezone);
+        const guestCounts = normalizeGuestCounts(req.body);
+        const ruleViolation = collectRuleViolations(room, stayDates, guestCounts)[0];
+
+        if (ruleViolation) {
+          throwViolation(ruleViolation);
+        }
+
+        const bookingOverlap = await tx.booking.findFirst({
+          where: {
+            roomId: room.id,
+            status: { notIn: BOOKING_CANCELLED_STATUSES },
+            checkIn: { lt: stayDates.checkOut },
+            checkOut: { gt: stayDates.checkIn },
+          },
+          select: { id: true },
+        });
+
+        if (bookingOverlap) {
+          throwViolation(
+            createViolation("DATE_CONFLICT", "Selected dates overlap an existing booking", 409)
+          );
+        }
+
+        const blockedOverlap = await tx.availabilityBlock.findFirst({
+          where: {
+            roomId: room.id,
+            startDate: { lt: stayDates.checkOut },
+            endDate: { gt: stayDates.checkIn },
+          },
+          select: { id: true },
+        });
+
+        if (blockedOverlap) {
+          throwViolation(
+            createViolation("DATE_BLOCKED", "Selected dates are blocked by the provider", 409)
+          );
+        }
+
+        quote = await computeQuote({
+          room,
+          checkIn: stayDates.checkIn,
+          checkOut: stayDates.checkOut,
+          adultCount: guestCounts.adultCount,
+          childCount: guestCounts.childCount,
+          infantCount: guestCounts.infantCount,
+          couponCode: req.body.couponCode || null,
+          prismaClient: tx,
+        });
+        const bookingMode = getBookingMode(room);
+        const cancellationPolicySnapshot = snapshotCancellationPolicy(room.accommodation);
+        const commissionRate = Number(room.accommodation?.commissionRate || 0);
+        const financials = computeBookingFinancials(quote.grandTotal, commissionRate);
+
+        const newBooking = await tx.booking.create({
+          data: {
+            roomId: room.id,
+            guestId: getUserId(req.user),
+            checkIn: stayDates.checkIn,
+            checkOut: stayDates.checkOut,
+            bookingMode,
+            providerId: room.providerId || room.accommodation?.ownerId || null,
+            nights: quote.nights,
+            pricePerNight: quote.nightlyBreakdown[0]?.pricePerNight ?? 0,
+            subtotal: quote.subtotal,
+            totalPrice: quote.grandTotal,
+            cleaningFee: quote.cleaningFee,
+            taxAmount: quote.taxAmount,
+            discountAmount: quote.promotionDiscount + quote.couponDiscount,
+            couponCode: quote.appliedCoupon?.code ?? null,
+            promotionId: quote.appliedPromotion?.id ?? null,
+            commissionRate,
+            commissionAmount: financials.commissionAmount,
+            netPayout: financials.netPayout,
+            status: bookingMode === "INSTANT" ? "PENDING_PAYMENT" : "PENDING_CONFIRMATION",
+            paymentStatus: "UNPAID",
+            specialRequests: req.body.specialRequests || "",
+            adultCount: guestCounts.adultCount,
+            childCount: guestCounts.childCount,
+            infantCount: guestCounts.infantCount,
+            cancellationPolicySnapshot,
+          },
+        });
+
+        await tx.bookingFeeSnapshot.create({
+          data: {
+            bookingId: newBooking.id,
+            lineItems: quote.lineItems,
+            subtotal: quote.subtotal,
+            discountAmount: quote.promotionDiscount + quote.couponDiscount,
+            taxAmount: quote.taxAmount,
+            grandTotal: quote.grandTotal,
+            couponCode: quote.appliedCoupon?.code ?? null,
+            promotionId: quote.appliedPromotion?.id ?? null,
+          },
+        });
+
+        if (quote.appliedCoupon) {
+          await incrementUseCount(tx, quote.appliedCoupon.id, quote.appliedPromotion.id);
+        }
+
+        return newBooking;
       },
-      seasonalRates: true,
-    },
-  });
-  if (!room) {
-    return next(new AppError("Stay not found", 404));
+      { isolationLevel: "Serializable" }
+    );
+  } catch (err) {
+    if (isBookingConflictError(err)) {
+      return next(
+        new AppError("Selected dates overlap an existing booking", 409, "DATE_CONFLICT")
+      );
+    }
+
+    throw err;
   }
-
-  const checkIn = parseDate(rawCheckIn, "checkIn");
-  const checkOut = parseDate(rawCheckOut, "checkOut");
-
-  if (checkIn >= checkOut) {
-    return next(new AppError("checkOut must be after checkIn", 400));
-  }
-
-  await ensureRoomAvailability(room.id, checkIn, checkOut);
-
-  const pricing = resolveBookingPricing(room, checkIn, checkOut);
-  const guestCounts = normalizeGuestCounts(req.body);
-  const bookingMode = getBookingMode(room);
-  const booking = await prisma.booking.create({
-    data: {
-      roomId: room.id,
-      guestId: getUserId(req.user),
-      checkIn,
-      checkOut,
-      bookingMode,
-      providerId: room.providerId || room.accommodation?.ownerId || null,
-      nights: pricing.nights,
-      pricePerNight: pricing.pricePerNight,
-      totalPrice: pricing.totalPrice,
-      status: bookingMode === "INSTANT" ? "PENDING_PAYMENT" : "PENDING_CONFIRMATION",
-      paymentStatus: "UNPAID",
-      specialRequests: req.body.specialRequests || "",
-      adultCount: guestCounts.adultCount,
-      childCount: guestCounts.childCount,
-      infantCount: guestCounts.infantCount,
-      cancellationPolicySnapshot: null,
-    },
-  });
 
   const populatedBooking = await prisma.booking.findUnique({
     where: { id: booking.id },
-    include: {
-      room: {
-        include: {
-          accommodation: {
-            select: { ownerId: true },
-          },
-        },
-      },
-      guest: {
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          phoneNumber: true,
-          avatar: true,
-        },
-      },
-    },
+    include: bookingRelationInclude,
   });
 
   mapBooking(populatedBooking);
@@ -301,14 +499,15 @@ exports.createBooking = catchAsync(async (req, res, next) => {
     provider,
   };
 
-  if (bookingMode === "REQUEST") {
-    void sendEmailSafe(bookingRequestSubmittedProvider(emailContext));
+  if (booking.bookingMode === "REQUEST") {
+    void notificationService.enqueue("booking.request_submitted", emailContext);
   }
 
   res.status(201).json({
     status: "success",
     data: {
       booking: populatedBooking,
+      quote,
     },
   });
 });
@@ -332,7 +531,7 @@ exports.cancelBooking = catchAsync(async (req, res, next) => {
       room: {
         include: {
           accommodation: {
-            select: { ownerId: true },
+            select: { ownerId: true, timezone: true },
           },
         },
       },
@@ -341,8 +540,10 @@ exports.cancelBooking = catchAsync(async (req, res, next) => {
           id: true,
           email: true,
           username: true,
+          phoneNumber: true,
         },
       },
+      payments: true,
     },
   });
   if (!booking) {
@@ -361,53 +562,87 @@ exports.cancelBooking = catchAsync(async (req, res, next) => {
     return next(new AppError("Booking is already cancelled", 400));
   }
 
+  const refundAmount = computeRefundAmount(booking, new Date());
+  if (refundAmount > 0 && booking.paymentStatus === "PAID") {
+    await issueBookingRefunds({
+      booking,
+      payments: booking.payments,
+      amount: refundAmount,
+      reason: req.body.reason || "Booking cancellation refund",
+      initiatedBy: getUserId(req.user),
+    });
+  }
+
+  const cumulativeRefundAmount = Number(booking.refundAmount || 0) + Number(refundAmount || 0);
+  const totalPrice = Number(booking.totalPrice || 0);
+  const refundPaymentStatus =
+    totalPrice > 0 && cumulativeRefundAmount >= totalPrice ? "REFUNDED" : "PARTIALLY_REFUNDED";
+
   const updatedBooking = await prisma.booking.update({
     where: { id: booking.id },
     data: {
       status: "CANCELLED",
       cancelledBy: isProviderCancellation ? "PROVIDER" : "GUEST",
       cancelledAt: new Date(),
+      refundAmount: cumulativeRefundAmount,
+      ...(refundAmount > 0 ? { paymentStatus: refundPaymentStatus } : {}),
     },
-    include: {
-      room: {
-        include: {
-          accommodation: {
-            select: { ownerId: true },
-          },
-        },
-      },
-      guest: {
-        select: {
-          id: true,
-          email: true,
-          username: true,
-        },
-      },
-    },
+    include: bookingRelationInclude,
   });
 
   mapBooking(updatedBooking);
 
   const provider = await resolveProviderEmail(updatedBooking.room);
-  const cancellationEmail = isProviderCancellation
-    ? bookingCancelledByProviderGuest({
-        booking: updatedBooking,
-        room: updatedBooking.room,
-        guest: updatedBooking.guest,
-        provider,
-      })
-    : bookingCancelledByGuestProvider({
-        booking: updatedBooking,
-        room: updatedBooking.room,
-        guest: updatedBooking.guest,
-        provider,
-      });
-  void sendEmailSafe(cancellationEmail);
+  void notificationService.enqueue(
+    isProviderCancellation ? "booking.cancelled_by_provider" : "booking.cancelled_by_guest",
+    {
+      booking: updatedBooking,
+      room: updatedBooking.room,
+      guest: updatedBooking.guest,
+      provider,
+    }
+  );
 
   res.status(200).json({
     status: "success",
     data: {
       booking: updatedBooking,
+    },
+  });
+});
+
+exports.getCancellationPreview = catchAsync(async (req, res, next) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: req.params.id },
+    select: {
+      id: true,
+      guestId: true,
+      totalPrice: true,
+      pricePerNight: true,
+      nights: true,
+      checkIn: true,
+      cancellationPolicySnapshot: true,
+    },
+  });
+
+  if (!booking) {
+    return next(new AppError("Booking not found", 404));
+  }
+
+  if (booking.guestId !== getUserId(req.user)) {
+    return next(new AppError("Forbidden", 403));
+  }
+
+  const cancelledAt = new Date();
+  const refundAmount = computeRefundAmount(booking, cancelledAt);
+  const cancellationFee = computeCancellationFee(booking, cancelledAt);
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      refundAmount,
+      cancellationFee,
+      policy: booking.cancellationPolicySnapshot,
     },
   });
 });
@@ -444,7 +679,7 @@ exports.confirmBooking = catchAsync(async (req, res, next) => {
       room: {
         include: {
           accommodation: {
-            select: { ownerId: true },
+            select: { ownerId: true, timezone: true },
           },
         },
       },
@@ -453,6 +688,7 @@ exports.confirmBooking = catchAsync(async (req, res, next) => {
           id: true,
           email: true,
           username: true,
+          phoneNumber: true,
         },
       },
     },
@@ -463,7 +699,7 @@ exports.confirmBooking = catchAsync(async (req, res, next) => {
 
   ensureProviderOwnsBooking(booking, getUserId(req.user));
 
-  if (SETTLEMENT_INELIGIBLE_STATUSES.includes(booking.status)) {
+  if (booking.status !== "PENDING_CONFIRMATION") {
     return next(new AppError("Booking cannot be confirmed", 400));
   }
 
@@ -476,7 +712,7 @@ exports.confirmBooking = catchAsync(async (req, res, next) => {
       room: {
         include: {
           accommodation: {
-            select: { ownerId: true },
+            select: { ownerId: true, timezone: true },
           },
         },
       },
@@ -485,6 +721,7 @@ exports.confirmBooking = catchAsync(async (req, res, next) => {
           id: true,
           email: true,
           username: true,
+          phoneNumber: true,
         },
       },
     },
@@ -493,14 +730,12 @@ exports.confirmBooking = catchAsync(async (req, res, next) => {
   mapBooking(updatedBooking);
 
   const provider = await resolveProviderEmail(updatedBooking.room);
-  void sendEmailSafe(
-    bookingRequestAcceptedGuest({
-      booking: updatedBooking,
-      room: updatedBooking.room,
-      guest: updatedBooking.guest,
-      provider,
-    })
-  );
+  void notificationService.enqueue("booking.request_accepted", {
+    booking: updatedBooking,
+    room: updatedBooking.room,
+    guest: updatedBooking.guest,
+    provider,
+  });
 
   res.status(200).json({
     status: "success",
@@ -517,7 +752,7 @@ exports.declineBooking = catchAsync(async (req, res, next) => {
       room: {
         include: {
           accommodation: {
-            select: { ownerId: true },
+            select: { ownerId: true, timezone: true },
           },
         },
       },
@@ -526,6 +761,7 @@ exports.declineBooking = catchAsync(async (req, res, next) => {
           id: true,
           email: true,
           username: true,
+          phoneNumber: true,
         },
       },
     },
@@ -536,7 +772,7 @@ exports.declineBooking = catchAsync(async (req, res, next) => {
 
   ensureProviderOwnsBooking(booking, getUserId(req.user));
 
-  if (SETTLEMENT_INELIGIBLE_STATUSES.includes(booking.status)) {
+  if (booking.status !== "PENDING_CONFIRMATION") {
     return next(new AppError("Booking cannot be declined", 400));
   }
 
@@ -550,7 +786,7 @@ exports.declineBooking = catchAsync(async (req, res, next) => {
       room: {
         include: {
           accommodation: {
-            select: { ownerId: true },
+            select: { ownerId: true, timezone: true },
           },
         },
       },
@@ -559,6 +795,7 @@ exports.declineBooking = catchAsync(async (req, res, next) => {
           id: true,
           email: true,
           username: true,
+          phoneNumber: true,
         },
       },
     },
@@ -567,19 +804,302 @@ exports.declineBooking = catchAsync(async (req, res, next) => {
   mapBooking(updatedBooking);
 
   const provider = await resolveProviderEmail(updatedBooking.room);
-  void sendEmailSafe(
-    bookingRequestDeclinedGuest({
-      booking: updatedBooking,
-      room: updatedBooking.room,
-      guest: updatedBooking.guest,
-      provider,
-    })
-  );
+  void notificationService.enqueue("booking.request_declined", {
+    booking: updatedBooking,
+    room: updatedBooking.room,
+    guest: updatedBooking.guest,
+    provider,
+  });
 
   res.status(200).json({
     status: "success",
     data: {
       booking: updatedBooking,
+    },
+  });
+});
+
+exports.modifyBooking = catchAsync(async (req, res, next) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: req.params.id },
+    include: {
+      room: {
+        include: {
+          occupancyRule: true,
+          seasonalRates: true,
+          fees: true,
+          occupancyPricingRule: true,
+          accommodation: {
+            select: {
+              ownerId: true,
+              timezone: true,
+              cancellationPolicy: true,
+              checkInOutRules: true,
+              commissionRate: true,
+              taxRule: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!booking) {
+    return next(new AppError("Booking not found", 404));
+  }
+
+  if (booking.guestId !== getUserId(req.user)) {
+    return next(new AppError("You do not own this booking", 403));
+  }
+
+  if (!["PENDING_CONFIRMATION", "PENDING_PAYMENT"].includes(booking.status)) {
+    return next(new AppError("Booking cannot be modified", 400));
+  }
+
+  const rawCheckIn = req.body.checkIn;
+  const rawCheckOut = req.body.checkOut;
+
+  let updatedBookings;
+  let quote;
+
+  try {
+    updatedBookings = await prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "Room" WHERE "id" = ${booking.roomId} FOR UPDATE`;
+
+        const room = await tx.room.findUnique({
+          where: { id: booking.roomId },
+          include: {
+            occupancyRule: true,
+            seasonalRates: true,
+            fees: true,
+            occupancyPricingRule: true,
+            accommodation: {
+              select: {
+                ownerId: true,
+                timezone: true,
+                cancellationPolicy: true,
+                checkInOutRules: true,
+                commissionRate: true,
+                taxRule: true,
+              },
+            },
+          },
+        });
+
+        if (!room) {
+          throw new AppError("Stay not found", 404);
+        }
+
+        const timezone = getRoomTimezone(room);
+        const stayDates = normalizeStayDates(rawCheckIn, rawCheckOut, timezone);
+        const guestCounts = normalizeGuestCounts(req.body);
+        const ruleViolation = collectRuleViolations(room, stayDates, guestCounts)[0];
+
+        if (ruleViolation) {
+          throwViolation(ruleViolation);
+        }
+
+        const bookingOverlap = await tx.booking.findFirst({
+          where: {
+            roomId: booking.roomId,
+            id: { not: booking.id },
+            status: { notIn: BOOKING_CANCELLED_STATUSES },
+            checkIn: { lt: stayDates.checkOut },
+            checkOut: { gt: stayDates.checkIn },
+          },
+          select: { id: true },
+        });
+
+        if (bookingOverlap) {
+          throwViolation(
+            createViolation("DATE_CONFLICT", "Selected dates overlap an existing booking", 409)
+          );
+        }
+
+        const blockedOverlap = await tx.availabilityBlock.findFirst({
+          where: {
+            roomId: booking.roomId,
+            startDate: { lt: stayDates.checkOut },
+            endDate: { gt: stayDates.checkIn },
+          },
+          select: { id: true },
+        });
+
+        if (blockedOverlap) {
+          throwViolation(
+            createViolation("DATE_BLOCKED", "Selected dates are blocked by the provider", 409)
+          );
+        }
+
+        const couponCode =
+          req.body.couponCode === undefined ? booking.couponCode : req.body.couponCode || null;
+        quote = await computeQuote({
+          room,
+          checkIn: stayDates.checkIn,
+          checkOut: stayDates.checkOut,
+          adultCount: guestCounts.adultCount,
+          childCount: guestCounts.childCount,
+          infantCount: guestCounts.infantCount,
+          couponCode,
+          prismaClient: tx,
+        });
+        const commissionRate = Number(room.accommodation?.commissionRate || 0);
+        const financials = computeBookingFinancials(quote.grandTotal, commissionRate);
+
+        await tx.booking.update({
+          where: { id: booking.id },
+          data: {
+            checkIn: stayDates.checkIn,
+            checkOut: stayDates.checkOut,
+            nights: quote.nights,
+            pricePerNight: quote.nightlyBreakdown[0]?.pricePerNight ?? 0,
+            subtotal: quote.subtotal,
+            totalPrice: quote.grandTotal,
+            cleaningFee: quote.cleaningFee,
+            taxAmount: quote.taxAmount,
+            discountAmount: quote.promotionDiscount + quote.couponDiscount,
+            couponCode: quote.appliedCoupon?.code ?? null,
+            promotionId: quote.appliedPromotion?.id ?? null,
+            commissionRate,
+            commissionAmount: financials.commissionAmount,
+            netPayout: financials.netPayout,
+            adultCount: guestCounts.adultCount,
+            childCount: guestCounts.childCount,
+            infantCount: guestCounts.infantCount,
+            specialRequests: req.body.specialRequests ?? booking.specialRequests ?? "",
+          },
+        });
+
+        await tx.bookingFeeSnapshot.upsert({
+          where: { bookingId: booking.id },
+          create: {
+            bookingId: booking.id,
+            lineItems: quote.lineItems,
+            subtotal: quote.subtotal,
+            discountAmount: quote.promotionDiscount + quote.couponDiscount,
+            taxAmount: quote.taxAmount,
+            grandTotal: quote.grandTotal,
+            couponCode: quote.appliedCoupon?.code ?? null,
+            promotionId: quote.appliedPromotion?.id ?? null,
+          },
+          update: {
+            lineItems: quote.lineItems,
+            subtotal: quote.subtotal,
+            discountAmount: quote.promotionDiscount + quote.couponDiscount,
+            taxAmount: quote.taxAmount,
+            grandTotal: quote.grandTotal,
+            couponCode: quote.appliedCoupon?.code ?? null,
+            promotionId: quote.appliedPromotion?.id ?? null,
+          },
+        });
+
+        if (quote.appliedCoupon && quote.appliedCoupon.code !== booking.couponCode) {
+          await incrementUseCount(tx, quote.appliedCoupon.id, quote.appliedPromotion.id);
+        }
+
+        return tx.booking.findMany({
+          where: { id: booking.id },
+          include: bookingRelationInclude,
+          orderBy: { createdAt: "desc" },
+        });
+      },
+      { isolationLevel: "Serializable" }
+    );
+  } catch (err) {
+    if (isBookingConflictError(err)) {
+      return next(
+        new AppError("Selected dates overlap an existing booking", 409, "DATE_CONFLICT")
+      );
+    }
+
+    throw err;
+  }
+
+  const updatedBooking = updatedBookings[0];
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      booking: updatedBooking,
+      quote,
+    },
+  });
+});
+
+exports.submitGuestInfo = catchAsync(async (req, res, next) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: req.params.id },
+    select: { id: true, guestId: true },
+  });
+
+  if (!booking) {
+    return next(new AppError("Booking not found", 404));
+  }
+
+  ensureBookingOwner(booking, getUserId(req.user));
+
+  const fullName = String(req.body.fullName || "").trim();
+  const phone = String(req.body.phone || "").trim();
+
+  if (!fullName || !phone) {
+    return next(new AppError("fullName and phone are required", 400));
+  }
+
+  const guestInfo = await prisma.bookingGuestInfo.upsert({
+    where: { bookingId: booking.id },
+    create: {
+      bookingId: booking.id,
+      fullName,
+      phone,
+      nationalId: req.body.nationalId || null,
+      estimatedArrivalTime: req.body.estimatedArrivalTime || null,
+      additionalNotes: req.body.additionalNotes || null,
+    },
+    update: {
+      fullName,
+      phone,
+      nationalId: req.body.nationalId || null,
+      estimatedArrivalTime: req.body.estimatedArrivalTime || null,
+      additionalNotes: req.body.additionalNotes || null,
+    },
+  });
+
+  mapId(guestInfo);
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      guestInfo,
+    },
+  });
+});
+
+exports.getBookingById = catchAsync(async (req, res, next) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: req.params.id },
+    include: bookingDetailInclude,
+  });
+
+  if (!booking) {
+    return next(new AppError("Booking not found", 404));
+  }
+
+  const userId = getUserId(req.user);
+  const isGuestOwner = booking.guestId === userId;
+  const isProviderOwner = getRoomOwnerIdentity(booking.room).includes(userId?.toString());
+  const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+
+  if (!isGuestOwner && !isProviderOwner && !isAdmin) {
+    return next(new AppError("You do not have access to this booking", 403));
+  }
+
+  mapBooking(booking);
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      booking,
     },
   });
 });
@@ -660,7 +1180,7 @@ exports.settleBooking = catchAsync(async (req, res, next) => {
       room: {
         include: {
           accommodation: {
-            select: { ownerId: true },
+            select: { ownerId: true, timezone: true },
           },
         },
       },
@@ -689,7 +1209,7 @@ exports.settleBooking = catchAsync(async (req, res, next) => {
       room: {
         include: {
           accommodation: {
-            select: { ownerId: true },
+            select: { ownerId: true, timezone: true },
           },
         },
       },
@@ -698,6 +1218,7 @@ exports.settleBooking = catchAsync(async (req, res, next) => {
           id: true,
           email: true,
           username: true,
+          phoneNumber: true,
         },
       },
     },
@@ -706,14 +1227,12 @@ exports.settleBooking = catchAsync(async (req, res, next) => {
   mapBooking(updatedBooking);
 
   const provider = await resolveProviderEmail(updatedBooking.room);
-  void sendEmailSafe(
-    bookingSettledProvider({
-      booking: updatedBooking,
-      room: updatedBooking.room,
-      guest: updatedBooking.guest,
-      provider,
-    })
-  );
+  void notificationService.enqueue("booking.settlement_completed", {
+    booking: updatedBooking,
+    room: updatedBooking.room,
+    guest: updatedBooking.guest,
+    provider,
+  });
 
   res.status(200).json({
     status: "success",
@@ -724,7 +1243,29 @@ exports.settleBooking = catchAsync(async (req, res, next) => {
 });
 
 exports.initiateBookingPayment = catchAsync(async (req, res, next) => {
-  const { bookingId, phone } = req.body;
+  const { bookingId, phone, idempotencyKey } = req.body;
+  let paymentIdempotencyKey = idempotencyKey || null;
+
+  if (idempotencyKey) {
+    const existingPayment = await prisma.payment.findUnique({
+      where: { idempotencyKey },
+    });
+
+    if (existingPayment && existingPayment.status !== "failed") {
+      return res.status(200).json({
+        status: "success",
+        data: {
+          transactionRef: existingPayment.transactionRef,
+          instructions: "Payment already initiated",
+          paymentId: existingPayment.id,
+        },
+      });
+    }
+
+    if (existingPayment?.status === "failed") {
+      paymentIdempotencyKey = `${idempotencyKey}-retry-${Date.now()}`;
+    }
+  }
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -732,7 +1273,7 @@ exports.initiateBookingPayment = catchAsync(async (req, res, next) => {
       room: {
         include: {
           accommodation: {
-            select: { ownerId: true },
+            select: { ownerId: true, timezone: true },
           },
         },
       },
@@ -773,9 +1314,14 @@ exports.initiateBookingPayment = catchAsync(async (req, res, next) => {
       bookingId: booking.id,
       userId: getUserId(req.user),
       transactionRef: result.transactionRef,
+      providerIntentId: result.providerIntentId || null,
+      idempotencyKey: paymentIdempotencyKey,
       status: "pending",
-      method: process.env.PAYMENT_PROVIDER === "paynow" ? "paynow" : "mock",
+      method: getPaymentMethod(),
       amount,
+      amountDue: amount,
+      currency: "USD",
+      providerMeta: result.providerMeta || null,
     },
   });
 
@@ -793,6 +1339,214 @@ exports.initiateBookingPayment = catchAsync(async (req, res, next) => {
       transactionRef: result.transactionRef,
       instructions: result.instructions,
       paymentId: payment.id,
+    },
+  });
+});
+
+exports.initiatePartialPayment = catchAsync(async (req, res, next) => {
+  const { phone, idempotencyKey } = req.body;
+  const amount = Number.parseFloat(req.body.amount);
+  let paymentIdempotencyKey = idempotencyKey || null;
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return next(new AppError("Partial payment amount is invalid", 400));
+  }
+
+  if (idempotencyKey) {
+    const existingPayment = await prisma.payment.findUnique({
+      where: { idempotencyKey },
+    });
+
+    if (existingPayment && existingPayment.status !== "failed") {
+      return res.status(200).json({
+        status: "success",
+        data: {
+          transactionRef: existingPayment.transactionRef,
+          instructions: "Payment already initiated",
+          paymentId: existingPayment.id,
+        },
+      });
+    }
+
+    if (existingPayment?.status === "failed") {
+      paymentIdempotencyKey = `${idempotencyKey}-retry-${Date.now()}`;
+    }
+  }
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: req.params.id },
+    include: {
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true, timezone: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (!booking) {
+    return next(new AppError("Booking not found", 404));
+  }
+
+  ensureBookingOwner(booking, getUserId(req.user));
+
+  if (BOOKING_CANCELLED_STATUSES.includes(booking.status)) {
+    return next(new AppError("Cancelled bookings cannot be paid", 400));
+  }
+
+  if (booking.paymentStatus === "PAID") {
+    return next(new AppError("Booking is already paid", 400));
+  }
+
+  const paidAggregate = await prisma.payment.aggregate({
+    where: {
+      bookingId: booking.id,
+      status: "success",
+    },
+    _sum: {
+      amountPaid: true,
+    },
+  });
+  const amountPaid = Number(paidAggregate?._sum?.amountPaid || 0);
+  const totalPrice = Number(booking.totalPrice || 0);
+  const remainingBalance = Math.max(0, totalPrice - amountPaid);
+
+  if (amount > remainingBalance) {
+    return next(new AppError("Partial payment exceeds the remaining balance", 400));
+  }
+
+  mapId(booking);
+  mapId(booking.room);
+
+  const provider = getProvider();
+  const result = await provider.initiatePartialPayment(booking, {
+    ...req.user,
+    _id: getUserId(req.user),
+    phone: getUserPhone(req.user, phone),
+  }, amount);
+
+  const payment = await prisma.payment.create({
+    data: {
+      type: "partial_booking_payment",
+      bookingId: booking.id,
+      userId: getUserId(req.user),
+      transactionRef: result.transactionRef,
+      providerIntentId: result.providerIntentId || null,
+      idempotencyKey: paymentIdempotencyKey,
+      status: "pending",
+      method: getPaymentMethod(),
+      amount,
+      amountDue: amount,
+      currency: "USD",
+      providerMeta: result.providerMeta || null,
+    },
+  });
+
+  await prisma.booking.update({
+    where: { id: booking.id },
+    data: {
+      paymentRef: result.transactionRef,
+      paymentStatus: amountPaid > 0 ? "PARTIALLY_PAID" : "PENDING",
+    },
+  });
+
+  res.status(201).json({
+    status: "success",
+    data: {
+      transactionRef: result.transactionRef,
+      instructions: result.instructions,
+      paymentId: payment.id,
+      remainingBalance: Math.max(0, remainingBalance - amount),
+    },
+  });
+});
+
+exports.initiateRefund = catchAsync(async (req, res, next) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: req.params.id },
+    include: {
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true, timezone: true },
+          },
+        },
+      },
+      guest: {
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          phoneNumber: true,
+        },
+      },
+      payments: true,
+    },
+  });
+
+  if (!booking) {
+    return next(new AppError("Booking not found", 404));
+  }
+
+  const userId = getUserId(req.user).toString();
+  const isGuestOwner = booking.guestId === userId;
+  const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+
+  if (!isGuestOwner && !isAdmin) {
+    return next(new AppError("You do not own this booking", 403));
+  }
+
+  if (!["PAID", "PARTIALLY_PAID"].includes(booking.paymentStatus)) {
+    return next(new AppError("Booking is not eligible for a refund", 400));
+  }
+
+  const requestedAmount =
+    isAdmin && req.body.amount !== undefined ? Number.parseFloat(req.body.amount) : null;
+  const refundAmount = requestedAmount || computeRefundAmount(booking, new Date());
+
+  if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+    return next(new AppError("Refund amount is invalid", 400));
+  }
+
+  const refunds = await issueBookingRefunds({
+    booking,
+    payments: booking.payments,
+    amount: refundAmount,
+    reason: req.body.reason || "refund",
+    initiatedBy: userId,
+  });
+  const cumulativeRefundAmount = Number(booking.refundAmount || 0) + refundAmount;
+  const totalPrice = Number(booking.totalPrice || 0);
+  const paymentStatus = cumulativeRefundAmount >= totalPrice ? "REFUNDED" : "PARTIALLY_REFUNDED";
+  const updatedBooking = await prisma.booking.update({
+    where: { id: booking.id },
+    data: {
+      paymentStatus,
+      refundAmount: cumulativeRefundAmount,
+    },
+    include: bookingRelationInclude,
+  });
+
+  mapBooking(updatedBooking);
+
+  const provider = await resolveProviderEmail(updatedBooking.room);
+  void notificationService.enqueue("booking.refund_initiated", {
+    booking: updatedBooking,
+    room: updatedBooking.room,
+    guest: updatedBooking.guest,
+    provider,
+    refundAmount,
+    reason: req.body.reason || "refund",
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      refund: refunds[0] || null,
+      refunds,
+      booking: updatedBooking,
     },
   });
 });

@@ -20,22 +20,33 @@
 
 const MockProvider = require('./providers/mockProvider');
 const PaynowProvider = require('./providers/paynowProvider');
+const StripeProvider = require('./providers/stripeProvider');
+
+const normalizeProviderName = (name) => String(name || 'mock').trim().toLowerCase();
+
+const getProviderByName = (name) => {
+  const paymentProvider = normalizeProviderName(name);
+
+  if (paymentProvider === 'paynow') {
+    return PaynowProvider;
+  }
+
+  if (paymentProvider === 'stripe') {
+    return StripeProvider;
+  }
+
+  return MockProvider;
+};
 
 /**
  * Factory function to get the appropriate payment provider
  * @returns {PaymentProvider} The configured payment provider instance
  */
 const getProvider = () => {
-  const paymentProvider = process.env.PAYMENT_PROVIDER || 'mock';
-  
-  if (paymentProvider === 'paynow') {
-    return PaynowProvider;
-  }
-  
-  // Default to mock provider
-  return MockProvider;
+  return getProviderByName(process.env.PAYMENT_PROVIDER);
 };
 
 module.exports = {
   getProvider,
+  getProviderByName,
 };

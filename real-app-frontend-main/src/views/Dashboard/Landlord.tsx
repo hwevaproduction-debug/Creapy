@@ -19,6 +19,8 @@ import useTypedSelector from "../../hooks/useTypedSelector";
 import { selectedUserId } from "../../redux/auth/authSlice";
 import {
   useDeleteListingMutation,
+  useDeleteListingDraftMutation,
+  useGetListingDraftQuery,
   useGetListingQuery,
 } from "../../redux/api/listingApiSlice";
 import { useGetMyPaymentsQuery } from "../../redux/api/paymentApiSlice";
@@ -151,12 +153,35 @@ const getPaymentStatusBadge = (status: string) => {
   );
 };
 
+const formatDraftTimestamp = (value?: string) => {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const LandlordDashboard = () => {
   const userId = useTypedSelector(selectedUserId);
   const navigate = useNavigate();
 
   const { data: listingsData, isLoading: listingsLoading } = useGetListingQuery(userId);
   const [deleteListing, { isLoading: isDeleting }] = useDeleteListingMutation();
+  const { data: listingDraft } = useGetListingDraftQuery(undefined, {
+    skip: !userId,
+  });
+  const [deleteListingDraft, { isLoading: isDeletingDraft }] =
+    useDeleteListingDraftMutation();
+  const listingDraftId = listingDraft?._id || listingDraft?.id;
+  const draftSavedAt = formatDraftTimestamp(
+    listingDraft?.updatedAt || listingDraft?.data?.savedAt
+  );
 
   const { data: paymentsData, isLoading: paymentsLoading } =
     useGetMyPaymentsQuery(undefined);
@@ -174,11 +199,76 @@ const LandlordDashboard = () => {
             gap: 1,
           }}
         >
-          <Heading>My Listings</Heading>
-          <AppButton onClick={() => navigate("/create-listing")}>
-            + Create New Listing
-          </AppButton>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Heading>My Listings</Heading>
+            {listingDraftId ? (
+              <Box
+                sx={{
+                  background: "#dbeafe",
+                  color: "#1e40af",
+                  borderRadius: "999px",
+                  padding: "4px 10px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                }}
+              >
+                Draft
+              </Box>
+            ) : null}
+          </Box>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            {listingDraftId ? (
+              <AppButton
+                variant="outlined"
+                onClick={() => navigate("/create-listing")}
+              >
+                Resume Draft
+              </AppButton>
+            ) : null}
+            <AppButton onClick={() => navigate("/create-listing")}>
+              + Create New Listing
+            </AppButton>
+          </Box>
         </Box>
+
+        {listingDraftId ? (
+          <AppCard
+            sx={{
+              width: "100%",
+              padding: "16px 20px",
+              margin: "12px 0 20px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: { xs: "flex-start", sm: "center" },
+              gap: 2,
+              flexDirection: { xs: "column", sm: "row" },
+            }}
+          >
+            <Box>
+              <Box sx={{ fontWeight: 700, color: "#1F4D3A" }}>
+                Unsaved listing draft
+              </Box>
+              {draftSavedAt ? (
+                <Box sx={{ color: "#6b7280", fontSize: "14px", mt: 0.5 }}>
+                  Last saved {draftSavedAt}
+                </Box>
+              ) : null}
+            </Box>
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+              <AppButton onClick={() => navigate("/create-listing")}>
+                Resume
+              </AppButton>
+              <AppButton
+                variant="outlined"
+                color="inherit"
+                disabled={isDeletingDraft}
+                onClick={() => deleteListingDraft(listingDraftId)}
+              >
+                Discard
+              </AppButton>
+            </Box>
+          </AppCard>
+        ) : null}
 
         {listingsLoading ? (
           <OverlayLoader />

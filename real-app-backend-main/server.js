@@ -76,6 +76,16 @@ async function start() {
         "Database connection unavailable at startup; requests that require PostgreSQL may fail."
       );
     }
+
+    if (process.env.NODE_ENV !== "test") {
+      const { startReconciliationJob } = require("./utils/reconciliationJob");
+      const { startNotificationWorker } = require("./utils/notificationWorker");
+      const { startReminderScanner } = require("./utils/reminderScanner");
+
+      startReconciliationJob();
+      startNotificationWorker();
+      startReminderScanner();
+    }
   });
 
   process.on("unhandledRejection", (err) => {

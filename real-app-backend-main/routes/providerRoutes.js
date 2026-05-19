@@ -9,11 +9,21 @@ router.post("/register", providerController.registerProvider);
 router.use(authController.protect);
 
 router.get(
+  "/me/analytics",
+  authController.requireRole("provider"),
+  providerController.getMyAnalytics
+);
+router.get(
   "/me",
   authController.requireRole("provider"),
   providerController.getMyProfile
 );
 router.put(
+  "/me",
+  authController.requireRole("provider"),
+  providerController.updateMyProfile
+);
+router.patch(
   "/me",
   authController.requireRole("provider"),
   providerController.updateMyProfile

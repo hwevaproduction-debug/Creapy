@@ -639,7 +639,9 @@ exports.protect = catchAsync(async (req, res, next) => {
 });
 exports.requireRole = (role) => {
   return (req, res, next) => {
-    if (!req.user || req.user.role !== role) {
+    const allowedRoles = Array.isArray(role) ? role : [role];
+
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
       return next(new AppError("Access denied", 403));
     }
     next();

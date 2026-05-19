@@ -1,7 +1,17 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Avatar, Box, Chip, Grid, Stack } from "@mui/material";
-import { FaCalendarDay, FaLocationDot, FaUserGroup } from "react-icons/fa6";
+import {
+  Avatar,
+  Box,
+  Chip,
+  Grid,
+  IconButton,
+  Stack,
+  Step,
+  StepLabel,
+  Stepper,
+} from "@mui/material";
+import { FaCalendarDay, FaLocationDot, FaMinus, FaPlus, FaUserGroup } from "react-icons/fa6";
 import { Heading, SubHeading } from "../../components/Heading";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import AppContainer from "../../components/ui/AppContainer";
@@ -9,14 +19,19 @@ import AppCard from "../../components/ui/AppCard";
 import AppInput from "../../components/ui/AppInput";
 import AppButton from "../../components/ui/AppButton";
 import DotLoader from "../../components/Spinner/dotLoader";
+import BookingCalendar from "../../components/stays/BookingCalendar";
+import CouponInput from "../../components/stays/CouponInput";
+import PriceBreakdown from "../../components/stays/PriceBreakdown";
+import { usePricingQuote } from "../../hooks/usePricingQuote";
 import useTypedSelector from "../../hooks/useTypedSelector";
 import {
   useCreateBookingMutation,
   useGetProviderProfileQuery,
   useGetRoomAvailabilityQuery,
   useGetStayByIdQuery,
+  useSubmitGuestInfoMutation,
 } from "../../redux/api/stayApiSlice";
-import { thousandSeparatorNumber } from "../../utils";
+import { getDateStringForTimeZone, thousandSeparatorNumber } from "../../utils";
 
 const CANCELLATION_POLICY_MAP: Record<string, string> = {
   flexible: "Free cancellation up to 24h before check-in",
@@ -54,7 +69,9 @@ const getRoomPrice = (room: any) =>
   );
 
 const getRoomCapacity = (room: any) =>
-  Number(room?.maxGuests || room?.capacity || room?.guests || room?.occupancy || 1);
+  Number(room?.occupancyRule?.maxGuests || room?.maxGuests || room?.capacity || room?.guests || room?.occupancy || 1);
+
+const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 const getAmenities = (room: any) => {
   if (Array.isArray(room?.amenities)) {
@@ -70,15 +87,55 @@ const getAmenities = (room: any) => {
   return [];
 };
 
+const parseDateOnlyAsUtc = (value: string) => {
+  const match = ISO_DATE_PATTERN.exec(value);
+
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+
+  if (
+    parsed.getUTCFullYear() !== Number(year) ||
+    parsed.getUTCMonth() !== Number(month) - 1 ||
+    parsed.getUTCDate() !== Number(day)
+  ) {
+    return null;
+  }
+
+  return parsed;
+};
+
+const addDaysToDateString = (value: string, days: number) => {
+  const parsed = parseDateOnlyAsUtc(value);
+
+  if (!parsed) return "";
+
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+
+  return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}-${String(parsed.getUTCDate()).padStart(2, "0")}`;
+};
+
 const getDayCount = (checkIn: string, checkOut: string) => {
-  const start = new Date(checkIn);
-  const end = new Date(checkOut);
+  const start = parseDateOnlyAsUtc(checkIn);
+  const end = parseDateOnlyAsUtc(checkOut);
+
+  if (!start || !end) return 0;
+
   const diff = end.getTime() - start.getTime();
 
   if (!checkIn || !checkOut || Number.isNaN(diff) || diff <= 0) return 0;
 
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 };
+
+const formatPricingDate = (value: string) =>
+  new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(parseDateOnlyAsUtc(value) || new Date(`${value}T00:00:00.000Z`));
 
 const formatAmenity = (value: string) =>
   value
@@ -88,21 +145,19 @@ const formatAmenity = (value: string) =>
     .trim()
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
-const toIsoDate = (value: string | Date) => new Date(value).toISOString().slice(0, 10);
-
-const expandDateRange = (start: string | Date, end: string | Date) => {
-  const startDate = new Date(start);
-  const endDate = new Date(end);
+const expandDateRange = (start: string, end: string) => {
   const dates = new Set<string>();
 
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+  if (!parseDateOnlyAsUtc(start) || !parseDateOnlyAsUtc(end)) {
     return dates;
   }
 
-  const cursor = new Date(startDate);
-  while (cursor < endDate) {
-    dates.add(toIsoDate(cursor));
-    cursor.setDate(cursor.getDate() + 1);
+  let cursor = start;
+  while (cursor < end) {
+    dates.add(cursor);
+    cursor = addDaysToDateString(cursor, 1);
+
+    if (!cursor) break;
   }
 
   return dates;
@@ -122,16 +177,33 @@ const getProviderInitials = (name: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join("") || "TS";
 
+const getBookingId = (booking: any) =>
+  booking?._id || booking?.id || booking?.data?.booking?._id || booking?.data?.booking?.id;
+
 const RoomDetail = () => {
   const navigate = useNavigate();
   const { roomId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const authUser = useTypedSelector((state) => state.auth?.user);
+  const initialGuests = Math.max(1, Number(searchParams.get("guests") || 1));
   const [form, setForm] = useState({
     checkIn: searchParams.get("checkIn") || "",
     checkOut: searchParams.get("checkOut") || "",
-    guests: searchParams.get("guests") || "1",
+    guests: String(initialGuests),
+    adultCount: initialGuests,
+    childCount: 0,
+    infantCount: 0,
     specialRequests: "",
+    couponCode: "",
+  });
+  const [bookingStep, setBookingStep] = useState<0 | 1 | 2>(0);
+  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
+  const [guestInfo, setGuestInfo] = useState({
+    fullName: "",
+    phone: "",
+    nationalId: "",
+    estimatedArrivalTime: "",
+    additionalNotes: "",
   });
   const [toast, setToast] = useState({
     appearence: false,
@@ -141,9 +213,14 @@ const RoomDetail = () => {
 
   const { data: room, isLoading, error } = useGetStayByIdQuery(roomId, { skip: !roomId });
   const [createBooking, { isLoading: isBooking }] = useCreateBookingMutation();
+  const [submitGuestInfo, { isLoading: isSubmittingGuestInfo }] = useSubmitGuestInfoMutation();
   const { data: providerData } = useGetProviderProfileQuery(room?.providerId || room?.provider?._id || "", {
     skip: !(room?.providerId || room?.provider?._id),
   });
+
+  useEffect(() => {
+    setCreatedBookingId(null);
+  }, [roomId]);
 
   const shouldCheckAvailability = Boolean(roomId && form.checkIn && form.checkOut);
   const {
@@ -155,16 +232,36 @@ const RoomDetail = () => {
       roomId,
       checkIn: form.checkIn,
       checkOut: form.checkOut,
+      adultCount: form.adultCount,
+      childCount: form.childCount,
+      infantCount: form.infantCount,
     },
     { skip: !shouldCheckAvailability }
   );
+  const { quote, isLoading: isQuoteLoading } = usePricingQuote({
+    roomId,
+    checkIn: form.checkIn,
+    checkOut: form.checkOut,
+    adultCount: form.adultCount,
+    childCount: form.childCount,
+    infantCount: form.infantCount,
+    couponCode: form.couponCode,
+  });
 
   const images = useMemo(() => getRoomImages(room), [room]);
   const provider = useMemo(() => getProviderProfile(providerData), [providerData]);
-  const nights = getDayCount(form.checkIn, form.checkOut);
+  const availabilityData = availability?.data || availability || null;
+  const roomTimezone = availabilityData?.timezone || room?.timezone || room?.accommodation?.timezone;
+  const nights = Number(availabilityData?.nights || getDayCount(form.checkIn, form.checkOut));
   const nightlyRate = getRoomPrice(room);
-  const totalPrice = nights * nightlyRate;
+  const totalPrice = quote?.grandTotal ?? Number(availabilityData?.totalPrice ?? nights * nightlyRate);
+  const occupancyRule = room?.occupancyRule || null;
+  const totalOccupancyGuests = Number(form.adultCount || 0) + Number(form.childCount || 0);
+  const occupancyExceeded = Boolean(
+    occupancyRule && totalOccupancyGuests > Number(occupancyRule.maxGuests || 0)
+  );
   const bookingMode = room?.bookingMode || room?.bookingSettings?.mode || room?.settings?.bookingMode || "request";
+  const isInstantBooking = String(bookingMode).toUpperCase() === "INSTANT";
   const policyCode = room?.policyCode || room?.cancellationPolicy || room?.provider?.providerProfile?.cancellationPolicy;
   const checkInTime = room?.checkInTime || provider?.checkInTime || "14:00";
   const checkOutTime = room?.checkOutTime || provider?.checkOutTime || "11:00";
@@ -177,8 +274,14 @@ const RoomDetail = () => {
     const dates = new Set<string>();
 
     ranges.forEach((range: any) => {
-      const start = range?.checkIn || range?.startDate;
-      const end = range?.checkOut || range?.endDate;
+      const start =
+        range?.checkInDate ||
+        range?.startDateString ||
+        getDateStringForTimeZone(range?.checkIn || range?.startDate, roomTimezone);
+      const end =
+        range?.checkOutDate ||
+        range?.endDateString ||
+        getDateStringForTimeZone(range?.checkOut || range?.endDate, roomTimezone);
 
       if (!start || !end) return;
 
@@ -186,14 +289,17 @@ const RoomDetail = () => {
     });
 
     return dates;
-  }, [availability]);
+  }, [availability, roomTimezone]);
 
   const isAvailable = useMemo(() => {
-    if (typeof availability?.isAvailable === "boolean") return availability.isAvailable;
-    if (typeof availability?.data?.isAvailable === "boolean") return availability.data.isAvailable;
+    if (typeof availabilityData?.isAvailable === "boolean") return availabilityData.isAvailable;
     if (!shouldCheckAvailability) return null;
     return forbiddenDates.size === 0;
-  }, [availability, forbiddenDates, shouldCheckAvailability]);
+  }, [availabilityData, forbiddenDates, shouldCheckAvailability]);
+
+  const availabilityViolations = Array.isArray(availabilityData?.violations)
+    ? availabilityData.violations
+    : [];
 
   const showToast = (type: string, message: string) => {
     setToast({
@@ -207,8 +313,24 @@ const RoomDetail = () => {
     setToast((prev) => ({ ...prev, appearence: false }));
   };
 
+  const updateOccupancyCount = (
+    field: "adultCount" | "childCount" | "infantCount",
+    delta: number,
+    minValue: number,
+    maxValue: number
+  ) => {
+    setForm((prev) => {
+      const nextValue = Math.min(maxValue, Math.max(minValue, Number(prev[field] || 0) + delta));
+
+      return {
+        ...prev,
+        [field]: nextValue,
+      };
+    });
+  };
+
   useEffect(() => {
-    if (!shouldCheckAvailability) return;
+    if (!shouldCheckAvailability || createdBookingId) return;
 
     if (availabilityError) {
       showToast(
@@ -226,56 +348,48 @@ const RoomDetail = () => {
     } else if (isAvailable === false) {
       showToast("error", "Room is not available for these dates.");
     }
-  }, [availabilityError, isAvailable, isCheckingAvailability, shouldCheckAvailability]);
+  }, [
+    availabilityError,
+    createdBookingId,
+    isAvailable,
+    isCheckingAvailability,
+    shouldCheckAvailability,
+  ]);
 
-  const validateSelectedDate = (field: "checkIn" | "checkOut", nextValue: string) => {
-    if (!nextValue) return true;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const nextDate = new Date(nextValue);
-    nextDate.setHours(0, 0, 0, 0);
-
-    if (nextDate < today) {
-      showToast("error", "Past dates cannot be selected.");
+  const validateStepZero = () => {
+    if (!form.checkIn || !form.checkOut) {
+      showToast("error", "Select check-in and check-out dates before continuing.");
       return false;
     }
 
-    const nextForm = { ...form, [field]: nextValue };
-    if (nextForm.checkIn && nextForm.checkOut) {
-      const start = new Date(nextForm.checkIn);
-      const end = new Date(nextForm.checkOut);
+    if (nights <= 0) {
+      showToast("error", "Check-out must be after check-in.");
+      return false;
+    }
 
-      if (start >= end) {
-        showToast("error", "Check-out must be after check-in.");
-        return false;
-      }
+    if (isAvailable === false) {
+      showToast("error", "This room is unavailable for the selected dates.");
+      return false;
+    }
 
-      const selectedDates = expandDateRange(nextForm.checkIn, nextForm.checkOut);
-      const overlapsForbidden = Array.from(selectedDates).some((date) => forbiddenDates.has(date));
-
-      if (overlapsForbidden) {
-        showToast("error", "Selected dates overlap booked or blocked dates.");
-        return false;
-      }
+    if (occupancyExceeded) {
+      showToast("error", `This room allows up to ${occupancyRule?.maxGuests} guests.`);
+      return false;
     }
 
     return true;
   };
 
-  const handleDateChange = (field: "checkIn" | "checkOut", value: string) => {
-    if (value && forbiddenDates.has(value)) {
-      setForm((prev) => ({ ...prev, [field]: "" }));
-      showToast("warning", "That date is unavailable. Please choose another date.");
-      return;
+  const validateStepOne = () => {
+    if (!guestInfo.fullName.trim() || !guestInfo.phone.trim()) {
+      showToast("error", "Full name and phone are required.");
+      return false;
     }
 
-    if (!validateSelectedDate(field, value)) return;
-    setForm((prev) => ({ ...prev, [field]: value }));
+    return true;
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handlePrimaryAction = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!authUser) {
@@ -283,44 +397,94 @@ const RoomDetail = () => {
       return;
     }
 
-    if (!form.checkIn || !form.checkOut) {
-      showToast("error", "Select check-in and check-out dates before booking.");
+    if (bookingStep === 0) {
+      if (validateStepZero()) {
+        setBookingStep(1);
+      }
       return;
     }
 
-    if (nights <= 0) {
-      showToast("error", "Check-out must be after check-in.");
+    if (bookingStep === 1) {
+      if (validateStepOne()) {
+        setBookingStep(2);
+      }
       return;
     }
 
-    if (isAvailable === false) {
-      showToast("error", "This room is unavailable for the selected dates.");
+    if (createdBookingId) {
+      if (!validateStepOne()) {
+        return;
+      }
+
+      try {
+        await submitGuestInfo({
+          id: createdBookingId,
+          body: guestInfo,
+        }).unwrap();
+
+        showToast("success", "Booking created successfully.");
+        navigate(`/stays/bookings/${createdBookingId}`);
+      } catch (guestInfoError: any) {
+        showToast(
+          "error",
+          guestInfoError?.data?.message ||
+            "Booking was created, but guest information could not be saved. Please try again."
+        );
+      }
       return;
     }
+
+    if (!validateStepZero() || !validateStepOne()) {
+      return;
+    }
+
+    let bookingId: string | null = null;
 
     try {
       const booking = await createBooking({
         room: roomId,
         checkIn: form.checkIn,
         checkOut: form.checkOut,
-        guests: Number(form.guests || 1),
+        guests: occupancyRule ? totalOccupancyGuests : Number(form.guests || 1),
+        adultCount: occupancyRule ? form.adultCount : Number(form.guests || 1),
+        childCount: occupancyRule ? form.childCount : 0,
+        infantCount: occupancyRule ? form.infantCount : 0,
         specialRequests: form.specialRequests,
         totalPrice,
+        couponCode: form.couponCode,
       }).unwrap();
 
-      const bookingStatus =
-        booking?.status || booking?.data?.booking?.status || booking?.booking?.status || "";
-      const successMessage =
-        bookingStatus === "confirmed"
-          ? "Booking confirmed!"
-          : "Booking request sent — awaiting provider confirmation";
+      bookingId = getBookingId(booking);
 
-      showToast("success", successMessage);
-      window.setTimeout(() => navigate("/stays/bookings"), 900);
+      if (!bookingId) {
+        throw new Error("Booking reference missing");
+      }
+      setCreatedBookingId(bookingId);
     } catch (bookingError: any) {
       showToast(
         "error",
-        bookingError?.data?.message || "Booking could not be completed right now."
+        bookingError?.data?.message || bookingError?.message || "Booking could not be completed right now."
+      );
+      return;
+    }
+
+    if (!bookingId) {
+      return;
+    }
+
+    try {
+      await submitGuestInfo({
+        id: bookingId,
+        body: guestInfo,
+      }).unwrap();
+
+      showToast("success", "Booking created successfully.");
+      navigate(`/stays/bookings/${bookingId}`);
+    } catch (guestInfoError: any) {
+      showToast(
+        "error",
+        guestInfoError?.data?.message ||
+          "Booking was created, but guest information could not be saved. Please try again."
       );
     }
   };
@@ -430,11 +594,11 @@ const RoomDetail = () => {
                       </Box>
                       <Chip
                         label={
-                          bookingMode === "instant" ? "⚡ Instant Booking" : "📋 Request to Book"
+                          isInstantBooking ? "Instant Booking" : "Request to Book"
                         }
                         sx={{
-                          background: bookingMode === "instant" ? "#DBEAFE" : "#FEF3C7",
-                          color: bookingMode === "instant" ? "#1D4ED8" : "#B45309",
+                          background: isInstantBooking ? "#DBEAFE" : "#FEF3C7",
+                          color: isInstantBooking ? "#1D4ED8" : "#B45309",
                           fontWeight: 700,
                           alignSelf: "flex-start",
                         }}
@@ -505,77 +669,362 @@ const RoomDetail = () => {
                 </Box>
 
                 <Chip
-                  label={bookingMode === "instant" ? "⚡ Instant Booking" : "📋 Request to Book"}
+                  label={isInstantBooking ? "Instant Booking" : "Request to Book"}
                   sx={{
                     alignSelf: "flex-start",
-                    background: bookingMode === "instant" ? "#DBEAFE" : "#FEF3C7",
-                    color: bookingMode === "instant" ? "#1D4ED8" : "#B45309",
+                    background: isInstantBooking ? "#DBEAFE" : "#FEF3C7",
+                    color: isInstantBooking ? "#1D4ED8" : "#B45309",
                     fontWeight: 700,
                   }}
                 />
 
-                <Box component="form" onSubmit={handleSubmit}>
+                <Box component="form" onSubmit={handlePrimaryAction}>
                   <Stack spacing={2}>
-                    <AppInput
-                      label="Check-in"
-                      type="date"
-                      value={form.checkIn}
-                      onChange={(event) => handleDateChange("checkIn", event.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                      inputProps={{ min: new Date().toISOString().slice(0, 10) }}
-                    />
-                    <AppInput
-                      label="Check-out"
-                      type="date"
-                      value={form.checkOut}
-                      onChange={(event) => handleDateChange("checkOut", event.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                      inputProps={{
-                        min: form.checkIn || new Date().toISOString().slice(0, 10),
-                      }}
-                    />
-                    <AppInput
-                      label="Guests"
-                      type="number"
-                      value={form.guests}
-                      onChange={(event) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          guests: String(
-                            Math.min(
-                              getRoomCapacity(room),
-                              Math.max(1, Number(event.target.value || 1))
-                            )
-                          ),
-                        }))
-                      }
-                      inputProps={{ min: 1, max: getRoomCapacity(room) }}
-                    />
-                    <AppInput
-                      label="Special requests"
-                      multiline
-                      minRows={3}
-                      value={form.specialRequests}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, specialRequests: event.target.value }))
-                      }
-                      placeholder="Arrival time, extra needs, notes..."
-                    />
+                    <Stepper activeStep={bookingStep} alternativeLabel>
+                      <Step>
+                        <StepLabel>Dates</StepLabel>
+                      </Step>
+                      <Step>
+                        <StepLabel>Guest info</StepLabel>
+                      </Step>
+                      <Step>
+                        <StepLabel>Review</StepLabel>
+                      </Step>
+                    </Stepper>
 
-                    <Box sx={{ p: 2, background: "#f8fafc", borderRadius: 2 }}>
-                      <SubHeading sx={{ mb: 0.5 }}>Pricing summary</SubHeading>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", color: "#334155" }}>
-                        <span>
-                          ${thousandSeparatorNumber(nightlyRate)} x {nights || 0} night
-                          {nights === 1 ? "" : "s"}
-                        </span>
-                        <strong>${thousandSeparatorNumber(totalPrice || 0)}</strong>
-                      </Box>
-                    </Box>
+                    {bookingStep === 0 ? (
+                      <Stack spacing={2}>
+                        <BookingCalendar
+                          roomId={roomId}
+                          value={{ checkIn: form.checkIn, checkOut: form.checkOut }}
+                          onChange={(value) => setForm((prev) => ({ ...prev, ...value }))}
+                          minNights={room?.minNights}
+                          maxNights={room?.maxNights}
+                          timezone={roomTimezone}
+                          currentDate={room?.currentDate || availabilityData?.currentDate}
+                        />
 
-                    <AppButton type="submit" disabled={isBooking || isCheckingAvailability}>
-                      {authUser ? (isBooking ? "Booking..." : "Book now") : "Log in to book"}
-                    </AppButton>
+                        {occupancyRule ? (
+                          <Box sx={{ p: 2, background: "#f8fafc", borderRadius: "8px" }}>
+                            <Stack spacing={1.5}>
+                              {[
+                                {
+                                  field: "adultCount" as const,
+                                  label: "Adults",
+                                  min: 1,
+                                  max: Number(occupancyRule.maxAdults ?? 1),
+                                  value: form.adultCount,
+                                },
+                                {
+                                  field: "childCount" as const,
+                                  label: "Children",
+                                  min: 0,
+                                  max: Number(occupancyRule.maxChildren ?? 0),
+                                  value: form.childCount,
+                                },
+                                {
+                                  field: "infantCount" as const,
+                                  label: "Infants",
+                                  min: 0,
+                                  max: Number(occupancyRule.maxInfants ?? 0),
+                                  value: form.infantCount,
+                                },
+                              ].map((counter) => (
+                                <Stack
+                                  key={counter.field}
+                                  direction="row"
+                                  justifyContent="space-between"
+                                  alignItems="center"
+                                  spacing={1.5}
+                                >
+                                  <SubHeading sx={{ color: "#334155", fontWeight: 700 }}>
+                                    {counter.label}
+                                  </SubHeading>
+                                  <Stack direction="row" alignItems="center" spacing={1}>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() =>
+                                        updateOccupancyCount(
+                                          counter.field,
+                                          -1,
+                                          counter.min,
+                                          counter.max
+                                        )
+                                      }
+                                      disabled={counter.value <= counter.min}
+                                      sx={{ border: "1px solid #cbd5e1" }}
+                                    >
+                                      <FaMinus size={12} />
+                                    </IconButton>
+                                    <Box sx={{ width: 28, textAlign: "center", fontWeight: 800 }}>
+                                      {counter.value}
+                                    </Box>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() =>
+                                        updateOccupancyCount(
+                                          counter.field,
+                                          1,
+                                          counter.min,
+                                          counter.max
+                                        )
+                                      }
+                                      disabled={counter.value >= counter.max}
+                                      sx={{ border: "1px solid #cbd5e1" }}
+                                    >
+                                      <FaPlus size={12} />
+                                    </IconButton>
+                                  </Stack>
+                                </Stack>
+                              ))}
+                              {occupancyExceeded ? (
+                                <Chip
+                                  color="warning"
+                                  label={`Maximum ${occupancyRule.maxGuests} guests, excluding infants`}
+                                  sx={{ alignSelf: "flex-start" }}
+                                />
+                              ) : null}
+                            </Stack>
+                          </Box>
+                        ) : (
+                          <AppInput
+                            label="Guests"
+                            type="number"
+                            value={form.guests}
+                            onChange={(event) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                guests: String(
+                                  Math.min(
+                                    getRoomCapacity(room),
+                                    Math.max(1, Number(event.target.value || 1))
+                                  )
+                                ),
+                              }))
+                            }
+                            inputProps={{ min: 1, max: getRoomCapacity(room) }}
+                          />
+                        )}
+                        <AppInput
+                          label="Special requests"
+                          multiline
+                          minRows={3}
+                          value={form.specialRequests}
+                          onChange={(event) =>
+                            setForm((prev) => ({ ...prev, specialRequests: event.target.value }))
+                          }
+                          placeholder="Arrival time, extra needs, notes..."
+                        />
+
+                        <Box sx={{ p: 2, background: "#f8fafc", borderRadius: "8px" }}>
+                          <SubHeading sx={{ mb: 1 }}>Pricing breakdown</SubHeading>
+                          <PriceBreakdown quote={quote} isLoading={isQuoteLoading} />
+                        </Box>
+                        <CouponInput
+                          roomId={roomId}
+                          checkIn={form.checkIn}
+                          checkOut={form.checkOut}
+                          adultCount={form.adultCount}
+                          childCount={form.childCount}
+                          onApply={(code) => setForm((prev) => ({ ...prev, couponCode: code }))}
+                          onRemove={() => setForm((prev) => ({ ...prev, couponCode: "" }))}
+                          appliedCode={form.couponCode}
+                        />
+
+                        {isAvailable === false && availabilityViolations.length > 0 ? (
+                          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                            {availabilityViolations.map((violation: any) => (
+                              <Chip
+                                key={violation.code || violation.message}
+                                color="warning"
+                                label={violation.message || violation.code}
+                              />
+                            ))}
+                          </Stack>
+                        ) : null}
+
+                        <AppButton
+                          type="submit"
+                          disabled={
+                            isCheckingAvailability ||
+                            isQuoteLoading ||
+                            isAvailable === false ||
+                            occupancyExceeded ||
+                            !form.checkIn ||
+                            !form.checkOut
+                          }
+                        >
+                          Continue →
+                        </AppButton>
+                      </Stack>
+                    ) : null}
+
+                    {bookingStep === 1 ? (
+                      <Stack spacing={2}>
+                        <AppInput
+                          label="Full name"
+                          required
+                          value={guestInfo.fullName}
+                          onChange={(event) =>
+                            setGuestInfo((prev) => ({ ...prev, fullName: event.target.value }))
+                          }
+                        />
+                        <AppInput
+                          label="Phone"
+                          required
+                          value={guestInfo.phone}
+                          onChange={(event) =>
+                            setGuestInfo((prev) => ({ ...prev, phone: event.target.value }))
+                          }
+                        />
+                        <AppInput
+                          label="National ID"
+                          value={guestInfo.nationalId}
+                          onChange={(event) =>
+                            setGuestInfo((prev) => ({ ...prev, nationalId: event.target.value }))
+                          }
+                        />
+                        <AppInput
+                          label="Estimated arrival time"
+                          value={guestInfo.estimatedArrivalTime}
+                          onChange={(event) =>
+                            setGuestInfo((prev) => ({
+                              ...prev,
+                              estimatedArrivalTime: event.target.value,
+                            }))
+                          }
+                        />
+                        <AppInput
+                          label="Additional notes"
+                          multiline
+                          minRows={3}
+                          value={guestInfo.additionalNotes}
+                          onChange={(event) =>
+                            setGuestInfo((prev) => ({
+                              ...prev,
+                              additionalNotes: event.target.value,
+                            }))
+                          }
+                        />
+                        <Stack direction="row" spacing={1.5}>
+                          <AppButton
+                            variant="outlined"
+                            type="button"
+                            onClick={() => setBookingStep(0)}
+                          >
+                            Back
+                          </AppButton>
+                          <AppButton
+                            type="submit"
+                            disabled={!guestInfo.fullName.trim() || !guestInfo.phone.trim()}
+                          >
+                            Continue →
+                          </AppButton>
+                        </Stack>
+                      </Stack>
+                    ) : null}
+
+                    {bookingStep === 2 ? (
+                      <Stack spacing={2}>
+                        <Box sx={{ p: 2, background: "#f8fafc", borderRadius: "8px" }}>
+                          <Stack spacing={1}>
+                            <Stack direction="row" justifyContent="space-between" spacing={1}>
+                              <SubHeading>Room</SubHeading>
+                              <Box sx={{ fontWeight: 700, textAlign: "right" }}>
+                                {getRoomName(room)}
+                              </Box>
+                            </Stack>
+                            <Stack direction="row" justifyContent="space-between" spacing={1}>
+                              <SubHeading>Stay</SubHeading>
+                              <Box sx={{ fontWeight: 700, textAlign: "right" }}>
+                                {formatPricingDate(form.checkIn)} to {formatPricingDate(form.checkOut)}
+                              </Box>
+                            </Stack>
+                            <Stack direction="row" justifyContent="space-between" spacing={1}>
+                              <SubHeading>Nights</SubHeading>
+                              <Box sx={{ fontWeight: 700 }}>{nights || 0}</Box>
+                            </Stack>
+                            <Stack direction="row" justifyContent="space-between" spacing={1}>
+                              <SubHeading>Guests</SubHeading>
+                              <Box sx={{ fontWeight: 700 }}>
+                                {occupancyRule
+                                  ? `${form.adultCount} adults, ${form.childCount} children, ${form.infantCount} infants`
+                                  : `${form.guests} guest${Number(form.guests) === 1 ? "" : "s"}`}
+                              </Box>
+                            </Stack>
+                            <Stack direction="row" justifyContent="space-between" spacing={1}>
+                              <SubHeading>Booking mode</SubHeading>
+                              <Chip
+                                size="small"
+                                label={isInstantBooking ? "Instant Booking" : "Request to Book"}
+                                sx={{
+                                  background: isInstantBooking ? "#DBEAFE" : "#FEF3C7",
+                                  color: isInstantBooking ? "#1D4ED8" : "#B45309",
+                                  fontWeight: 700,
+                                }}
+                              />
+                            </Stack>
+                          </Stack>
+                        </Box>
+
+                        <Box sx={{ p: 2, background: "#f8fafc", borderRadius: "8px" }}>
+                          <SubHeading sx={{ mb: 1 }}>Pricing breakdown</SubHeading>
+                          <PriceBreakdown quote={quote} isLoading={isQuoteLoading} />
+                        </Box>
+
+                        <Box sx={{ p: 2, background: "#f8fafc", borderRadius: "8px" }}>
+                          <SubHeading sx={{ mb: 1 }}>Guest information</SubHeading>
+                          <Stack spacing={0.75}>
+                            <SubHeading sx={{ color: "#334155" }}>
+                              {guestInfo.fullName || "Guest name not set"}
+                            </SubHeading>
+                            <SubHeading sx={{ color: "#334155" }}>
+                              {guestInfo.phone || "Guest phone not set"}
+                            </SubHeading>
+                            {guestInfo.nationalId ? (
+                              <SubHeading sx={{ color: "#334155" }}>
+                                National ID: {guestInfo.nationalId}
+                              </SubHeading>
+                            ) : null}
+                            {guestInfo.estimatedArrivalTime ? (
+                              <SubHeading sx={{ color: "#334155" }}>
+                                Arrival: {guestInfo.estimatedArrivalTime}
+                              </SubHeading>
+                            ) : null}
+                            {guestInfo.additionalNotes ? (
+                              <SubHeading sx={{ color: "#334155" }}>
+                                Notes: {guestInfo.additionalNotes}
+                              </SubHeading>
+                            ) : null}
+                          </Stack>
+                        </Box>
+
+                        <Box sx={{ p: 2, background: "#f8fafc", borderRadius: "8px" }}>
+                          <SubHeading sx={{ mb: 1 }}>Cancellation policy</SubHeading>
+                          <SubHeading sx={{ color: "#334155", lineHeight: 1.7 }}>
+                            {room?.cancellationPolicyCustomText ||
+                              CANCELLATION_POLICY_MAP[policyCode] ||
+                              "Cancellation policy will be shared by the provider before confirmation."}
+                          </SubHeading>
+                        </Box>
+
+                        <Stack direction="row" spacing={1.5}>
+                          <AppButton
+                            variant="outlined"
+                            type="button"
+                            onClick={() => setBookingStep(1)}
+                          >
+                            Back
+                          </AppButton>
+                          <AppButton
+                            type="submit"
+                            disabled={isBooking || isSubmittingGuestInfo || isQuoteLoading}
+                          >
+                            {isBooking || isSubmittingGuestInfo ? "Confirming..." : "Confirm Booking"}
+                          </AppButton>
+                        </Stack>
+                      </Stack>
+                    ) : null}
                   </Stack>
                 </Box>
               </Stack>

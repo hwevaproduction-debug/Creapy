@@ -2,15 +2,31 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const emailUtils = require("../utils/email");
+const notificationService = require("../utils/notificationService");
 const prisma = require("../utils/prisma");
 
 const originalSendEmail = emailUtils.sendEmail;
+const originalEnqueue = notificationService.enqueue;
 const originalPrisma = {
+  transaction: prisma.$transaction,
   listingCount: prisma.listing.count,
   listingFindMany: prisma.listing.findMany,
   listingFindUnique: prisma.listing.findUnique,
   listingUpdate: prisma.listing.update,
+  accommodationCount: prisma.accommodation.count,
+  accommodationFindMany: prisma.accommodation.findMany,
+  accommodationFindUnique: prisma.accommodation.findUnique,
+  accommodationUpdate: prisma.accommodation.update,
+  auditLogCount: prisma.auditLog.count,
+  auditLogCreate: prisma.auditLog.create,
+  auditLogFindMany: prisma.auditLog.findMany,
+  auditLogFindUnique: prisma.auditLog.findUnique,
+  disputeCount: prisma.dispute.count,
+  reportCount: prisma.report.count,
+  reviewCount: prisma.review.count,
   userFindMany: prisma.user.findMany,
+  userFindUnique: prisma.user.findUnique,
+  userUpdate: prisma.user.update,
 };
 
 const loadAdminController = () => {
@@ -44,11 +60,26 @@ const invokeController = (handler, req) =>
 
 test.afterEach(() => {
   emailUtils.sendEmail = originalSendEmail;
+  notificationService.enqueue = originalEnqueue;
+  prisma.$transaction = originalPrisma.transaction;
   prisma.listing.count = originalPrisma.listingCount;
   prisma.listing.findMany = originalPrisma.listingFindMany;
   prisma.listing.findUnique = originalPrisma.listingFindUnique;
   prisma.listing.update = originalPrisma.listingUpdate;
+  prisma.accommodation.count = originalPrisma.accommodationCount;
+  prisma.accommodation.findMany = originalPrisma.accommodationFindMany;
+  prisma.accommodation.findUnique = originalPrisma.accommodationFindUnique;
+  prisma.accommodation.update = originalPrisma.accommodationUpdate;
+  prisma.auditLog.count = originalPrisma.auditLogCount;
+  prisma.auditLog.create = originalPrisma.auditLogCreate;
+  prisma.auditLog.findMany = originalPrisma.auditLogFindMany;
+  prisma.auditLog.findUnique = originalPrisma.auditLogFindUnique;
+  prisma.dispute.count = originalPrisma.disputeCount;
+  prisma.report.count = originalPrisma.reportCount;
+  prisma.review.count = originalPrisma.reviewCount;
   prisma.user.findMany = originalPrisma.userFindMany;
+  prisma.user.findUnique = originalPrisma.userFindUnique;
+  prisma.user.update = originalPrisma.userUpdate;
 });
 
 test("admin routes expose inactive listings and bulk revive endpoints", async () => {
@@ -66,6 +97,23 @@ test("admin routes expose inactive listings and bulk revive endpoints", async ()
 
   assert.ok(inactiveLayer);
   assert.ok(reviveLayer);
+  assert.ok(
+    routeLayers.find((layer) => layer.route.path === "/queue" && layer.route.methods.get)
+  );
+  assert.ok(
+    routeLayers.find(
+      (layer) =>
+        layer.route.path === "/accommodations/:id/approve" &&
+        layer.route.methods.put
+    )
+  );
+  assert.ok(
+    routeLayers.find(
+      (layer) =>
+        layer.route.path === "/reviews/:id/moderate" &&
+        layer.route.methods.put
+    )
+  );
 });
 
 test("getInactiveListings returns paginated inactive listings", async () => {
@@ -285,4 +333,340 @@ test("bulkReviveListings rejects oversized batches", async () => {
     "Cannot revive more than 100 listings at once"
   );
   assert.equal(findUniqueCalls, 0);
+});
+
+test("getAccommodations returns paginated moderation results with filters", async () => {
+  const adminController = loadAdminController();
+  let countArgs = null;
+  let findArgs = null;
+
+  prisma.accommodation.count = async (args) => {
+    countArgs = args;
+    return 1;
+  };
+  prisma.accommodation.findMany = async (args) => {
+    findArgs = args;
+    return [
+      {
+        id: "acc_1",
+        name: "Sunset Lodge",
+        type: "LODGE",
+        province: "Harare",
+        city: "Avondale",
+        moderationStatus: "PENDING_REVIEW",
+        isPublished: false,
+        owner: { id: "provider_1", username: "host", email: "host@example.com" },
+      },
+    ];
+  };
+
+  const result = await invokeController(adminController.getAccommodations, {
+    query: {
+      moderationStatus: "pending_review",
+      type: "lodge",
+      province: "Harare",
+      search: "sunset",
+      page: "2",
+      limit: "5",
+    },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.total, 1);
+  assert.equal(result.body.data[0]._id, "acc_1");
+  assert.equal(countArgs.where.moderationStatus, "PENDING_REVIEW");
+  assert.equal(countArgs.where.type, "LODGE");
+  assert.deepEqual(countArgs.where.province, {
+    contains: "Harare",
+    mode: "insensitive",
+  });
+  assert.equal(findArgs.skip, 5);
+  assert.equal(findArgs.take, 5);
+});
+
+test("approveAccommodation publishes the accommodation and writes audit log", async () => {
+  const adminController = loadAdminController();
+  const auditEntries = [];
+  let updateArgs = null;
+  let notificationEvent = null;
+
+  prisma.accommodation.findUnique = async () => ({
+    id: "acc_1",
+    moderationStatus: "PENDING_REVIEW",
+    isPublished: false,
+    owner: { id: "provider_1", email: "host@example.com", username: "host" },
+  });
+  prisma.accommodation.update = async (args) => {
+    updateArgs = args;
+    return {
+      id: "acc_1",
+      name: "Sunset Lodge",
+      moderationStatus: "APPROVED",
+      isPublished: true,
+      owner: { id: "provider_1", email: "host@example.com", username: "host" },
+    };
+  };
+  prisma.auditLog.create = async ({ data }) => {
+    auditEntries.push(data);
+    return { id: "audit_1", ...data };
+  };
+  notificationService.enqueue = async (event) => {
+    notificationEvent = event;
+    return { count: 1 };
+  };
+
+  const result = await invokeController(adminController.approveAccommodation, {
+    params: { id: "acc_1" },
+    body: {},
+    user: { id: "admin_1" },
+    ip: "127.0.0.1",
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(updateArgs.data, {
+    moderationStatus: "APPROVED",
+    isPublished: true,
+  });
+  assert.equal(auditEntries[0].adminId, "admin_1");
+  assert.equal(auditEntries[0].action, "accommodation.approved");
+  assert.equal(notificationEvent, "accommodation.approved");
+});
+
+test("audit log failure does not cause accommodation approval to fail", async () => {
+  const adminController = loadAdminController();
+
+  prisma.accommodation.findUnique = async () => ({
+    id: "acc_1",
+    moderationStatus: "PENDING_REVIEW",
+    isPublished: false,
+    owner: { id: "provider_1", email: "host@example.com", username: "host" },
+  });
+  prisma.accommodation.update = async () => ({
+    id: "acc_1",
+    name: "Sunset Lodge",
+    moderationStatus: "APPROVED",
+    isPublished: true,
+    owner: { id: "provider_1", email: "host@example.com", username: "host" },
+  });
+  prisma.auditLog.create = async () => {
+    throw new Error("audit unavailable");
+  };
+  notificationService.enqueue = async () => ({ count: 1 });
+
+  const result = await invokeController(adminController.approveAccommodation, {
+    params: { id: "acc_1" },
+    body: {},
+    user: { id: "admin_1" },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.data.accommodation.moderationStatus, "APPROVED");
+});
+
+test("rejectAccommodation requires a reason", async () => {
+  const adminController = loadAdminController();
+
+  const result = await invokeController(adminController.rejectAccommodation, {
+    params: { id: "acc_1" },
+    body: {},
+    user: { id: "admin_1" },
+  });
+
+  assert.equal(result.error.statusCode, 400);
+  assert.equal(result.error.message, "reason is required");
+});
+
+test("reject, suspend, and reinstate accommodation set the expected moderation status", async () => {
+  const adminController = loadAdminController();
+  const updateStatuses = [];
+
+  prisma.accommodation.findUnique = async () => ({
+    id: "acc_1",
+    moderationStatus: "APPROVED",
+    isPublished: true,
+    owner: { id: "provider_1", email: "host@example.com", username: "host" },
+  });
+  prisma.accommodation.update = async ({ data }) => {
+    updateStatuses.push(data);
+    return {
+      id: "acc_1",
+      name: "Sunset Lodge",
+      ...data,
+      owner: { id: "provider_1", email: "host@example.com", username: "host" },
+    };
+  };
+  prisma.auditLog.create = async ({ data }) => ({ id: "audit_1", ...data });
+  notificationService.enqueue = async () => ({ count: 1 });
+
+  await invokeController(adminController.rejectAccommodation, {
+    params: { id: "acc_1" },
+    body: { reason: "Incomplete details" },
+    user: { id: "admin_1" },
+  });
+  await invokeController(adminController.suspendAccommodation, {
+    params: { id: "acc_1" },
+    body: { reason: "Fraud report" },
+    user: { id: "admin_1" },
+  });
+  await invokeController(adminController.reinstateAccommodation, {
+    params: { id: "acc_1" },
+    body: {},
+    user: { id: "admin_1" },
+  });
+
+  assert.deepEqual(updateStatuses, [
+    { moderationStatus: "REJECTED", isPublished: false },
+    { moderationStatus: "SUSPENDED", isPublished: false },
+    { moderationStatus: "APPROVED", isPublished: true },
+  ]);
+});
+
+test("getModerationQueue returns all moderation counts", async () => {
+  const adminController = loadAdminController();
+
+  prisma.accommodation.count = async () => 5;
+  prisma.report.count = async () => 6;
+  prisma.dispute.count = async () => 3;
+  prisma.review.count = async () => 2;
+
+  const result = await invokeController(adminController.getModerationQueue, {
+    query: {},
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(result.body.data, {
+    pendingAccommodations: 5,
+    openReports: 6,
+    openDisputes: 3,
+    pendingReviews: 2,
+  });
+});
+
+test("suspendProvider and reinstateProvider update providerProfile suspension fields", async () => {
+  const adminController = loadAdminController();
+  const updates = [];
+
+  prisma.user.findUnique = async () => ({
+    id: "provider_1",
+    username: "host",
+    email: "host@example.com",
+    providerProfile: {
+      verificationStatus: "approved",
+      commissionRate: 10,
+    },
+  });
+  prisma.user.update = async ({ data }) => {
+    updates.push(data.providerProfile);
+    return {
+      id: "provider_1",
+      username: "host",
+      email: "host@example.com",
+      providerProfile: data.providerProfile,
+    };
+  };
+  prisma.auditLog.create = async ({ data }) => ({ id: "audit_1", ...data });
+  notificationService.enqueue = async () => ({ count: 1 });
+
+  const suspended = await invokeController(adminController.suspendProvider, {
+    params: { id: "provider_1" },
+    body: { reason: "Fraud risk" },
+    user: { id: "admin_1" },
+  });
+  const reinstated = await invokeController(adminController.reinstateProvider, {
+    params: { id: "provider_1" },
+    body: {},
+    user: { id: "admin_1" },
+  });
+
+  assert.equal(suspended.statusCode, 200);
+  assert.equal(reinstated.statusCode, 200);
+  assert.equal(updates[0].suspensionReason, "Fraud risk");
+  assert.ok(updates[0].suspendedAt);
+  assert.equal(updates[1].suspendedAt, undefined);
+  assert.equal(updates[1].suspensionReason, undefined);
+});
+
+test("getAuditLogs returns paginated filtered audit entries", async () => {
+  const adminController = loadAdminController();
+  let countArgs = null;
+  let findArgs = null;
+
+  prisma.auditLog.count = async (args) => {
+    countArgs = args;
+    return 1;
+  };
+  prisma.auditLog.findMany = async (args) => {
+    findArgs = args;
+    return [
+      {
+        id: "audit_1",
+        adminId: "admin_1",
+        action: "provider.suspended",
+        targetType: "User",
+        targetId: "provider_1",
+        metadata: { reason: "Fraud" },
+        admin: { id: "admin_1", email: "admin@example.com" },
+        createdAt: new Date("2026-05-19T00:00:00.000Z"),
+      },
+    ];
+  };
+
+  const result = await invokeController(adminController.getAuditLogs, {
+    query: {
+      adminId: "admin_1",
+      action: "provider.suspended",
+      targetType: "User",
+      targetId: "provider_1",
+      from: "2026-05-01",
+      to: "2026-05-31",
+      page: "2",
+      limit: "10",
+    },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.total, 1);
+  assert.equal(countArgs.where.adminId, "admin_1");
+  assert.equal(countArgs.where.action, "provider.suspended");
+  assert.equal(countArgs.where.createdAt.gte instanceof Date, true);
+  assert.equal(findArgs.skip, 10);
+  assert.equal(findArgs.take, 10);
+});
+
+test("createBooking rejects rooms owned by suspended providers", async () => {
+  const bookingController = require("../controllers/bookingController");
+
+  prisma.$transaction = async (callback) =>
+    callback({
+      $queryRaw: async () => [],
+      room: {
+        findUnique: async () => ({
+          id: "room_1",
+          providerId: "provider_1",
+          provider: {
+            id: "provider_1",
+            providerProfile: {
+              suspendedAt: "2026-05-19T00:00:00.000Z",
+              suspensionReason: "Fraud",
+            },
+          },
+          accommodation: {
+            ownerId: "provider_1",
+            timezone: "Africa/Harare",
+          },
+        }),
+      },
+    });
+
+  const result = await invokeController(bookingController.createBooking, {
+    body: {
+      roomId: "room_1",
+      checkIn: "2026-06-01",
+      checkOut: "2026-06-03",
+    },
+    user: { id: "guest_1" },
+  });
+
+  assert.equal(result.error.statusCode, 403);
+  assert.equal(result.error.message, "This provider is currently suspended");
 });

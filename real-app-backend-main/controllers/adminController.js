@@ -2,6 +2,8 @@ const catchAsync = require("../utils/catchAsync");
 const prisma = require("../utils/prisma");
 const AppError = require("../utils/appError");
 const emailUtils = require("../utils/email");
+const notificationService = require("../utils/notificationService");
+const auditLog = require("../utils/auditLog");
 
 const MAX_BULK_REVIVE_IDS = 100;
 const SETTLEMENT_INELIGIBLE_STATUSES = ["cancelled", "canceled", "rejected", "expired"];
@@ -63,6 +65,279 @@ function buildProviderResponse(userDoc, roomCount) {
       verificationNotes: providerProfile.verificationNotes || null,
     },
   };
+}
+
+function buildNotificationProvider(userDoc) {
+  if (!userDoc) {
+    return null;
+  }
+
+  return {
+    id: userDoc.id,
+    _id: userDoc.id,
+    username: userDoc.username,
+    email: userDoc.email,
+    phoneNumber: userDoc.phoneNumber || null,
+    providerProfile: userDoc.providerProfile || null,
+  };
+}
+
+function getUserId(user) {
+  return user?.id || user?._id?.toString() || null;
+}
+
+function buildPagination(query = {}) {
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 20));
+  const skip = (page - 1) * limit;
+
+  return { page, limit, skip };
+}
+
+function normalizeEnumValue(value) {
+  if (value == null || value === "") {
+    return "";
+  }
+
+  return String(value).trim().toUpperCase().replace(/[\s-]+/g, "_");
+}
+
+function requireText(value, label, next) {
+  const text = value == null ? "" : String(value).trim();
+
+  if (!text) {
+    next(new AppError(`${label} is required`, 400));
+    return null;
+  }
+
+  return text;
+}
+
+function auditAdminAction(req, action, targetType, targetId, metadata = null) {
+  void auditLog.createEntry({
+    adminId: getUserId(req.user),
+    action,
+    targetType,
+    targetId,
+    metadata,
+    ipAddress: req.ip,
+  });
+}
+
+function mapId(record) {
+  if (!record) {
+    return record;
+  }
+
+  return {
+    ...record,
+    _id: record.id,
+  };
+}
+
+function mapAccommodation(accommodation) {
+  return {
+    ...mapId(accommodation),
+    owner: accommodation.owner ? mapId(accommodation.owner) : null,
+  };
+}
+
+function mapProvider(provider) {
+  return buildProviderResponse(provider, 0);
+}
+
+function getProfile(provider) {
+  return provider?.providerProfile && typeof provider.providerProfile === "object"
+    ? provider.providerProfile
+    : {};
+}
+
+function getBookingProvider(booking) {
+  return (
+    booking?.providerUser ||
+    booking?.room?.provider ||
+    (booking?.room?.accommodation?.owner
+      ? booking.room.accommodation.owner
+      : null)
+  );
+}
+
+function mapDispute(dispute) {
+  return {
+    ...mapId(dispute),
+    booking: dispute.booking
+      ? {
+          ...mapId(dispute.booking),
+          room: dispute.booking.room ? mapId(dispute.booking.room) : null,
+          guest: dispute.booking.guest ? mapId(dispute.booking.guest) : null,
+          provider: getBookingProvider(dispute.booking)
+            ? mapId(getBookingProvider(dispute.booking))
+            : null,
+        }
+      : null,
+    raiser: dispute.raiser ? mapId(dispute.raiser) : null,
+    resolver: dispute.resolver ? mapId(dispute.resolver) : null,
+  };
+}
+
+function mapReport(report, target = undefined) {
+  return {
+    ...mapId(report),
+    reporter: report.reporter ? mapId(report.reporter) : null,
+    resolver: report.resolver ? mapId(report.resolver) : null,
+    ...(target !== undefined ? { target } : {}),
+  };
+}
+
+function mapAuditLog(entry) {
+  return {
+    ...mapId(entry),
+    admin: entry.admin ? mapId(entry.admin) : null,
+  };
+}
+
+const disputeInclude = {
+  booking: {
+    include: {
+      guest: {
+        select: {
+          id: true,
+          username: true,
+          email: true,
+        },
+      },
+      providerUser: {
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          phoneNumber: true,
+          providerProfile: true,
+        },
+      },
+      room: {
+        select: {
+          id: true,
+          name: true,
+          provider: {
+            select: {
+              id: true,
+              username: true,
+              email: true,
+              phoneNumber: true,
+              providerProfile: true,
+            },
+          },
+          accommodation: {
+            select: {
+              id: true,
+              name: true,
+              ownerId: true,
+              owner: {
+                select: {
+                  id: true,
+                  username: true,
+                  email: true,
+                  phoneNumber: true,
+                  providerProfile: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  raiser: {
+    select: {
+      id: true,
+      username: true,
+      email: true,
+    },
+  },
+  resolver: {
+    select: {
+      id: true,
+      username: true,
+      email: true,
+    },
+  },
+};
+
+const reportInclude = {
+  reporter: {
+    select: {
+      id: true,
+      username: true,
+      email: true,
+    },
+  },
+  resolver: {
+    select: {
+      id: true,
+      username: true,
+      email: true,
+    },
+  },
+};
+
+async function getReportTarget(report) {
+  if (!report) {
+    return null;
+  }
+
+  if (report.targetType === "Accommodation") {
+    return prisma.accommodation.findUnique({
+      where: { id: report.targetId },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+      },
+    });
+  }
+
+  if (report.targetType === "Listing") {
+    return prisma.listing.findUnique({
+      where: { id: report.targetId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+      },
+    });
+  }
+
+  if (report.targetType === "Review") {
+    return prisma.review.findUnique({
+      where: { id: report.targetId },
+      include: {
+        guest: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+        accommodation: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+  }
+
+  return null;
 }
 
 exports.getInactiveListings = catchAsync(async (req, res, next) => {
@@ -351,6 +626,12 @@ exports.verifyProvider = catchAsync(async (req, res, next) => {
     data: { providerProfile: merged },
   });
 
+  if (["approved", "rejected"].includes(verificationStatus)) {
+    void notificationService.enqueue(`provider.${verificationStatus}`, {
+      provider: buildNotificationProvider(updatedProvider),
+    });
+  }
+
   res.status(200).json({
     status: "success",
     data: buildProviderResponse(updatedProvider, 0),
@@ -389,6 +670,684 @@ exports.updateProviderCommission = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: "success",
     data: buildProviderResponse(updatedProvider, 0),
+  });
+});
+
+exports.getAccommodations = catchAsync(async (req, res) => {
+  const { page, limit, skip } = buildPagination(req.query);
+  const where = {};
+
+  if (req.query.moderationStatus) {
+    where.moderationStatus = normalizeEnumValue(req.query.moderationStatus);
+  }
+
+  if (req.query.type) {
+    where.type = normalizeEnumValue(req.query.type);
+  }
+
+  if (req.query.province) {
+    where.province = {
+      contains: String(req.query.province).trim(),
+      mode: "insensitive",
+    };
+  }
+
+  if (req.query.city) {
+    where.city = {
+      contains: String(req.query.city).trim(),
+      mode: "insensitive",
+    };
+  }
+
+  if (req.query.search) {
+    const search = String(req.query.search).trim();
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { owner: { is: { username: { contains: search, mode: "insensitive" } } } },
+      { owner: { is: { email: { contains: search, mode: "insensitive" } } } },
+    ];
+  }
+
+  const [total, accommodations] = await Promise.all([
+    prisma.accommodation.count({ where }),
+    prisma.accommodation.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  res.status(200).json({
+    status: "success",
+    total,
+    results: accommodations.length,
+    data: accommodations.map(mapAccommodation),
+    pagination: {
+      page,
+      limit,
+      total,
+      hasMore: total > skip + accommodations.length,
+    },
+  });
+});
+
+async function updateAccommodationModeration(req, res, next, status, isPublished, action) {
+  const reason = ["REJECTED", "SUSPENDED"].includes(status)
+    ? requireText(req.body.reason, "reason", next)
+    : null;
+
+  if (reason === null && ["REJECTED", "SUSPENDED"].includes(status)) {
+    return;
+  }
+
+  const accommodation = await prisma.accommodation.findUnique({
+    where: { id: req.params.id },
+    include: {
+      owner: {
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          phoneNumber: true,
+          providerProfile: true,
+        },
+      },
+    },
+  });
+
+  if (!accommodation) {
+    return next(new AppError("Accommodation not found", 404));
+  }
+
+  const updatedAccommodation = await prisma.accommodation.update({
+    where: { id: accommodation.id },
+    data: {
+      moderationStatus: status,
+      isPublished,
+    },
+    include: {
+      owner: {
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          phoneNumber: true,
+          providerProfile: true,
+        },
+      },
+    },
+  });
+
+  const metadata = {
+    previousStatus: accommodation.moderationStatus,
+    nextStatus: status,
+    previousPublished: accommodation.isPublished,
+    nextPublished: isPublished,
+    ...(reason ? { reason } : {}),
+  };
+
+  auditAdminAction(req, action, "Accommodation", accommodation.id, metadata);
+
+  const notificationEvent =
+    action === "accommodation.reinstated" ? "accommodation.approved" : action;
+  void notificationService.enqueue(notificationEvent, {
+    provider: buildNotificationProvider(updatedAccommodation.owner),
+    accommodation: mapAccommodation(updatedAccommodation),
+    reason,
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      accommodation: mapAccommodation(updatedAccommodation),
+    },
+  });
+}
+
+exports.approveAccommodation = catchAsync((req, res, next) =>
+  updateAccommodationModeration(
+    req,
+    res,
+    next,
+    "APPROVED",
+    true,
+    "accommodation.approved"
+  )
+);
+
+exports.rejectAccommodation = catchAsync((req, res, next) =>
+  updateAccommodationModeration(
+    req,
+    res,
+    next,
+    "REJECTED",
+    false,
+    "accommodation.rejected"
+  )
+);
+
+exports.suspendAccommodation = catchAsync((req, res, next) =>
+  updateAccommodationModeration(
+    req,
+    res,
+    next,
+    "SUSPENDED",
+    false,
+    "accommodation.suspended"
+  )
+);
+
+exports.reinstateAccommodation = catchAsync((req, res, next) =>
+  updateAccommodationModeration(
+    req,
+    res,
+    next,
+    "APPROVED",
+    true,
+    "accommodation.reinstated"
+  )
+);
+
+exports.getModerationQueue = catchAsync(async (req, res) => {
+  const [
+    pendingAccommodations,
+    openReports,
+    openDisputes,
+    pendingReviews,
+  ] = await Promise.all([
+    prisma.accommodation.count({
+      where: {
+        moderationStatus: "PENDING_REVIEW",
+        deletedAt: null,
+      },
+    }),
+    prisma.report.count({ where: { status: "OPEN" } }),
+    prisma.dispute.count({ where: { status: "OPEN" } }),
+    prisma.review.count({
+      where: {
+        isPublished: false,
+        deletedAt: null,
+      },
+    }),
+  ]);
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      pendingAccommodations,
+      openReports,
+      openDisputes,
+      pendingReviews,
+    },
+  });
+});
+
+exports.getAuditLogs = catchAsync(async (req, res, next) => {
+  const { page, limit, skip } = buildPagination(req.query);
+  const where = {};
+
+  ["adminId", "action", "targetType", "targetId"].forEach((field) => {
+    if (req.query[field]) {
+      where[field] = String(req.query[field]).trim();
+    }
+  });
+
+  const createdAt = parseDateRange(req.query.from, req.query.to, "from", "to", next);
+  if (createdAt === null && (req.query.from || req.query.to)) {
+    return;
+  }
+  if (createdAt) {
+    where.createdAt = createdAt;
+  }
+
+  const [total, auditLogs] = await Promise.all([
+    prisma.auditLog.count({ where }),
+    prisma.auditLog.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: {
+        admin: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  res.status(200).json({
+    status: "success",
+    total,
+    results: auditLogs.length,
+    data: auditLogs.map(mapAuditLog),
+    pagination: {
+      page,
+      limit,
+      total,
+      hasMore: total > skip + auditLogs.length,
+    },
+  });
+});
+
+exports.getAuditLogById = catchAsync(async (req, res, next) => {
+  const auditLogEntry = await prisma.auditLog.findUnique({
+    where: { id: req.params.id },
+    include: {
+      admin: {
+        select: {
+          id: true,
+          username: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  if (!auditLogEntry) {
+    return next(new AppError("Audit log not found", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      auditLog: mapAuditLog(auditLogEntry),
+    },
+  });
+});
+
+exports.suspendProvider = catchAsync(async (req, res, next) => {
+  const reason = requireText(req.body.reason, "reason", next);
+  if (!reason) {
+    return;
+  }
+
+  const provider = await prisma.user.findUnique({
+    where: { id: req.params.id },
+  });
+
+  if (!provider) {
+    return next(new AppError("Provider not found", 404));
+  }
+
+  const providerProfile = {
+    ...getProfile(provider),
+    suspendedAt: new Date().toISOString(),
+    suspensionReason: reason,
+  };
+
+  const updatedProvider = await prisma.user.update({
+    where: { id: provider.id },
+    data: { providerProfile },
+  });
+
+  auditAdminAction(req, "provider.suspended", "User", provider.id, { reason });
+  void notificationService.enqueue("provider.suspended", {
+    provider: buildNotificationProvider(updatedProvider),
+    reason,
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      provider: mapProvider(updatedProvider),
+    },
+  });
+});
+
+exports.reinstateProvider = catchAsync(async (req, res, next) => {
+  const provider = await prisma.user.findUnique({
+    where: { id: req.params.id },
+  });
+
+  if (!provider) {
+    return next(new AppError("Provider not found", 404));
+  }
+
+  const {
+    suspendedAt: _suspendedAt,
+    suspensionReason: _suspensionReason,
+    ...providerProfile
+  } = getProfile(provider);
+
+  const updatedProvider = await prisma.user.update({
+    where: { id: provider.id },
+    data: { providerProfile },
+  });
+
+  auditAdminAction(req, "provider.reinstated", "User", provider.id);
+  void notificationService.enqueue("provider.reinstated", {
+    provider: buildNotificationProvider(updatedProvider),
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      provider: mapProvider(updatedProvider),
+    },
+  });
+});
+
+exports.getDisputes = catchAsync(async (req, res) => {
+  const { page, limit, skip } = buildPagination(req.query);
+  const where = {};
+
+  if (req.query.status) {
+    where.status = normalizeEnumValue(req.query.status);
+  }
+
+  if (req.query.raisedByRole) {
+    where.raisedByRole = String(req.query.raisedByRole).trim().toLowerCase();
+  }
+
+  if (req.query.bookingId) {
+    where.bookingId = String(req.query.bookingId).trim();
+  }
+
+  const [total, disputes] = await Promise.all([
+    prisma.dispute.count({ where }),
+    prisma.dispute.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: disputeInclude,
+    }),
+  ]);
+
+  res.status(200).json({
+    status: "success",
+    total,
+    results: disputes.length,
+    data: disputes.map(mapDispute),
+    pagination: {
+      page,
+      limit,
+      total,
+      hasMore: total > skip + disputes.length,
+    },
+  });
+});
+
+exports.getDisputeById = catchAsync(async (req, res, next) => {
+  const dispute = await prisma.dispute.findUnique({
+    where: { id: req.params.id },
+    include: disputeInclude,
+  });
+
+  if (!dispute) {
+    return next(new AppError("Dispute not found", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      dispute: mapDispute(dispute),
+    },
+  });
+});
+
+exports.resolveDispute = catchAsync(async (req, res, next) => {
+  const resolution = requireText(req.body.resolution, "resolution", next);
+  if (!resolution) {
+    return;
+  }
+
+  const dispute = await prisma.dispute.findUnique({
+    where: { id: req.params.id },
+    include: disputeInclude,
+  });
+
+  if (!dispute) {
+    return next(new AppError("Dispute not found", 404));
+  }
+
+  const updatedDispute = await prisma.dispute.update({
+    where: { id: dispute.id },
+    data: {
+      status: "RESOLVED",
+      resolution,
+      resolvedBy: getUserId(req.user),
+      resolvedAt: new Date(),
+    },
+    include: disputeInclude,
+  });
+
+  auditAdminAction(req, "dispute.resolved", "Dispute", dispute.id, {
+    resolution,
+    previousStatus: dispute.status,
+  });
+
+  void notificationService.enqueue("dispute.resolved", {
+    dispute: mapDispute(updatedDispute),
+    booking: updatedDispute.booking,
+    guest: updatedDispute.booking?.guest,
+    provider: getBookingProvider(updatedDispute.booking),
+    resolution,
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      dispute: mapDispute(updatedDispute),
+    },
+  });
+});
+
+exports.closeDispute = catchAsync(async (req, res, next) => {
+  const dispute = await prisma.dispute.findUnique({
+    where: { id: req.params.id },
+    include: disputeInclude,
+  });
+
+  if (!dispute) {
+    return next(new AppError("Dispute not found", 404));
+  }
+
+  const resolution = req.body.resolution ? String(req.body.resolution).trim() : null;
+  const updatedDispute = await prisma.dispute.update({
+    where: { id: dispute.id },
+    data: {
+      status: "CLOSED",
+      resolution,
+      resolvedBy: getUserId(req.user),
+      resolvedAt: new Date(),
+    },
+    include: disputeInclude,
+  });
+
+  auditAdminAction(req, "dispute.closed", "Dispute", dispute.id, {
+    resolution,
+    previousStatus: dispute.status,
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      dispute: mapDispute(updatedDispute),
+    },
+  });
+});
+
+exports.getReports = catchAsync(async (req, res) => {
+  const { page, limit, skip } = buildPagination(req.query);
+  const where = {};
+
+  if (req.query.status) {
+    where.status = normalizeEnumValue(req.query.status);
+  }
+
+  ["targetType", "reason"].forEach((field) => {
+    if (req.query[field]) {
+      where[field] = String(req.query[field]).trim();
+    }
+  });
+
+  const [total, reports] = await Promise.all([
+    prisma.report.count({ where }),
+    prisma.report.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: reportInclude,
+    }),
+  ]);
+
+  res.status(200).json({
+    status: "success",
+    total,
+    results: reports.length,
+    data: reports.map((report) => mapReport(report)),
+    pagination: {
+      page,
+      limit,
+      total,
+      hasMore: total > skip + reports.length,
+    },
+  });
+});
+
+exports.getReportById = catchAsync(async (req, res, next) => {
+  const report = await prisma.report.findUnique({
+    where: { id: req.params.id },
+    include: reportInclude,
+  });
+
+  if (!report) {
+    return next(new AppError("Report not found", 404));
+  }
+
+  const target = await getReportTarget(report);
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      report: mapReport(report, target ? mapId(target) : null),
+    },
+  });
+});
+
+exports.markReportUnderReview = catchAsync(async (req, res, next) => {
+  const report = await prisma.report.findUnique({
+    where: { id: req.params.id },
+  });
+
+  if (!report) {
+    return next(new AppError("Report not found", 404));
+  }
+
+  const updatedReport = await prisma.report.update({
+    where: { id: report.id },
+    data: { status: "UNDER_REVIEW" },
+    include: reportInclude,
+  });
+
+  auditAdminAction(req, "report.under_review", "Report", report.id, {
+    previousStatus: report.status,
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      report: mapReport(updatedReport),
+    },
+  });
+});
+
+exports.resolveReport = catchAsync(async (req, res, next) => {
+  const resolution = requireText(req.body.resolution, "resolution", next);
+  if (!resolution) {
+    return;
+  }
+
+  const report = await prisma.report.findUnique({
+    where: { id: req.params.id },
+    include: reportInclude,
+  });
+
+  if (!report) {
+    return next(new AppError("Report not found", 404));
+  }
+
+  const updatedReport = await prisma.report.update({
+    where: { id: report.id },
+    data: {
+      status: "RESOLVED",
+      resolution,
+      resolvedBy: getUserId(req.user),
+      resolvedAt: new Date(),
+    },
+    include: reportInclude,
+  });
+
+  auditAdminAction(req, "report.resolved", "Report", report.id, {
+    resolution,
+    previousStatus: report.status,
+  });
+
+  void notificationService.enqueue("report.resolved", {
+    report: mapReport(updatedReport),
+    reporter: updatedReport.reporter,
+    resolution,
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      report: mapReport(updatedReport),
+    },
+  });
+});
+
+exports.dismissReport = catchAsync(async (req, res, next) => {
+  const resolution = requireText(req.body.resolution, "resolution", next);
+  if (!resolution) {
+    return;
+  }
+
+  const report = await prisma.report.findUnique({
+    where: { id: req.params.id },
+  });
+
+  if (!report) {
+    return next(new AppError("Report not found", 404));
+  }
+
+  const updatedReport = await prisma.report.update({
+    where: { id: report.id },
+    data: {
+      status: "DISMISSED",
+      resolution,
+      resolvedBy: getUserId(req.user),
+      resolvedAt: new Date(),
+    },
+    include: reportInclude,
+  });
+
+  auditAdminAction(req, "report.dismissed", "Report", report.id, {
+    resolution,
+    previousStatus: report.status,
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      report: mapReport(updatedReport),
+    },
   });
 });
 
@@ -519,6 +1478,75 @@ exports.settleBooking = catchAsync(async (req, res, next) => {
       settlementReference:
         req.body.settlementReference || booking.settlementReference || null,
     },
+    include: {
+      room: {
+        include: {
+          accommodation: {
+            select: {
+              ownerId: true,
+              timezone: true,
+            },
+          },
+        },
+      },
+      guest: {
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          phoneNumber: true,
+        },
+      },
+      providerUser: {
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          phoneNumber: true,
+          providerProfile: true,
+        },
+      },
+    },
+  });
+
+  const fallbackProviderId =
+    updatedBooking.providerId ||
+    updatedBooking.room?.providerId ||
+    updatedBooking.room?.accommodation?.ownerId ||
+    null;
+  const provider =
+    updatedBooking.providerUser ||
+    (fallbackProviderId
+      ? await prisma.user.findUnique({
+          where: { id: fallbackProviderId },
+          select: {
+            id: true,
+            email: true,
+            username: true,
+            phoneNumber: true,
+            providerProfile: true,
+          },
+        })
+      : null);
+
+  void notificationService.enqueue("booking.settlement_completed", {
+    booking: {
+      ...updatedBooking,
+      _id: updatedBooking.id,
+    },
+    room: updatedBooking.room
+      ? {
+          ...updatedBooking.room,
+          _id: updatedBooking.room.id,
+        }
+      : null,
+    guest: updatedBooking.guest
+      ? {
+          ...updatedBooking.guest,
+          _id: updatedBooking.guest.id,
+        }
+      : null,
+    provider: buildNotificationProvider(provider),
   });
 
   res.status(200).json({

@@ -1,44 +1,119 @@
+const crypto = require("crypto");
 const prisma = require("../utils/prisma");
-const { getProvider } = require("../utils/paymentProvider");
-const { sendEmail } = require("../utils/email");
-const {
-  bookingConfirmedInstantGuest,
-  bookingConfirmedInstantProvider,
-  bookingPaymentSuccessGuest,
-  bookingPaymentSuccessProvider,
-} = require("../utils/emailTemplates/stayEmails");
+const { getProviderByName } = require("../utils/paymentProvider");
+const { applyPaymentSuccess, BOOKING_PAYMENT_TYPES } = require("../utils/paymentSideEffects");
 
-const SUCCESSFUL_STATUSES = ["paid"];
+const SUCCESSFUL_PAYNOW_STATUSES = ["paid"];
 
-const normalizeEnumInput = (value) => {
-  if (value == null || value === "") {
-    return null;
-  }
+const normalizeStatus = (value) => String(value || "").toLowerCase();
 
-  return String(value).trim().toUpperCase().replace(/[\s-]+/g, "_");
+const normalizeAmount = (value) => {
+  const amount = Number.parseFloat(value);
+
+  return Number.isFinite(amount) ? amount : undefined;
 };
 
-const sendEmailSafe = async (payload) => {
-  if (!payload?.to) {
+const hashEventId = (...parts) =>
+  crypto.createHash("sha256").update(parts.filter(Boolean).join(":")).digest("hex");
+
+const serializePayload = (payload) => {
+  if (Buffer.isBuffer(payload)) {
+    return { rawBody: payload.toString("utf8") };
+  }
+
+  if (payload && typeof payload === "object") {
+    return payload;
+  }
+
+  return { value: String(payload || "") };
+};
+
+const isUniqueConstraintError = (err) => err?.code === "P2002";
+
+const recordWebhookEvent = async (provider, eventId, payload) => {
+  if (!process.env.DATABASE_URL || !prisma.webhookEvent?.create) {
+    return { duplicate: false };
+  }
+
+  try {
+    await prisma.webhookEvent.create({
+      data: {
+        provider,
+        eventId,
+        payload: serializePayload(payload),
+      },
+    });
+
+    return { duplicate: false };
+  } catch (err) {
+    if (isUniqueConstraintError(err)) {
+      return { duplicate: true };
+    }
+
+    console.log(`[webhook] Could not record ${provider} webhook event: ${err.message}`);
+    return { duplicate: false };
+  }
+};
+
+const removeWebhookEvent = async (provider, eventId) => {
+  if (!process.env.DATABASE_URL || !prisma.webhookEvent?.deleteMany) {
     return;
   }
 
   try {
-    await sendEmail(payload);
+    await prisma.webhookEvent.deleteMany({
+      where: {
+        provider,
+        eventId,
+      },
+    });
   } catch (err) {
-    console.error("[email] send failed:", err.message);
+    console.log(`[webhook] Could not reset ${provider} webhook event: ${err.message}`);
   }
+};
+
+const ensureConfirmedAmount = async (payment, explicitAmountPaid) => {
+  if (!payment || !BOOKING_PAYMENT_TYPES.includes(payment.type)) {
+    return payment;
+  }
+
+  const fallbackAmount = Number(payment.amountDue || payment.amount || 0);
+  const amountPaid = explicitAmountPaid ?? fallbackAmount;
+
+  if (!Number.isFinite(amountPaid) || amountPaid <= 0) {
+    return payment;
+  }
+
+  if (Number(payment.amountPaid || 0) === amountPaid) {
+    return payment;
+  }
+
+  const updatedPayment = await prisma.payment.update({
+    where: { id: payment.id },
+    data: { amountPaid },
+  });
+
+  return updatedPayment;
 };
 
 exports.handlePaynowWebhook = async (req, res) => {
   try {
-    const provider = getProvider();
-    const result = await provider.verifyWebhook(req.body);
+    const provider = getProviderByName("paynow");
+    const result = await provider.verifyWebhook(req.body, req.headers);
+
     if (!result.valid) {
       return res.status(200).json({ status: "ignored", reason: "invalid hash" });
     }
 
-    if (!SUCCESSFUL_STATUSES.includes(result.status)) {
+    const eventId =
+      result.eventId || hashEventId("paynow", result.transactionRef, result.status);
+    const eventRecord = await recordWebhookEvent("paynow", eventId, req.body);
+
+    if (eventRecord.duplicate) {
+      return res.status(200).json({ status: "ok", reason: "already processed" });
+    }
+
+    if (!SUCCESSFUL_PAYNOW_STATUSES.includes(normalizeStatus(result.status))) {
       try {
         console.log(
           `[webhook] Non-success status for transactionRef=${result.transactionRef}: status=${result.status}`
@@ -50,9 +125,11 @@ exports.handlePaynowWebhook = async (req, res) => {
       } catch (logErr) {
         console.log("[webhook] Error marking failed payment:", logErr.message);
       }
+
       return res.status(200).json({ status: "ok" });
     }
 
+    const amountPaid = normalizeAmount(result.amountPaid);
     const updateResult = await prisma.payment.updateMany({
       where: {
         transactionRef: result.transactionRef,
@@ -61,6 +138,7 @@ exports.handlePaynowWebhook = async (req, res) => {
       data: {
         webhookVerified: true,
         status: "success",
+        ...(amountPaid !== undefined ? { amountPaid } : {}),
       },
     });
 
@@ -68,7 +146,7 @@ exports.handlePaynowWebhook = async (req, res) => {
       return res.status(200).json({ status: "ok", reason: "already processed" });
     }
 
-    const claimedPayment = await prisma.payment.findFirst({
+    let claimedPayment = await prisma.payment.findFirst({
       where: { transactionRef: result.transactionRef },
     });
 
@@ -77,146 +155,17 @@ exports.handlePaynowWebhook = async (req, res) => {
     }
 
     try {
-      if (claimedPayment.type === "listing_fee") {
-        if (
-          req.query?.earlyAccess === "true" &&
-          process.env.PAYMENT_PROVIDER !== "paynow"
-        ) {
-          await prisma.listing.update({
-            where: { id: claimedPayment.listingId },
-            data: {
-              status: "early_access",
-              earlyAccessUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-              paymentDeadline: null,
-            },
-          });
-        } else {
-          await prisma.listing.update({
-            where: { id: claimedPayment.listingId },
-            data: {
-              status: "active",
-              paymentDeadline: null,
-            },
-          });
-        }
-      }
-
-      if (claimedPayment.type === "premium_subscription") {
-        const user = await prisma.user.findUnique({
-          where: { id: claimedPayment.userId },
-        });
-        const base =
-          user.premiumExpiry && user.premiumExpiry > new Date()
-            ? user.premiumExpiry
-            : new Date();
-
-        await prisma.user.update({
-          where: { id: claimedPayment.userId },
-          data: {
-            premiumExpiry: new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000),
+      claimedPayment = await ensureConfirmedAmount(claimedPayment, amountPaid);
+      await applyPaymentSuccess(
+        {
+          ...claimedPayment,
+          providerMeta: {
+            ...(claimedPayment.providerMeta || {}),
+            earlyAccess: req.query?.earlyAccess === "true",
           },
-        });
-      }
-
-      if (claimedPayment.type === "booking_payment") {
-        const booking = await prisma.booking.findUnique({
-          where: { id: claimedPayment.bookingId },
-          include: {
-            room: {
-              include: {
-                accommodation: {
-                  select: { ownerId: true },
-                },
-              },
-            },
-          },
-        });
-
-        if (!booking) {
-          throw new Error("Booking not found");
-        }
-
-        const shouldConfirmInstantBooking =
-          normalizeEnumInput(booking.status) === "PENDING_PAYMENT" &&
-          normalizeEnumInput(booking.room.bookingMode) === "INSTANT";
-
-        const updatedBooking = await prisma.booking.update({
-          where: { id: booking.id },
-          data: {
-            paymentStatus: "PAID",
-            ...(shouldConfirmInstantBooking ? { status: "CONFIRMED" } : {}),
-          },
-          include: {
-            room: {
-              include: {
-                accommodation: {
-                  select: { ownerId: true },
-                },
-              },
-            },
-          },
-        });
-
-        updatedBooking._id = updatedBooking.id;
-        updatedBooking.room._id = updatedBooking.room.id;
-
-        const guest = await prisma.user.findUnique({
-          where: { id: updatedBooking.guestId },
-          select: { id: true, email: true, username: true },
-        });
-        const bookingProviderId =
-          updatedBooking.room.providerId || updatedBooking.room.accommodation?.ownerId;
-        const bookingProvider = bookingProviderId
-          ? await prisma.user.findUnique({
-              where: { id: bookingProviderId },
-              select: { id: true, email: true, providerProfile: true },
-            })
-          : null;
-
-        if (guest) {
-          guest._id = guest.id;
-        }
-
-        if (bookingProvider) {
-          bookingProvider._id = bookingProvider.id;
-        }
-
-        void sendEmailSafe(
-          bookingPaymentSuccessGuest({
-            booking: updatedBooking,
-            room: updatedBooking.room,
-            guest,
-            provider: bookingProvider,
-          })
-        );
-        void sendEmailSafe(
-          bookingPaymentSuccessProvider({
-            booking: updatedBooking,
-            room: updatedBooking.room,
-            guest,
-            provider: bookingProvider,
-          })
-        );
-
-        if (shouldConfirmInstantBooking) {
-          void sendEmailSafe(
-            bookingConfirmedInstantGuest({
-              booking: updatedBooking,
-              room: updatedBooking.room,
-              guest,
-              provider: bookingProvider,
-            })
-          );
-          void sendEmailSafe(
-            bookingConfirmedInstantProvider({
-              booking: updatedBooking,
-              room: updatedBooking.room,
-              guest,
-              provider: bookingProvider,
-            })
-          );
-        }
-      }
+        },
+        prisma
+      );
 
       return res.status(200).json({ status: "ok" });
     } catch (sideEffectErr) {
@@ -234,10 +183,116 @@ exports.handlePaynowWebhook = async (req, res) => {
       } catch (resetErr) {
         console.log("[webhook] Error resetting webhook claim:", resetErr.message);
       }
+      await removeWebhookEvent("paynow", eventId);
+
       return res.status(200).json({ status: "error" });
     }
   } catch (err) {
     console.log("[webhook] Unexpected error:", err.message);
+    return res.status(200).json({ status: "error" });
+  }
+};
+
+const findPaymentForProviderRef = (providerRef) =>
+  prisma.payment.findFirst({
+    where: {
+      OR: [{ transactionRef: providerRef }, { providerIntentId: providerRef }],
+    },
+  });
+
+exports.handleStripeWebhook = async (req, res) => {
+  try {
+    const provider = getProviderByName("stripe");
+    const result = await provider.verifyWebhook(req.body, req.headers);
+
+    if (!result.valid) {
+      return res.status(200).json({ status: "ignored", reason: "invalid signature" });
+    }
+
+    const eventId =
+      result.eventId || hashEventId("stripe", result.transactionRef, result.status);
+    const eventRecord = await recordWebhookEvent(
+      "stripe",
+      eventId,
+      result.payload || {
+        type: result.status,
+        transactionRef: result.transactionRef,
+      }
+    );
+
+    if (eventRecord.duplicate) {
+      return res.status(200).json({ status: "ok", reason: "already processed" });
+    }
+
+    if (result.status === "payment_intent.succeeded") {
+      const payment = await findPaymentForProviderRef(result.transactionRef);
+
+      if (!payment) {
+        return res.status(200).json({ status: "ok", reason: "payment missing" });
+      }
+
+      const amountPaid = normalizeAmount(result.amountPaid) ?? Number(payment.amountDue || payment.amount || 0);
+      let updatedPayment;
+
+      try {
+        updatedPayment = await prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: "success",
+            webhookVerified: true,
+            amountPaid,
+          },
+        });
+
+        await applyPaymentSuccess(updatedPayment, prisma);
+      } catch (sideEffectErr) {
+        console.log(
+          `[webhook] Stripe side effect error for transactionRef=${result.transactionRef}: ${sideEffectErr.message}`
+        );
+        try {
+          await prisma.payment.update({
+            where: { id: updatedPayment?.id || payment.id },
+            data: {
+              webhookVerified: false,
+              status: "pending",
+            },
+          });
+        } catch (resetErr) {
+          console.log("[webhook] Error resetting Stripe webhook claim:", resetErr.message);
+        }
+        await removeWebhookEvent("stripe", eventId);
+
+        return res.status(200).json({ status: "error" });
+      }
+
+      return res.status(200).json({ status: "ok" });
+    }
+
+    if (result.status === "payment_intent.payment_failed") {
+      await prisma.payment.updateMany({
+        where: {
+          OR: [{ transactionRef: result.transactionRef }, { providerIntentId: result.transactionRef }],
+        },
+        data: { status: "failed" },
+      });
+
+      return res.status(200).json({ status: "ok" });
+    }
+
+    if (result.status === "charge.refunded") {
+      if (prisma.refund?.updateMany) {
+        await prisma.refund.updateMany({
+          where: { providerRefId: result.providerRefId },
+          data: { status: "success" },
+        });
+      }
+
+      return res.status(200).json({ status: "ok" });
+    }
+
+    return res.status(200).json({ status: "ok", reason: "event ignored" });
+  } catch (err) {
+    console.log("[webhook] Stripe webhook error:", err.message);
     return res.status(200).json({ status: "error" });
   }
 };

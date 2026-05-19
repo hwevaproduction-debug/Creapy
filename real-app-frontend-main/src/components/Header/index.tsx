@@ -23,6 +23,7 @@ import { Heading } from "../Heading";
 import SearchBar from "../SearchBar";
 import AppButton from "../ui/AppButton";
 import AppContainer from "../ui/AppContainer";
+import NotificationBell from "./NotificationBell";
 // Hooks Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
@@ -30,6 +31,7 @@ import {
   selectedUserAvatar,
   selectedUserName,
   selectedUserRole,
+  selectedUserToken,
   setUser,
 } from "../../redux/auth/authSlice";
 // Icons Imports
@@ -47,6 +49,19 @@ const menuStyle = {
   "&:hover": {
     textDecoration: "underline",
   },
+};
+
+const getInitials = (name?: string) => {
+  if (!name) {
+    return "U";
+  }
+
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
 };
 
 const StyledMenu = styled((props: MenuProps) => (
@@ -85,10 +100,12 @@ const StyledMenu = styled((props: MenuProps) => (
 const Header = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const token = useTypedSelector(selectedUserToken);
   const avatar = useTypedSelector(selectedUserAvatar);
   const userName = useTypedSelector(selectedUserName);
   const userRole = useTypedSelector(selectedUserRole);
   const searchText = useTypedSelector(selectedSearchText);
+  const isAuthenticated = Boolean(token);
 
   const [anchorEl, setAnchorEl] = useState<Element | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -214,7 +231,7 @@ const Header = () => {
                 List Your Stay
               </AppButton>
 
-              {avatar ? (
+              {isAuthenticated ? (
                 <>
                   <Box
                     sx={menuStyle}
@@ -240,12 +257,15 @@ const Header = () => {
                       Create Listing
                     </AppButton>
                   )}
+                  <NotificationBell />
                   <Box sx={{ cursor: "pointer" }}>
                     <IconButton
                       onClick={(e) => setAnchorEl(e.currentTarget)}
                       color="inherit"
                     >
-                      <Avatar alt="User Avatar" src={avatar} />
+                      <Avatar alt={userName || "User Avatar"} src={avatar || undefined}>
+                        {getInitials(userName)}
+                      </Avatar>
                     </IconButton>
                     <StyledMenu
                       onClick={() => setAnchorEl(null)}
@@ -263,13 +283,9 @@ const Header = () => {
                         <Box
                           sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
-                          <img
-                            height={30}
-                            width={30}
-                            src={avatar}
-                            alt="user"
-                            style={{ borderRadius: "50%" }}
-                          />
+                          <Avatar alt={userName || "User Avatar"} src={avatar || undefined}>
+                            {getInitials(userName)}
+                          </Avatar>
                           <Box>{userName}</Box>
                         </Box>
                       </MenuItem>
@@ -389,8 +405,18 @@ const Header = () => {
             <ListItemText primary="List Your Stay" />
           </ListItemButton>
 
-          {avatar ? (
+          {isAuthenticated ? (
             <>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "flex-start",
+                  px: 0,
+                  py: 1,
+                }}
+              >
+                <NotificationBell />
+              </Box>
               <ListItemButton
                 onClick={() => {
                   if (userRole === "landlord") {

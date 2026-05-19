@@ -166,12 +166,17 @@ export const providerApiSlice = apiSlice.injectEndpoints({
       ],
     }),
     declineBooking: builder.mutation({
-      query: (bookingId) => ({
-        url: `bookings/${bookingId}/decline`,
+      query: (args) => {
+        const id = typeof args === "string" ? args : args?.id;
+        const reason = typeof args === "string" ? undefined : args?.reason;
+        return {
+        url: `bookings/${id}/decline`,
         method: "POST",
-      }),
-      invalidatesTags: (result, error, bookingId) => [
-        { type: "ProviderBooking", id: bookingId },
+          body: reason ? { reason } : undefined,
+        };
+      },
+      invalidatesTags: (result, error, args) => [
+        { type: "ProviderBooking", id: typeof args === "string" ? args : args?.id },
         { type: "ProviderBooking", id: "LIST" },
         { type: "ProviderSettlement", id: "SUMMARY" },
       ],
@@ -213,6 +218,201 @@ export const providerApiSlice = apiSlice.injectEndpoints({
       }),
       providesTags: [{ type: "ProviderSettlement", id: "SUMMARY" }],
     }),
+    getMyAccommodation: builder.query({
+      query: () => ({
+        url: "accommodations/mine",
+        method: "GET",
+      }),
+      providesTags: [{ type: "Accommodation", id: "MINE" }],
+    }),
+    updateAccommodation: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `accommodations/${id}`,
+        method: "PATCH",
+        body: payload,
+      }),
+      invalidatesTags: [{ type: "Accommodation", id: "MINE" }],
+    }),
+    addAccommodationImage: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `accommodations/${id}/images`,
+        method: "POST",
+        body: payload,
+      }),
+      invalidatesTags: [{ type: "Accommodation", id: "MINE" }],
+    }),
+    deleteAccommodationImage: builder.mutation({
+      query: ({ id, imageId }) => ({
+        url: `accommodations/${id}/images/${imageId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "Accommodation", id: "MINE" }],
+    }),
+    addRoomImage: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `rooms/${id}/images`,
+        method: "POST",
+        body: payload,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Room", id },
+        { type: "Room", id: "LIST" },
+      ],
+    }),
+    deleteRoomImage: builder.mutation({
+      query: ({ id, imageId }) => ({
+        url: `rooms/${id}/images/${imageId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Room", id },
+        { type: "Room", id: "LIST" },
+      ],
+    }),
+    updateRoomImage: builder.mutation({
+      query: ({ id, imageId, payload }) => ({
+        url: `rooms/${id}/images/${imageId}`,
+        method: "PATCH",
+        body: payload,
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: "Room", id }],
+    }),
+    upsertCancellationPolicy: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `accommodations/${id}/cancellation-policy`,
+        method: "PUT",
+        body: payload,
+      }),
+      invalidatesTags: [{ type: "Accommodation", id: "MINE" }],
+    }),
+    upsertCheckInRules: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `accommodations/${id}/checkin-rules`,
+        method: "PUT",
+        body: payload,
+      }),
+      invalidatesTags: [{ type: "Accommodation", id: "MINE" }],
+    }),
+    getMyAnalytics: builder.query({
+      query: (args: any = {}) => {
+        const { from, to, roomId } = args;
+        const params = new URLSearchParams();
+        if (from) params.set("from", from);
+        if (to) params.set("to", to);
+        if (roomId) params.set("roomId", roomId);
+        const query = params.toString();
+        return {
+          url: query ? `providers/me/analytics?${query}` : "providers/me/analytics",
+          method: "GET",
+        };
+      },
+      providesTags: [{ type: "ProviderAnalytics", id: "SUMMARY" }],
+    }),
+    getRoomCalendar: builder.query({
+      query: ({ roomId, year, month }) => ({
+        url: `rooms/${roomId}/calendar?year=${year}&month=${month}`,
+        method: "GET",
+      }),
+      providesTags: (result, error, { roomId, year, month }) => [
+        { type: "RoomCalendar", id: `${roomId}-${year}-${month}` },
+      ],
+    }),
+    listRoomBlocks: builder.query({
+      query: (roomId) => ({
+        url: `rooms/${roomId}/blocks`,
+        method: "GET",
+      }),
+      providesTags: (result, error, roomId) => [{ type: "ProviderAvailability", id: roomId }],
+    }),
+    deleteRoomBlock: builder.mutation({
+      query: ({ roomId, blockId }) => ({
+        url: `rooms/${roomId}/blocks/${blockId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, { roomId }) => [
+        { type: "Room", id: roomId },
+        { type: "ProviderAvailability", id: roomId },
+      ],
+    }),
+    listSeasonalRates: builder.query({
+      query: (roomId) => ({
+        url: `rooms/${roomId}/seasonal-rates`,
+        method: "GET",
+      }),
+      providesTags: (result, error, roomId) => [{ type: "SeasonalRate", id: roomId }],
+    }),
+    createSeasonalRate: builder.mutation({
+      query: ({ roomId, payload }) => ({
+        url: `rooms/${roomId}/seasonal-rates`,
+        method: "POST",
+        body: payload,
+      }),
+      invalidatesTags: (result, error, { roomId }) => [{ type: "SeasonalRate", id: roomId }],
+    }),
+    updateSeasonalRate: builder.mutation({
+      query: ({ roomId, rateId, payload }) => ({
+        url: `rooms/${roomId}/seasonal-rates/${rateId}`,
+        method: "PUT",
+        body: payload,
+      }),
+      invalidatesTags: (result, error, { roomId }) => [{ type: "SeasonalRate", id: roomId }],
+    }),
+    deleteSeasonalRate: builder.mutation({
+      query: ({ roomId, rateId }) => ({
+        url: `rooms/${roomId}/seasonal-rates/${rateId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, { roomId }) => [{ type: "SeasonalRate", id: roomId }],
+    }),
+    listRoomFees: builder.query({
+      query: (roomId) => ({
+        url: `rooms/${roomId}/fees`,
+        method: "GET",
+      }),
+      providesTags: (result, error, roomId) => [{ type: "RoomFee", id: roomId }],
+    }),
+    createRoomFee: builder.mutation({
+      query: ({ roomId, payload }) => ({
+        url: `rooms/${roomId}/fees`,
+        method: "POST",
+        body: payload,
+      }),
+      invalidatesTags: (result, error, { roomId }) => [{ type: "RoomFee", id: roomId }],
+    }),
+    updateRoomFee: builder.mutation({
+      query: ({ roomId, feeId, payload }) => ({
+        url: `rooms/${roomId}/fees/${feeId}`,
+        method: "PUT",
+        body: payload,
+      }),
+      invalidatesTags: (result, error, { roomId }) => [{ type: "RoomFee", id: roomId }],
+    }),
+    deleteRoomFee: builder.mutation({
+      query: ({ roomId, feeId }) => ({
+        url: `rooms/${roomId}/fees/${feeId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, { roomId }) => [{ type: "RoomFee", id: roomId }],
+    }),
+    getAccommodationTax: builder.query({
+      query: (accommodationId) => ({
+        url: `accommodations/${accommodationId}/tax`,
+        method: "GET",
+      }),
+      providesTags: (result, error, accommodationId) => [
+        { type: "AccommodationTax", id: accommodationId },
+      ],
+    }),
+    upsertAccommodationTax: builder.mutation({
+      query: ({ accommodationId, payload }) => ({
+        url: `accommodations/${accommodationId}/tax`,
+        method: "PUT",
+        body: payload,
+      }),
+      invalidatesTags: (result, error, { accommodationId }) => [
+        { type: "AccommodationTax", id: accommodationId },
+      ],
+    }),
   }),
 });
 
@@ -232,6 +432,29 @@ export const {
   useGetProviderProfileQuery,
   useUpdateProviderProfileMutation,
   useGetProviderSettlementsSummaryQuery,
+  useGetMyAccommodationQuery,
+  useUpdateAccommodationMutation,
+  useAddAccommodationImageMutation,
+  useDeleteAccommodationImageMutation,
+  useAddRoomImageMutation,
+  useDeleteRoomImageMutation,
+  useUpdateRoomImageMutation,
+  useUpsertCancellationPolicyMutation,
+  useUpsertCheckInRulesMutation,
+  useGetMyAnalyticsQuery,
+  useGetRoomCalendarQuery,
+  useListRoomBlocksQuery,
+  useDeleteRoomBlockMutation,
+  useListSeasonalRatesQuery,
+  useCreateSeasonalRateMutation,
+  useUpdateSeasonalRateMutation,
+  useDeleteSeasonalRateMutation,
+  useListRoomFeesQuery,
+  useCreateRoomFeeMutation,
+  useUpdateRoomFeeMutation,
+  useDeleteRoomFeeMutation,
+  useGetAccommodationTaxQuery,
+  useUpsertAccommodationTaxMutation,
 } = providerApiSlice;
 
 export { toEntityArray, toEntityObject };

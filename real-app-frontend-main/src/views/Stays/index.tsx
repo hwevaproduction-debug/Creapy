@@ -1,276 +1,156 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
-  Alert,
+  Badge,
   Box,
-  Checkbox,
-  Chip,
   Drawer,
   Fab,
-  FormControlLabel,
   Grid,
-  Radio,
-  RadioGroup,
   Stack,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { FaLocationDot, FaSliders, FaUserGroup } from "react-icons/fa6";
+import { FaSliders } from "react-icons/fa6";
 import { Heading, SubHeading } from "../../components/Heading";
+import EmptyState from "../../components/stays/EmptyState";
+import FilterPanel from "../../components/stays/FilterPanel";
+import StayCard from "../../components/stays/StayCard";
+import StayCardSkeleton from "../../components/stays/StayCardSkeleton";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppInput from "../../components/ui/AppInput";
 import AppButton from "../../components/ui/AppButton";
 import AppSelect from "../../components/ui/AppSelect";
-import DotLoader from "../../components/Spinner/dotLoader";
-import { StaySearchParams, useSearchStaysQuery } from "../../redux/api/stayApiSlice";
-import { thousandSeparatorNumber } from "../../utils";
-
-type StayFilterState = StaySearchParams & {
-  amenities: string[];
-};
+import {
+  DEFAULT_STAY_FILTERS,
+  StayFilterField,
+  StayFilterState,
+  useStayFilters,
+} from "../../hooks/useStayFilters";
+import { useSearchStaysQuery } from "../../redux/api/stayApiSlice";
 
 export const BUSINESS_TYPES = [
   { label: "All", value: "" },
-  { label: "Hotel", value: "hotel" },
-  { label: "Lodge", value: "lodge" },
-  { label: "BnB", value: "bnb" },
-  { label: "Guesthouse", value: "guesthouse" },
-  { label: "Motel", value: "motel" },
-  { label: "Backpackers", value: "backpackers" },
-];
-
-const AMENITY_OPTIONS = [
-  { label: "Wi-Fi", value: "Wi-Fi" },
-  { label: "Breakfast Included", value: "Breakfast Included" },
-  { label: "Secure Parking", value: "Secure Parking" },
-  { label: "Swimming Pool", value: "Swimming Pool" },
-  { label: "Air Conditioning", value: "Air Conditioning" },
-  { label: "Conference Room", value: "Conference Room" },
-  { label: "Airport Pickup", value: "Airport Pickup" },
-  { label: "Family Friendly", value: "Family Friendly" },
+  { label: "Hotel", value: "HOTEL" },
+  { label: "Lodge", value: "LODGE" },
+  { label: "BnB", value: "BNB" },
+  { label: "Apartment", value: "APARTMENT" },
+  { label: "Guesthouse", value: "GUEST_HOUSE" },
+  { label: "Hostel", value: "HOSTEL" },
 ];
 
 const SORT_OPTIONS = [
+  { label: "Newest", value: "newest" },
   { label: "Price Low to High", value: "price_asc" },
   { label: "Price High to Low", value: "price_desc" },
-  { label: "Newest", value: "newest" },
+  { label: "Rating", value: "rating_desc" },
+  { label: "Distance", value: "distance" },
 ];
 
-const getRoomName = (room: any) =>
-  room?.name || room?.title || room?.roomType || room?.type || "Temporary stay";
-
-const getRoomLocation = (room: any) =>
-  room?.location || room?.address || room?.city || room?.province || "Location unavailable";
-
-const getRoomDescription = (room: any) =>
-  room?.description || room?.summary || room?.details || "No description available yet.";
-
-const getRoomImage = (room: any) => {
-  if (Array.isArray(room?.images) && room.images.length > 0) return room.images[0];
-  if (typeof room?.image === "string") return room.image;
-  if (typeof room?.coverImage === "string") return room.coverImage;
-  return "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
-};
-
-const getRoomPrice = (room: any) =>
-  Number(
-    room?.resolvedPrice ||
-      room?.basePricePerNight ||
-      room?.pricePerNight ||
-      room?.nightlyRate ||
-      room?.price ||
-      0
-  );
-
-const getRoomCapacity = (room: any) =>
-  Number(room?.maxGuests || room?.capacity || room?.guests || room?.occupancy || 1);
-
-const readParams = (searchParams: URLSearchParams): StayFilterState => ({
-  location: searchParams.get("location") || "",
-  checkIn: searchParams.get("checkIn") || "",
-  checkOut: searchParams.get("checkOut") || "",
-  guests: searchParams.get("guests") || "1",
-  minPrice: searchParams.get("minPrice") || "",
-  maxPrice: searchParams.get("maxPrice") || "",
-  searchTerm: searchParams.get("searchTerm") || "",
-  businessType: searchParams.get("businessType") || "",
-  bookingMode: searchParams.get("bookingMode") || "",
-  amenities: searchParams.getAll("amenities"),
-  sort: searchParams.get("sort") || "",
+const cloneFilters = (filters: StayFilterState): StayFilterState => ({
+  ...filters,
+  amenities: [...filters.amenities],
 });
 
-const buildSearchParams = (filters: StayFilterState) => {
-  const nextSearchParams = new URLSearchParams();
+const getErrorMessage = (error: unknown) =>
+  (error as any)?.data?.message ||
+  (error as any)?.error ||
+  "Unable to load stays right now. Please try again.";
 
-  Object.entries(filters).forEach(([key, value]) => {
-    if (key === "amenities") {
-      if (Array.isArray(value) && value.length > 0) {
-        value.forEach((amenity) => nextSearchParams.append(key, amenity));
-      }
-      return;
-    }
+const buildDetailsQuery = (filters: StayFilterState) => {
+  const query = new URLSearchParams();
 
-    if (value !== undefined && value !== null && value !== "") {
-      nextSearchParams.set(key, String(value));
-    }
-  });
+  if (filters.checkIn) query.set("checkIn", filters.checkIn);
+  if (filters.checkOut) query.set("checkOut", filters.checkOut);
+  if (filters.guests) query.set("guests", filters.guests);
 
-  return nextSearchParams;
-};
-
-const buildQueryParams = (filters: StayFilterState): StaySearchParams => {
-  const params: Record<string, any> = {
-    location: filters.location,
-    guests: filters.guests,
-    minPrice: filters.minPrice,
-    maxPrice: filters.maxPrice,
-    searchTerm: filters.searchTerm,
-    businessType: filters.businessType,
-    bookingMode: filters.bookingMode,
-    amenities: filters.amenities,
-    sort: filters.sort,
-  };
-
-  if (filters.checkIn && filters.checkOut) {
-    const checkIn = new Date(filters.checkIn);
-    const checkOut = new Date(filters.checkOut);
-
-    if (!Number.isNaN(checkIn.getTime()) && !Number.isNaN(checkOut.getTime()) && checkIn < checkOut) {
-      params.checkIn = filters.checkIn;
-      params.checkOut = filters.checkOut;
-    }
-  }
-
-  return params;
+  return query.toString();
 };
 
 const Stays = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-  const currentFilters = useMemo(() => readParams(searchParams), [searchParams]);
-  const [form, setForm] = useState<StayFilterState>(currentFilters);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-
-  useEffect(() => {
-    setForm(currentFilters);
-  }, [currentFilters]);
-
-  const queryParams = useMemo(() => buildQueryParams(currentFilters), [currentFilters]);
   const {
-    data: stays = [],
+    filters,
+    appliedFilters,
+    queryParams,
+    activeFilterCount,
+    activeFilterSummary,
+    updateField,
+    clearFilters,
+    applyFilters,
+  } = useStayFilters();
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileDraftFilters, setMobileDraftFilters] = useState<StayFilterState>(() =>
+    cloneFilters(DEFAULT_STAY_FILTERS)
+  );
+
+  const {
+    data,
     isLoading,
     isFetching,
     error,
+    refetch,
   } = useSearchStaysQuery(queryParams);
 
-  const sortedStays = useMemo(() => {
-    const nextStays = [...stays];
+  const stays = data?.data?.stays || [];
+  const pagination = data?.pagination;
+  const detailsQuery = useMemo(() => buildDetailsQuery(appliedFilters), [appliedFilters]);
+  const resultCount = pagination?.total ?? stays.length;
+  const showInitialSkeletons = isLoading && stays.length === 0;
+  const showFetchingSkeletons = isFetching && !showInitialSkeletons;
 
-    switch (currentFilters.sort) {
-      case "price_asc":
-        return nextStays.sort((a, b) => getRoomPrice(a) - getRoomPrice(b));
-      case "price_desc":
-        return nextStays.sort((a, b) => getRoomPrice(b) - getRoomPrice(a));
-      case "newest":
-        return nextStays.sort((a, b) => {
-          const left = new Date(a?.createdAt || a?.updatedAt || 0).getTime();
-          const right = new Date(b?.createdAt || b?.updatedAt || 0).getTime();
-          return right - left;
-        });
-      default:
-        return nextStays;
+  useEffect(() => {
+    if (!data || isLoading) {
+      return;
     }
-  }, [currentFilters.sort, stays]);
 
-  const applyFilters = (nextFilters: StayFilterState) => {
-    setForm(nextFilters);
-    setSearchParams(buildSearchParams(nextFilters));
-  };
+    window.dispatchEvent(
+      new CustomEvent("stay:search", {
+        detail: {
+          params: queryParams,
+          resultCount: data.data?.stays?.length || 0,
+        },
+      })
+    );
+  }, [data, isLoading, queryParams]);
 
-  const updateField = (field: keyof StayFilterState, value: any) => {
-    applyFilters({
-      ...form,
-      [field]: value,
-    });
-  };
-
-  const toggleAmenity = (amenityValue: string) => {
-    const nextAmenities = form.amenities.includes(amenityValue)
-      ? form.amenities.filter((item) => item !== amenityValue)
-      : [...form.amenities, amenityValue];
-
-    applyFilters({
-      ...form,
-      amenities: nextAmenities,
-    });
-  };
+  useEffect(() => {
+    if (mobileFiltersOpen) {
+      setMobileDraftFilters(cloneFilters(filters));
+    }
+  }, [filters, mobileFiltersOpen]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    applyFilters(form);
+    applyFilters(filters);
   };
 
-  const renderFilters = () => (
-    <Stack spacing={2}>
-      <AppCard sx={{ p: 2.5, borderRadius: 3 }}>
-        <Stack spacing={2}>
-          <Heading sx={{ fontSize: "20px" }}>Price per Night</Heading>
-          <AppInput
-            label="Minimum"
-            type="number"
-            value={form.minPrice || ""}
-            onChange={(event) => updateField("minPrice", event.target.value)}
-            inputProps={{ min: 0 }}
-          />
-          <AppInput
-            label="Maximum"
-            type="number"
-            value={form.maxPrice || ""}
-            onChange={(event) => updateField("maxPrice", event.target.value)}
-            inputProps={{ min: 0 }}
-          />
-        </Stack>
-      </AppCard>
+  const handleOpenStay = (room: any) => {
+    const roomId = room?._id || room?.id;
 
-      <AppCard sx={{ p: 2.5, borderRadius: 3 }}>
-        <Stack spacing={1.25}>
-          <Heading sx={{ fontSize: "20px" }}>Amenities</Heading>
-          {AMENITY_OPTIONS.map((amenity) => (
-            <FormControlLabel
-              key={amenity.value}
-              control={
-                <Checkbox
-                  checked={form.amenities.includes(amenity.value)}
-                  onChange={() => toggleAmenity(amenity.value)}
-                />
-              }
-              label={amenity.label}
-              sx={{ alignItems: "flex-start", m: 0 }}
-            />
-          ))}
-        </Stack>
-      </AppCard>
+    if (!roomId) {
+      return;
+    }
 
-      <AppCard sx={{ p: 2.5, borderRadius: 3 }}>
-        <Stack spacing={1.25}>
-          <Heading sx={{ fontSize: "20px" }}>Booking Type</Heading>
-          <RadioGroup
-            value={form.bookingMode || ""}
-            onChange={(event) => updateField("bookingMode", event.target.value)}
-          >
-            <FormControlLabel value="" control={<Radio />} label="All" />
-            <FormControlLabel value="instant" control={<Radio />} label="Instant" />
-            <FormControlLabel value="request" control={<Radio />} label="Request to Book" />
-          </RadioGroup>
-        </Stack>
-      </AppCard>
-    </Stack>
-  );
+    navigate(`/stays/rooms/${roomId}${detailsQuery ? `?${detailsQuery}` : ""}`);
+  };
 
-  const statusMessage = (error as any)?.data?.message || "Unable to load stays right now.";
+  const updateMobileDraft = (
+    field: StayFilterField,
+    value: StayFilterState[StayFilterField]
+  ) => {
+    setMobileDraftFilters((previousFilters) => ({
+      ...previousFilters,
+      [field]: value,
+      page: 1,
+    }));
+  };
+
+  const handleLoadMore = () => {
+    updateField("page", appliedFilters.page + 1);
+  };
 
   return (
     <Box sx={{ py: { xs: 4, md: 6 }, background: "#f8fafc", minHeight: "calc(100vh - 72px)" }}>
@@ -279,7 +159,7 @@ const Stays = () => {
           <AppCard
             sx={{
               p: { xs: 2.5, md: 4 },
-              borderRadius: 4,
+              borderRadius: "8px",
               background:
                 "linear-gradient(135deg, rgba(15,23,42,1) 0%, rgba(30,41,59,0.96) 45%, rgba(15,118,110,0.88) 100%)",
               color: "#fff",
@@ -298,7 +178,7 @@ const Stays = () => {
                   <Grid item xs={12} md={3}>
                     <AppInput
                       label="Location"
-                      value={form.location || ""}
+                      value={filters.location}
                       onChange={(event) => updateField("location", event.target.value)}
                       placeholder="Harare"
                       InputLabelProps={{ shrink: true }}
@@ -309,7 +189,7 @@ const Stays = () => {
                     <AppInput
                       label="Check-in"
                       type="date"
-                      value={form.checkIn || ""}
+                      value={filters.checkIn}
                       onChange={(event) => updateField("checkIn", event.target.value)}
                       InputLabelProps={{ shrink: true }}
                       sx={{ "& .MuiInputBase-root": { background: "#fff" } }}
@@ -319,7 +199,7 @@ const Stays = () => {
                     <AppInput
                       label="Check-out"
                       type="date"
-                      value={form.checkOut || ""}
+                      value={filters.checkOut}
                       onChange={(event) => updateField("checkOut", event.target.value)}
                       InputLabelProps={{ shrink: true }}
                       sx={{ "& .MuiInputBase-root": { background: "#fff" } }}
@@ -329,7 +209,7 @@ const Stays = () => {
                     <AppInput
                       label="Guests"
                       type="number"
-                      value={form.guests || "1"}
+                      value={filters.guests}
                       onChange={(event) => updateField("guests", event.target.value)}
                       inputProps={{ min: 1 }}
                       InputLabelProps={{ shrink: true }}
@@ -339,7 +219,7 @@ const Stays = () => {
                   <Grid item xs={12} md={3}>
                     <AppInput
                       label="Search"
-                      value={form.searchTerm || ""}
+                      value={filters.searchTerm}
                       onChange={(event) => updateField("searchTerm", event.target.value)}
                       placeholder="Suite, wifi, city center..."
                       InputLabelProps={{ shrink: true }}
@@ -356,169 +236,124 @@ const Stays = () => {
 
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                 {BUSINESS_TYPES.map((type) => {
-                  const isActive = (form.businessType || "") === type.value;
+                  const isActive = filters.businessType === type.value;
 
                   return (
-                    <Chip
+                    <Box
                       key={type.label}
-                      label={type.label}
-                      color={isActive ? "primary" : "default"}
-                      variant={isActive ? "filled" : "outlined"}
+                      component="button"
+                      type="button"
                       onClick={() => updateField("businessType", type.value)}
                       sx={{
-                        color: isActive ? "#fff" : "#fff",
-                        borderColor: "rgba(255,255,255,0.3)",
+                        border: "1px solid rgba(255,255,255,0.3)",
+                        borderRadius: "999px",
+                        px: 1.5,
+                        py: 0.75,
+                        color: "#fff",
+                        cursor: "pointer",
+                        font: "inherit",
                         backgroundColor: isActive ? "#0f766e" : "rgba(255,255,255,0.08)",
                       }}
-                    />
+                    >
+                      {type.label}
+                    </Box>
                   );
                 })}
               </Stack>
             </Stack>
           </AppCard>
 
-          {error ? <Alert severity="error">{statusMessage}</Alert> : null}
-
-          {isLoading || isFetching ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-              <DotLoader />
-            </Box>
+          {error ? (
+            <AppCard sx={{ p: 3, borderRadius: "8px", border: "1px solid #FECACA", boxShadow: "none" }}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="space-between">
+                <Box>
+                  <Heading sx={{ fontSize: "22px", color: "#991B1B", mb: 0.75 }}>
+                    Search could not be completed
+                  </Heading>
+                  <SubHeading sx={{ color: "#7F1D1D" }}>{getErrorMessage(error)}</SubHeading>
+                </Box>
+                <AppButton onClick={refetch} sx={{ alignSelf: { xs: "stretch", sm: "center" } }}>
+                  Retry
+                </AppButton>
+              </Stack>
+            </AppCard>
           ) : null}
 
-          {!isLoading && !isFetching && !error && (
-            <Grid container spacing={3}>
-              {!isMobile ? (
-                <Grid item xs={12} md={3}>
-                  <Box sx={{ position: "sticky", top: 96 }}>{renderFilters()}</Box>
-                </Grid>
-              ) : null}
-
-              <Grid item xs={12} md={isMobile ? 12 : 9}>
-                <Stack spacing={2.5}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 2,
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                      flexDirection: { xs: "column", sm: "row" },
-                    }}
-                  >
-                    <SubHeading sx={{ color: "#334155" }}>
-                      {sortedStays.length} results
-                    </SubHeading>
-                    <Box sx={{ minWidth: 200, maxWidth: 300, flex: "0 0 auto", width: { xs: "100%" } }}>
-                      <AppSelect
-                        label="Sort"
-                        value={form.sort || ""}
-                        onChange={(event) => updateField("sort", event.target.value)}
-                        options={SORT_OPTIONS}
-                      />
-                    </Box>
-                  </Box>
-
-                  {sortedStays.length === 0 ? (
-                    <Alert severity="info">
-                      No temporary stays matched the current filters. Adjust the dates, price, or amenities and try again.
-                    </Alert>
-                  ) : (
-                    <Grid container spacing={2.5}>
-                      {sortedStays.map((room: any) => {
-                        const price = getRoomPrice(room);
-                        const query = new URLSearchParams();
-
-                        if (currentFilters.checkIn) query.set("checkIn", String(currentFilters.checkIn));
-                        if (currentFilters.checkOut) query.set("checkOut", String(currentFilters.checkOut));
-                        if (currentFilters.guests) query.set("guests", String(currentFilters.guests));
-
-                        return (
-                          <Grid item xs={12} md={6} xl={4} key={room?._id || room?.id}>
-                            <AppCard
-                              sx={{
-                                height: "100%",
-                                borderRadius: 3,
-                                overflow: "hidden",
-                                display: "flex",
-                                flexDirection: "column",
-                              }}
-                            >
-                              <Box
-                                component="img"
-                                src={getRoomImage(room)}
-                                alt={getRoomName(room)}
-                                sx={{ height: 220, objectFit: "cover", width: "100%" }}
-                              />
-                              <Box
-                                sx={{
-                                  p: 2.5,
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: 1.5,
-                                  flex: 1,
-                                }}
-                              >
-                                <Heading sx={{ fontSize: "22px" }}>{getRoomName(room)}</Heading>
-                                <Box
-                                  sx={{ display: "flex", alignItems: "center", gap: 1, color: "#475569" }}
-                                >
-                                  <FaLocationDot />
-                                  <SubHeading>{getRoomLocation(room)}</SubHeading>
-                                </Box>
-                                <Box
-                                  sx={{ display: "flex", alignItems: "center", gap: 1, color: "#475569" }}
-                                >
-                                  <FaUserGroup />
-                                  <SubHeading>Up to {getRoomCapacity(room)} guests</SubHeading>
-                                </Box>
-                                <SubHeading
-                                  sx={{
-                                    color: "#334155",
-                                    display: "-webkit-box",
-                                    WebkitLineClamp: 3,
-                                    WebkitBoxOrient: "vertical",
-                                    overflow: "hidden",
-                                  }}
-                                >
-                                  {getRoomDescription(room)}
-                                </SubHeading>
-                                <Box
-                                  sx={{
-                                    mt: "auto",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    gap: 2,
-                                  }}
-                                >
-                                  <Box sx={{ fontSize: "22px", fontWeight: 700, color: "#0f172a" }}>
-                                    ${thousandSeparatorNumber(price)}
-                                    <Box
-                                      component="span"
-                                      sx={{ fontSize: "14px", color: "#64748b", ml: 0.5 }}
-                                    >
-                                      /night
-                                    </Box>
-                                  </Box>
-                                  <AppButton
-                                    onClick={() =>
-                                      navigate(`/stays/rooms/${room?._id || room?.id}?${query.toString()}`)
-                                    }
-                                  >
-                                    View details
-                                  </AppButton>
-                                </Box>
-                              </Box>
-                            </AppCard>
-                          </Grid>
-                        );
-                      })}
-                    </Grid>
-                  )}
-                </Stack>
+          <Grid container spacing={3}>
+            {!isMobile ? (
+              <Grid item xs={12} md={3}>
+                <Box sx={{ position: "sticky", top: 96 }}>
+                  <FilterPanel filters={filters} onChange={updateField} onClear={clearFilters} />
+                </Box>
               </Grid>
+            ) : null}
+
+            <Grid item xs={12} md={isMobile ? 12 : 9}>
+              <Stack spacing={2.5}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 2,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    flexDirection: { xs: "column", sm: "row" },
+                  }}
+                >
+                  <SubHeading sx={{ color: "#334155" }}>
+                    {resultCount} result{resultCount === 1 ? "" : "s"}
+                  </SubHeading>
+                  <Box sx={{ minWidth: 200, maxWidth: 300, flex: "0 0 auto", width: { xs: "100%" } }}>
+                    <AppSelect
+                      label="Sort"
+                      value={filters.sort}
+                      onChange={(event) => updateField("sort", event.target.value as string)}
+                      options={SORT_OPTIONS}
+                    />
+                  </Box>
+                </Box>
+
+                {showInitialSkeletons ? (
+                  <Grid container spacing={2.5}>
+                    {Array.from({ length: 6 }).map((_, index) => (
+                      <Grid item xs={12} md={6} xl={4} key={`initial-skeleton-${index}`}>
+                        <StayCardSkeleton />
+                      </Grid>
+                    ))}
+                  </Grid>
+                ) : null}
+
+                {!showInitialSkeletons && !error && stays.length === 0 ? (
+                  <EmptyState activeFilterSummary={activeFilterSummary} onClear={clearFilters} />
+                ) : null}
+
+                {!showInitialSkeletons && stays.length > 0 ? (
+                  <Grid container spacing={2.5}>
+                    {stays.map((room: any) => (
+                      <Grid item xs={12} md={6} xl={4} key={room?._id || room?.id}>
+                        <StayCard room={room} onOpen={() => handleOpenStay(room)} />
+                      </Grid>
+                    ))}
+                    {showFetchingSkeletons
+                      ? Array.from({ length: 6 }).map((_, index) => (
+                          <Grid item xs={12} md={6} xl={4} key={`fetching-skeleton-${index}`}>
+                            <StayCardSkeleton />
+                          </Grid>
+                        ))
+                      : null}
+                  </Grid>
+                ) : null}
+
+                {pagination?.hasMore && !error ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", pt: 1 }}>
+                    <AppButton onClick={handleLoadMore} disabled={isFetching}>
+                      {isFetching ? "Loading..." : "Load more"}
+                    </AppButton>
+                  </Box>
+                ) : null}
+              </Stack>
             </Grid>
-          )}
+          </Grid>
         </Stack>
       </AppContainer>
 
@@ -530,41 +365,88 @@ const Stays = () => {
             onClose={() => setMobileFiltersOpen(false)}
             PaperProps={{
               sx: {
-                borderRadius: "20px 20px 0 0",
-                padding: 2,
+                borderRadius: "16px 16px 0 0",
                 maxHeight: "85vh",
+                display: "flex",
               },
             }}
           >
             <Box
               sx={{
-                width: 48,
-                height: 4,
-                borderRadius: "999px",
-                background: "#cbd5e1",
-                margin: "0 auto 16px",
-              }}
-            />
-            {renderFilters()}
-          </Drawer>
-          {!mobileFiltersOpen ? (
-            <Fab
-              variant="extended"
-              onClick={() => setMobileFiltersOpen(true)}
-              sx={{
-                position: "fixed",
-                bottom: 24,
-                right: 20,
-                background: "#0f766e",
-                color: "#fff",
-                "&:hover": {
-                  background: "#115e59",
-                },
+                px: 2,
+                pt: 1.5,
+                pb: 1,
+                borderBottom: "1px solid #E2E8F0",
+                background: "#fff",
               }}
             >
-              <FaSliders style={{ marginRight: 8 }} />
-              Filters
-            </Fab>
+              <Box
+                sx={{
+                  width: 48,
+                  height: 4,
+                  borderRadius: "999px",
+                  background: "#cbd5e1",
+                  margin: "0 auto 16px",
+                }}
+              />
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Heading sx={{ fontSize: "20px" }}>Filters</Heading>
+                <AppButton
+                  variant="text"
+                  onClick={() => {
+                    clearFilters();
+                    setMobileFiltersOpen(false);
+                  }}
+                >
+                  Clear all
+                </AppButton>
+              </Stack>
+            </Box>
+
+            <Box sx={{ overflowY: "auto", flex: 1, minHeight: 0, p: 2 }}>
+              <FilterPanel
+                filters={mobileDraftFilters}
+                onChange={updateMobileDraft}
+                onClear={() => setMobileDraftFilters(cloneFilters(DEFAULT_STAY_FILTERS))}
+              />
+            </Box>
+
+            <Box sx={{ p: 2, borderTop: "1px solid #E2E8F0", background: "#fff" }}>
+              <AppButton
+                fullWidth
+                size="large"
+                onClick={() => {
+                  applyFilters(mobileDraftFilters);
+                  setMobileFiltersOpen(false);
+                }}
+              >
+                Apply Filters
+              </AppButton>
+            </Box>
+          </Drawer>
+
+          {!mobileFiltersOpen ? (
+            <Badge
+              badgeContent={activeFilterCount}
+              color="error"
+              invisible={activeFilterCount === 0}
+              sx={{ position: "fixed", bottom: 24, right: 20, zIndex: theme.zIndex.speedDial }}
+            >
+              <Fab
+                variant="extended"
+                onClick={() => setMobileFiltersOpen(true)}
+                sx={{
+                  background: "#0f766e",
+                  color: "#fff",
+                  "&:hover": {
+                    background: "#115e59",
+                  },
+                }}
+              >
+                <FaSliders style={{ marginRight: 8 }} />
+                Filters
+              </Fab>
+            </Badge>
           ) : null}
         </>
       ) : null}

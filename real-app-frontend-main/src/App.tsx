@@ -14,7 +14,7 @@ import ViewListing from "./views/Listing/components/viewListing";
 import SearchPage from "./views/Search";
 import SavedSearches from "./views/SavedSearches";
 import LandlordDashboard from "./views/Dashboard/Landlord";
-import ProviderDashboard from "./views/Dashboard/Provider";
+import ProviderDashboardShell from "./views/Dashboard/provider/ProviderDashboardShell";
 import TenantDashboard from "./views/Dashboard/Tenant";
 import ListingPayment from "./views/Dashboard/Payment";
 import AdminDashboard from "./views/Dashboard/Admin";
@@ -22,6 +22,7 @@ import VerifyEmail from "./views/VerifyEmail";
 import VerifyPhone from "./views/VerifyPhone";
 import Stays from "./views/Stays";
 import StayRoomDetail from "./views/Stays/RoomDetail";
+import BookingConfirmation from "./views/Stays/BookingConfirmation";
 import MyStayBookings from "./views/Stays/MyBookings";
 import ProviderSignUp from "./views/ProviderSignUp";
 
@@ -88,6 +89,14 @@ function App() {
           }
         />
         <Route
+          path="/stays/bookings/:id"
+          element={
+            <ProtectedRoutes>
+              <BookingConfirmation />
+            </ProtectedRoutes>
+          }
+        />
+        <Route
           path="/stays/bookings"
           element={
             <ProtectedRoutes>
@@ -107,7 +116,7 @@ function App() {
           path="/dashboard/provider"
           element={
             <ProtectedRoutes allowedRoles={["provider"]}>
-              <ProviderDashboard />
+              <ProviderDashboardShell />
             </ProtectedRoutes>
           }
         />
@@ -122,7 +131,7 @@ function App() {
         <Route
           path="/dashboard/admin"
           element={
-            <ProtectedRoutes allowedRoles={["admin"]}>
+            <ProtectedRoutes allowedRoles={["admin", "super_admin"]}>
               <AdminDashboard />
             </ProtectedRoutes>
           }

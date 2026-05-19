@@ -1,6 +1,8 @@
 import { parsePhoneNumber } from "libphonenumber-js";
 import moment from "moment";
 
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 // prevent auto form submission
 export function onKeyDown(keyEvent: any) {
   if ((keyEvent.charCode || keyEvent.keyCode) === 13) {
@@ -29,15 +31,99 @@ export function formatDateTime(dateString: string) {
 
   return formattedDateTime;
 }
+
+const parseDateOnlyAsUtc = (value: string) => {
+  const match = DATE_ONLY_PATTERN.exec(value);
+
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+
+  if (
+    parsed.getUTCFullYear() !== Number(year) ||
+    parsed.getUTCMonth() !== Number(month) - 1 ||
+    parsed.getUTCDate() !== Number(day)
+  ) {
+    return null;
+  }
+
+  return parsed;
+};
+
+const formatDateOnly = (dateString: string) => {
+  const parsed = parseDateOnlyAsUtc(dateString);
+
+  if (!parsed) return dateString;
+
+  return new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(parsed);
+};
+
+export function getDateStringForTimeZone(
+  value?: string | Date | null,
+  timeZone?: string | null
+) {
+  if (!value) return "";
+
+  const rawValue = value instanceof Date ? value.toISOString() : String(value).trim();
+  if (!rawValue) return "";
+
+  if (DATE_ONLY_PATTERN.test(rawValue)) {
+    return rawValue;
+  }
+
+  const date = new Date(rawValue);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  if (timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(date);
+      const year = parts.find((part) => part.type === "year")?.value;
+      const month = parts.find((part) => part.type === "month")?.value;
+      const day = parts.find((part) => part.type === "day")?.value;
+
+      if (year && month && day) {
+        return `${year}-${month}-${day}`;
+      }
+    } catch {
+      // Fall through to the UTC date below when the supplied timezone is invalid.
+    }
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
 // 2023-11-21T19:00:00.000Z => 11/22/2023
-export function formatDate(dateString: string) {
+export function formatDate(dateString: string | Date, timeZone?: string | null) {
   const options: Intl.DateTimeFormatOptions = {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   };
 
-  const date = new Date(dateString);
+  const rawValue = dateString instanceof Date ? dateString.toISOString() : String(dateString || "").trim();
+  const localDateString =
+    DATE_ONLY_PATTERN.test(rawValue) || timeZone
+      ? getDateStringForTimeZone(rawValue, timeZone)
+      : "";
+
+  if (localDateString) {
+    return formatDateOnly(localDateString);
+  }
+
+  const date = dateString instanceof Date ? dateString : new Date(dateString);
   const formattedDateTime = date.toLocaleString("en-US", options);
 
   return formattedDateTime;

@@ -165,6 +165,50 @@ exports.bookingPaymentSuccessProvider = ({ booking, room, guest, provider }) => 
   }),
 });
 
+exports.paymentPartialReceived = ({ booking, room, guest, provider, amountPaid, remainingBalance }) => ({
+  to: guest?.email,
+  subject: `Partial payment received for ${getRoomName(room)}`,
+  text: [
+    buildBaseText({
+      booking,
+      room,
+      guest,
+      provider,
+      nextActionHint: "Complete the remaining balance before check-in.",
+    }),
+    `Amount received: ${formatMoney(amountPaid)}`,
+    `Remaining balance: ${formatMoney(remainingBalance)}`,
+  ].join("\n"),
+});
+
+exports.paymentRetryAvailable = ({ booking, room, guest, provider }) => ({
+  to: guest?.email,
+  subject: `Payment retry available for ${getRoomName(room)}`,
+  text: buildBaseText({
+    booking,
+    room,
+    guest,
+    provider,
+    nextActionHint: "Retry payment from your bookings page to keep this reservation active.",
+  }),
+});
+
+exports.paymentRefundInitiated = ({ booking, room, guest, provider, refundAmount, reason }) => ({
+  to: guest?.email,
+  subject: `Refund initiated for ${getRoomName(room)}`,
+  text: [
+    buildBaseText({
+      booking,
+      room,
+      guest,
+      provider,
+      nextActionHint: "Your refund has been initiated and will be processed by the payment provider.",
+      refundAmount,
+    }),
+    `Reason: ${reason || "Refund"}`,
+  ].join("\n"),
+});
+
 exports.bookingSettledProvider = ({ booking, room, guest, provider }) => {
   const subtotal = Number(booking?.totalPrice || 0);
   const commissionRate = Number(booking?.commissionRate || 0);

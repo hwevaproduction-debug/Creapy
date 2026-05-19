@@ -67,15 +67,24 @@ enum BookingStatus {
   CHECKED_IN
   COMPLETED
   EXPIRED
+  REFUNDED
 }
 
 enum PaymentStatus {
   UNPAID
   PENDING
+  PARTIALLY_PAID
   PAID
   REFUNDED
   PARTIALLY_REFUNDED
   FAILED
+}
+
+enum NotificationJobStatus {
+  pending
+  processing
+  sent
+  dead
 }
 
 enum SettlementStatus {
@@ -109,7 +118,107 @@ enum AmenityCategory {
   ACCESSIBILITY
 }
 
+enum FeeType {
+  CLEANING
+  LINEN
+  PET
+  OTHER
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum TaxAppliesTo {
+  SUBTOTAL
+  CLEANING
+  ALL
+}
+
+enum ReportStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+enum ModerationStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  targetType String
+  targetId   String
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  admin      User     @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@index([adminId, action, createdAt])
+  @@index([targetType, targetId])
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  reporterId  String
+  targetType  String
+  targetId    String
+  reason      String
+  description String?
+  status      ReportStatus @default(OPEN)
+  resolvedBy  String?
+  resolution  String?
+  resolvedAt  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  reporter    User         @relation("ReporterReports", fields: [reporterId], references: [id])
+  resolver    User?        @relation("ResolverReports", fields: [resolvedBy], references: [id])
+
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+}
+
+model Dispute {
+  id           String        @id @default(cuid())
+  bookingId    String
+  raisedBy     String
+  raisedByRole String
+  reason       String
+  description  String
+  status       DisputeStatus @default(OPEN)
+  resolution   String?
+  resolvedBy   String?
+  resolvedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  booking      Booking       @relation(fields: [bookingId], references: [id])
+  raiser       User          @relation("RaiserDisputes", fields: [raisedBy], references: [id])
+  resolver     User?         @relation("ResolverDisputes", fields: [resolvedBy], references: [id])
+
+  @@index([status, createdAt])
+  @@index([bookingId])
+}
+
 model User {
+  auditLogs        AuditLog[] @relation("AdminAuditLogs")
+  reportsFiled     Report[]   @relation("ReporterReports")
+  reportsResolved  Report[]   @relation("ResolverReports")
+  disputesRaised   Dispute[]  @relation("RaiserDisputes")
+  disputesResolved Dispute[]  @relation("ResolverDisputes")
   id                        String              @id @default(cuid())
   username                  String              @unique
   email                     String              @unique
@@ -133,6 +242,8 @@ model User {
   guestBookings             Booking[]           @relation("GuestBookings")
   providerBookings          Booking[]           @relation("ProviderBookings")
   savedSearches             SavedSearch[]
+  notificationJobs          NotificationJob[]   @relation("NotificationJobRecipient")
+  notifications             Notification[]
   accommodations            Accommodation[]
   availabilityBlocksCreated AvailabilityBlock[]
   reviews                   Review[]
@@ -186,6 +297,7 @@ model ListingDraft {
 }
 
 model Accommodation {
+  moderationStatus ModerationStatus @default(APPROVED)
   id                  String                 @id @default(cuid())
   ownerId             String
   owner               User                   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
@@ -203,12 +315,15 @@ model Accommodation {
   verificationStatus  VerificationStatus
   commissionRate      Decimal                @default(10)
   isPublished         Boolean                @default(false)
+  timezone            String                 @default("Africa/Harare")
   deletedAt           DateTime?
   rooms               Room[]
   images              AccommodationImage[]
   amenities           AccommodationAmenity[]
   cancellationPolicy  CancellationPolicy?
   checkInOutRules     CheckInOutRules?
+  taxRule             TaxRule?
+  promotions          Promotion[]
   reviews             Review[]
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
@@ -216,6 +331,7 @@ model Accommodation {
   @@index([ownerId])
   @@index([province, city])
   @@index([type, verificationStatus, isPublished])
+  @@index([lat, lng])
 }
 
 model Room {
@@ -238,18 +354,24 @@ model Room {
   images                RoomImage[]
   amenities             RoomAmenity[]
   seasonalRates         SeasonalRate[]
+  fees                  RoomFee[]
   availabilityBlocks    AvailabilityBlock[]
   occupancyRule         OccupancyRule?
+  occupancyPricingRule  OccupancyPricingRule?
+  promotions            Promotion[]
   bookings              Booking[]
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
 
   @@index([providerId, status])
   @@index([accommodationId, status])
+  @@index([accommodationId, status, basePricePerNight])
+  @@index([accommodationId, status, roomType])
   @@index([status, bookingMode])
 }
 
 model Booking {
+  disputes Dispute[]
   id                         String            @id @default(cuid())
   roomId                     String
   providerId                 String?
@@ -277,6 +399,11 @@ model Booking {
   cancellationReason         String?
   cancellationPolicySnapshot Json?
   refundAmount               Decimal           @default(0)
+  cleaningFee                Decimal?
+  taxAmount                  Decimal?
+  discountAmount             Decimal?
+  couponCode                 String?
+  promotionId                String?
   cancelledAt                DateTime?
   settledAt                  DateTime?
   settlementReference        String?
@@ -286,12 +413,28 @@ model Booking {
   providerUser               User?             @relation("ProviderBookings", fields: [providerId], references: [id])
   appliedRate                SeasonalRate?     @relation(fields: [appliedRateId], references: [id], onDelete: SetNull)
   review                     Review?
+  guestInfo                  BookingGuestInfo?
+  feeSnapshot                BookingFeeSnapshot?
   payments                   Payment[]
+  refunds                    Refund[]
   createdAt                  DateTime          @default(now())
   updatedAt                  DateTime          @updatedAt
 
   @@index([roomId, checkIn, checkOut, status])
   @@index([guestId, createdAt])
+}
+
+model BookingGuestInfo {
+  id                   String   @id @default(cuid())
+  bookingId            String   @unique
+  booking              Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fullName             String
+  phone                String
+  nationalId           String?
+  estimatedArrivalTime String?
+  additionalNotes      String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model Payment {
@@ -303,13 +446,50 @@ model Payment {
   type            String
   listingId       String?
   bookingId       String?
+  idempotencyKey  String?   @unique
   transactionRef  String?   @unique
+  providerIntentId String?
+  amountPaid      Float     @default(0)
+  amountDue       Float     @default(0)
+  retryCount      Int       @default(0)
+  lastRetryAt     DateTime?
+  providerMeta    Json?
+  currency        String    @default("USD")
   webhookVerified Boolean   @default(false)
   user            User      @relation(fields: [userId], references: [id])
   listing         Listing?  @relation(fields: [listingId], references: [id])
   booking         Booking?  @relation(fields: [bookingId], references: [id])
+  refunds         Refund[]
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+}
+
+model Refund {
+  id            String   @id @default(cuid())
+  paymentId     String
+  payment       Payment  @relation(fields: [paymentId], references: [id])
+  bookingId     String?
+  booking       Booking? @relation(fields: [bookingId], references: [id])
+  amount        Float
+  reason        String?
+  status        String   @default("pending")
+  providerRefId String?
+  initiatedBy   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([paymentId])
+  @@index([bookingId])
+}
+
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  provider    String
+  eventId     String   @unique
+  payload     Json
+  processedAt DateTime @default(now())
+
+  @@index([eventId])
 }
 
 model SavedSearch {
@@ -356,6 +536,94 @@ model SeasonalRate {
 
   @@index([roomId, rateType])
   @@index([roomId, startDate, endDate])
+}
+
+model RoomFee {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  feeType   FeeType
+  label     String
+  amount    Decimal
+  currency  String   @default("USD")
+  isPerStay Boolean  @default(true)
+  isOptional Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([roomId])
+}
+
+model TaxRule {
+  id              String        @id @default(cuid())
+  accommodationId String        @unique
+  accommodation   Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+  label           String
+  percentage      Decimal
+  isInclusive     Boolean       @default(false)
+  appliesTo       TaxAppliesTo  @default(SUBTOTAL)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model OccupancyPricingRule {
+  id                    String  @id @default(cuid())
+  roomId                String  @unique
+  room                  Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  baseGuestCount        Int
+  extraGuestFeePerNight Decimal
+}
+
+model Promotion {
+  id              String         @id @default(cuid())
+  accommodationId String?
+  accommodation   Accommodation? @relation(fields: [accommodationId], references: [id], onDelete: SetNull)
+  roomId          String?
+  room            Room?          @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  name            String
+  discountType    DiscountType
+  discountValue   Decimal
+  minNights       Int            @default(1)
+  minSubtotal     Decimal?
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean        @default(true)
+  stackable       Boolean        @default(false)
+  maxUses         Int?
+  useCount        Int            @default(0)
+  coupons         Coupon[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([isActive, startDate, endDate])
+  @@index([accommodationId])
+}
+
+model Coupon {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  maxUses     Int?
+  useCount    Int       @default(0)
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@index([code, isActive])
+}
+
+model BookingFeeSnapshot {
+  id             String   @id @default(cuid())
+  bookingId      String   @unique
+  booking        Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  lineItems      Json
+  subtotal       Decimal
+  discountAmount Decimal  @default(0)
+  taxAmount      Decimal  @default(0)
+  grandTotal     Decimal
+  couponCode     String?
+  promotionId    String?
+  createdAt      DateTime @default(now())
 }
 
 model AvailabilityBlock {
@@ -475,5 +743,51 @@ model Review {
   updatedAt         DateTime      @updatedAt
 
   @@index([accommodationId, isPublished])
+  @@index([accommodationId, overallRating, isPublished])
   @@index([guestId])
+}
+
+model SearchAnalyticsEvent {
+  id          String   @id @default(cuid())
+  params      Json
+  resultCount Int
+  durationMs  Int
+  userId      String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model NotificationJob {
+  id               String    @id @default(cuid())
+  event            String
+  channel          String
+  recipientId      String?
+  recipientAddress String?
+  templateKey      String
+  context          Json
+  locale           String    @default("en")
+  status           NotificationJobStatus @default(pending)
+  attempts         Int       @default(0)
+  lastError        String?
+  scheduledAt      DateTime  @default(now())
+  processedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  recipient        User?     @relation("NotificationJobRecipient", fields: [recipientId], references: [id], onDelete: SetNull)
+
+  @@index([status, scheduledAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  event     String
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
 }

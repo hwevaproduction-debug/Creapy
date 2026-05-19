@@ -4,6 +4,7 @@ const prisma = require("../utils/prisma");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const { sendEmail } = require("../utils/email");
+const notificationService = require("../utils/notificationService");
 
 const SELF_RESTRICTED_FIELDS = new Set(["verificationStatus", "commissionRate"]);
 const ACCOMMODATION_TYPES = new Set([
@@ -212,6 +213,48 @@ const buildProviderResponse = (user) => ({
   updatedAt: user.updatedAt,
 });
 
+const buildNotificationProvider = (user) => ({
+  id: user.id,
+  _id: user.id,
+  username: user.username,
+  email: user.email,
+  phoneNumber: user.phoneNumber || null,
+  providerProfile: user.providerProfile || null,
+});
+
+const decimalToNumber = (value) => {
+  if (value == null) {
+    return 0;
+  }
+
+  if (typeof value.toNumber === "function") {
+    return value.toNumber();
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const parseOptionalDate = (value, label) => {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    throw new AppError(`Invalid ${label}`, 400);
+  }
+
+  return parsed;
+};
+
+const differenceInDays = (startDate, endDate) =>
+  Math.max(
+    0,
+    Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000))
+  );
+
 const getProviderOrFail = async (providerId) => {
   const provider = await prisma.user.findFirst({
     where: { id: providerId, role: "provider" },
@@ -351,6 +394,145 @@ exports.updateMyProfile = catchAsync(async (req, res) => {
   });
 });
 
+exports.getMyAnalytics = catchAsync(async (req, res, next) => {
+  const from = parseOptionalDate(req.query.from, "from");
+  const to = parseOptionalDate(req.query.to, "to");
+
+  if (from && to && from >= to) {
+    return next(new AppError("from must be before to", 400));
+  }
+
+  const ownedRooms = await prisma.room.findMany({
+    where: {
+      deletedAt: null,
+      accommodation: {
+        ownerId: req.user.id,
+        deletedAt: null,
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  let rooms = ownedRooms;
+  if (req.query.roomId) {
+    const room = ownedRooms.find((item) => item.id === req.query.roomId);
+
+    if (!room) {
+      return next(new AppError("You do not own this room", 403));
+    }
+
+    rooms = [room];
+  }
+
+  const roomIds = rooms.map((room) => room.id);
+  const bookingWhere = {
+    providerId: req.user.id,
+    status: { in: ["CONFIRMED", "CHECKED_IN", "COMPLETED"] },
+    ...(roomIds.length ? { roomId: { in: roomIds } } : { roomId: { in: [] } }),
+    ...(from ? { checkIn: { gte: from } } : {}),
+    ...(to ? { checkOut: { lte: to } } : {}),
+  };
+
+  const bookings = await prisma.booking.findMany({
+    where: bookingWhere,
+    select: {
+      roomId: true,
+      checkIn: true,
+      checkOut: true,
+      nights: true,
+      totalPrice: true,
+      netPayout: true,
+    },
+    orderBy: { checkIn: "asc" },
+  });
+
+  const bookingCount = bookings.length;
+  const totalRevenue = bookings.reduce(
+    (sum, booking) => sum + decimalToNumber(booking.totalPrice),
+    0
+  );
+  const netPayout = bookings.reduce(
+    (sum, booking) => sum + decimalToNumber(booking.netPayout),
+    0
+  );
+  const totalBookedNights = bookings.reduce(
+    (sum, booking) =>
+      sum +
+      (Number.isFinite(Number(booking.nights)) && Number(booking.nights) > 0
+        ? Number(booking.nights)
+        : differenceInDays(booking.checkIn, booking.checkOut)),
+    0
+  );
+  const avgNights = bookingCount ? totalBookedNights / bookingCount : 0;
+
+  const rangeStart =
+    from ||
+    bookings.reduce(
+      (earliest, booking) =>
+        !earliest || booking.checkIn < earliest ? booking.checkIn : earliest,
+      null
+    ) ||
+    new Date();
+  const rangeEnd =
+    to ||
+    bookings.reduce(
+      (latest, booking) =>
+        !latest || booking.checkOut > latest ? booking.checkOut : latest,
+      null
+    ) ||
+    new Date(rangeStart.getTime() + 24 * 60 * 60 * 1000);
+  const rangeDays = Math.max(1, differenceInDays(rangeStart, rangeEnd));
+  const roomCount = Math.max(rooms.length, 1);
+
+  const revenueByMonthMap = new Map();
+  const bookedNightsByRoom = new Map(roomIds.map((roomId) => [roomId, 0]));
+
+  bookings.forEach((booking) => {
+    const month = booking.checkIn.toISOString().slice(0, 7);
+    const nights =
+      Number.isFinite(Number(booking.nights)) && Number(booking.nights) > 0
+        ? Number(booking.nights)
+        : differenceInDays(booking.checkIn, booking.checkOut);
+
+    revenueByMonthMap.set(
+      month,
+      (revenueByMonthMap.get(month) || 0) + decimalToNumber(booking.totalPrice)
+    );
+    bookedNightsByRoom.set(
+      booking.roomId,
+      (bookedNightsByRoom.get(booking.roomId) || 0) + nights
+    );
+  });
+
+  const revenueByMonth = Array.from(revenueByMonthMap.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([month, revenue]) => ({ month, revenue }));
+  const occupancyByRoom = rooms.map((room) => ({
+    roomId: room.id,
+    roomName: room.name,
+    bookedNights: bookedNightsByRoom.get(room.id) || 0,
+    occupancyRate: rangeDays
+      ? ((bookedNightsByRoom.get(room.id) || 0) / rangeDays) * 100
+      : 0,
+  }));
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      bookingCount,
+      totalRevenue,
+      netPayout,
+      avgNights,
+      occupancyRate: (totalBookedNights / (rangeDays * roomCount)) * 100,
+      revenueByMonth,
+      occupancyByRoom,
+    },
+  });
+});
+
 exports.listProviders = catchAsync(async (req, res) => {
   let providers = await prisma.user.findMany({
     where: { role: "provider" },
@@ -442,6 +624,10 @@ exports.verifyProvider = catchAsync(async (req, res, next) => {
       data: { verificationStatus: verificationStatus.toUpperCase() },
     }),
   ]);
+
+  void notificationService.enqueue(`provider.${verificationStatus}`, {
+    provider: buildNotificationProvider(updatedProvider),
+  });
 
   res.status(200).json({
     status: "success",

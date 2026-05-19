@@ -364,7 +364,7 @@ test("tenant can initiate premium subscription payment", async () => {
 
 test("webhook ignores payments with invalid hash", async () => {
   const paymentProvider = require("../utils/paymentProvider");
-  const provider = paymentProvider.getProvider();
+  const provider = paymentProvider.getProviderByName("paynow");
   const originalVerifyWebhook = provider.verifyWebhook;
   provider.verifyWebhook = async () => ({ valid: false, transactionRef: "tx_1" });
 
@@ -381,7 +381,7 @@ test("webhook ignores payments with invalid hash", async () => {
 
 test("webhook marks failed payments as failed without granting access", async () => {
   const paymentProvider = require("../utils/paymentProvider");
-  const provider = paymentProvider.getProvider();
+  const provider = paymentProvider.getProviderByName("paynow");
   const originalVerifyWebhook = provider.verifyWebhook;
 
   let updateArgs = null;
@@ -425,7 +425,7 @@ test("isPremiumTenant returns true only for active premium expiry", () => {
 
 test("webhook idempotency returns ok on duplicate webhook payloads", async () => {
   const paymentProvider = require("../utils/paymentProvider");
-  const provider = paymentProvider.getProvider();
+  const provider = paymentProvider.getProviderByName("paynow");
   const originalVerifyWebhook = provider.verifyWebhook;
 
   let updateManyCalls = 0;

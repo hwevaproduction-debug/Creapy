@@ -13,7 +13,7 @@ const startOfDay = (value) => {
     return null;
   }
 
-  date.setHours(0, 0, 0, 0);
+  date.setUTCHours(0, 0, 0, 0);
   return date;
 };
 
@@ -66,7 +66,7 @@ const matchesDayOfWeek = (night, rate) => {
     return true;
   }
 
-  return rate.daysOfWeek.map(Number).includes(night.getDay());
+  return rate.daysOfWeek.map(Number).includes(night.getUTCDay());
 };
 
 const matchesMinimumStay = (rate, totalNights) => {
@@ -112,4 +112,21 @@ exports.resolvePrice = (room, checkIn, checkOut) => {
   }
 
   return room?.basePricePerNight ?? null;
+};
+
+exports.resolvePriceBreakdown = (room, checkIn, checkOut) => {
+  const nights = eachNight(checkIn, checkOut);
+  const seasonalRates = Array.isArray(room?.seasonalRates) ? room.seasonalRates : [];
+  const sortedRates = sortRates(seasonalRates);
+  const basePrice = room?.basePricePerNight ?? null;
+
+  return nights.map((night) => {
+    const matchedPrice = resolveNightPrice(night, sortedRates, nights.length);
+    const pricePerNight = Number(matchedPrice ?? basePrice ?? 0);
+
+    return {
+      date: night.toISOString().slice(0, 10),
+      pricePerNight: Number.isFinite(pricePerNight) ? pricePerNight : 0,
+    };
+  });
 };
