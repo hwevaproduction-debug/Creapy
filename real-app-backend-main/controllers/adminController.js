@@ -921,6 +921,16 @@ exports.getAuditLogs = catchAsync(async (req, res, next) => {
           },
         },
       },
+      {
+        admin: {
+          is: {
+            username: {
+              contains: adminSearchRaw,
+              mode: "insensitive",
+            },
+          },
+        },
+      },
     ];
   }
 

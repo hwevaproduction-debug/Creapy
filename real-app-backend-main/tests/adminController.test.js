@@ -697,11 +697,50 @@ test("getAuditLogs returns paginated filtered audit entries", async () => {
         },
       },
     },
+    {
+      admin: {
+        is: {
+          username: {
+            contains: "admin@example.com",
+            mode: "insensitive",
+          },
+        },
+      },
+    },
   ]);
   assert.equal(countArgs.where.action, "provider.suspended");
   assert.equal(countArgs.where.createdAt.gte instanceof Date, true);
   assert.equal(findArgs.skip, 10);
   assert.equal(findArgs.take, 10);
+});
+
+test("getAuditLogs adminSearch also matches admin username", async () => {
+  const adminController = loadAdminController();
+  let countArgs = null;
+
+  prisma.auditLog.count = async (args) => {
+    countArgs = args;
+    return 0;
+  };
+  prisma.auditLog.findMany = async () => [];
+
+  const result = await invokeController(adminController.getAuditLogs, {
+    query: {
+      adminSearch: "audit-admin",
+    },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(countArgs.where.OR[2], {
+    admin: {
+      is: {
+        username: {
+          contains: "audit-admin",
+          mode: "insensitive",
+        },
+      },
+    },
+  });
 });
 
 test("createBooking rejects rooms owned by suspended providers", async () => {

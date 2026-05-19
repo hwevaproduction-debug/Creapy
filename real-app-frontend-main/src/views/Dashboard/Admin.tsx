@@ -242,6 +242,34 @@ function firstStringValue(
   return null;
 }
 
+function formatDetailLabel(value: string) {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatDetailValue(value: unknown): string {
+  if (value == null || value === "") {
+    return "—";
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.length ? value.map(formatDetailValue).join(", ") : "—";
+  }
+
+  const record = asRecord(value);
+  if (record) {
+    return firstStringValue(record, ["name", "title", "email", "username", "status", "_id", "id"]) || "—";
+  }
+
+  return "—";
+}
+
 const AdminDashboard: React.FC = () => {
   const ROWS_PER_PAGE = 20;
 
@@ -1292,15 +1320,18 @@ const AdminDashboard: React.FC = () => {
       "—";
     const targetOwnerLabel =
       firstStringValue(targetOwner, ["email", "username", "_id", "id"]) || "—";
+    const targetDetails = target
+      ? Object.entries(target).filter(([, value]) => value != null && value !== "")
+      : [];
 
     return (
       <AppCard sx={{ mt: 2, p: 2 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
           Report Detail
         </Typography>
-        {isFetchingReportDetail ? (
-          <Box sx={{ display: "flex", py: 2 }}>
-            <CircularProgress size={22} />
+        {isFetchingReportDetail && !selectedReport ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+            <CircularProgress />
           </Box>
         ) : selectedReport ? (
           <>
@@ -1316,6 +1347,18 @@ const AdminDashboard: React.FC = () => {
             <Typography variant="body2">Status: {formatStatusLabel(selectedReport.status)}</Typography>
             <Typography variant="body2">Description: {selectedReport.description || "—"}</Typography>
             <Typography variant="body2">Resolution: {selectedReport.resolution || "—"}</Typography>
+            {targetDetails.length > 0 && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Target Details
+                </Typography>
+                {targetDetails.map(([key, value]) => (
+                  <Typography key={key} variant="body2">
+                    {formatDetailLabel(key)}: {formatDetailValue(value)}
+                  </Typography>
+                ))}
+              </Box>
+            )}
           </>
         ) : (
           <Typography variant="body2">Report detail unavailable.</Typography>
@@ -1342,15 +1385,21 @@ const AdminDashboard: React.FC = () => {
         <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
           Dispute Detail
         </Typography>
-        {isFetchingDisputeDetail ? (
-          <Box sx={{ display: "flex", py: 2 }}>
-            <CircularProgress size={22} />
+        {isFetchingDisputeDetail && !selectedDispute ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+            <CircularProgress />
           </Box>
         ) : selectedDispute ? (
           <>
             <Typography variant="body2">Booking: {selectedDispute.bookingId}</Typography>
             <Typography variant="body2">Booking Status: {formatStatusLabel(booking?.status)}</Typography>
             <Typography variant="body2">Stay: {bookingWindow}</Typography>
+            <Typography variant="body2">
+              Check-in: {booking?.checkIn ? convertToFormattedDate(booking.checkIn) : "—"}
+            </Typography>
+            <Typography variant="body2">
+              Check-out: {booking?.checkOut ? convertToFormattedDate(booking.checkOut) : "—"}
+            </Typography>
             <Typography variant="body2">Room: {booking?.room?.name || "—"}</Typography>
             <Typography variant="body2">
               Accommodation: {booking?.room?.accommodation?.name || "—"}
@@ -1570,9 +1619,9 @@ const AdminDashboard: React.FC = () => {
               <TableCell>{dispute.createdAt ? convertToFormattedDate(dispute.createdAt) : "—"}</TableCell>
               <TableCell onClick={(event) => event.stopPropagation()}>
                 <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                  {dispute.status === "OPEN" && (
+                  {dispute.status?.toUpperCase() === "OPEN" && (
                     <AppButton size="small" onClick={() => handleDisputeAction(dispute, "review")}>
-                      Review
+                      Mark Under Review
                     </AppButton>
                   )}
                   <AppButton size="small" onClick={() => handleDisputeAction(dispute, "resolve")}>
