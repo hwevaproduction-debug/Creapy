@@ -36,6 +36,7 @@ router.put("/providers/:id/reinstate", adminController.reinstateProvider);
 
 router.get("/disputes", adminController.getDisputes);
 router.get("/disputes/:id", adminController.getDisputeById);
+router.post("/disputes/:id/review", adminController.markDisputeUnderReview);
 router.post("/disputes/:id/resolve", adminController.resolveDispute);
 router.post("/disputes/:id/close", adminController.closeDispute);
 

@@ -63,6 +63,8 @@ function buildProviderResponse(userDoc, roomCount) {
           : 0,
       verifiedAt: providerProfile.verifiedAt || null,
       verificationNotes: providerProfile.verificationNotes || null,
+      suspendedAt: providerProfile.suspendedAt || null,
+      suspensionReason: providerProfile.suspensionReason || null,
     },
   };
 }
@@ -896,11 +898,31 @@ exports.getAuditLogs = catchAsync(async (req, res, next) => {
   const { page, limit, skip } = buildPagination(req.query);
   const where = {};
 
-  ["adminId", "action", "targetType", "targetId"].forEach((field) => {
+  ["action", "targetType", "targetId"].forEach((field) => {
     if (req.query[field]) {
       where[field] = String(req.query[field]).trim();
     }
   });
+
+  const adminSearchRaw =
+    req.query.adminSearch || req.query.adminId
+      ? String(req.query.adminSearch || req.query.adminId).trim()
+      : "";
+  if (adminSearchRaw) {
+    where.OR = [
+      { adminId: adminSearchRaw },
+      {
+        admin: {
+          is: {
+            email: {
+              contains: adminSearchRaw,
+              mode: "insensitive",
+            },
+          },
+        },
+      },
+    ];
+  }
 
   const createdAt = parseDateRange(req.query.from, req.query.to, "from", "to", next);
   if (createdAt === null && (req.query.from || req.query.to)) {
@@ -1096,6 +1118,34 @@ exports.getDisputeById = catchAsync(async (req, res, next) => {
     status: "success",
     data: {
       dispute: mapDispute(dispute),
+    },
+  });
+});
+
+exports.markDisputeUnderReview = catchAsync(async (req, res, next) => {
+  const dispute = await prisma.dispute.findUnique({
+    where: { id: req.params.id },
+    include: disputeInclude,
+  });
+
+  if (!dispute) {
+    return next(new AppError("Dispute not found", 404));
+  }
+
+  const updatedDispute = await prisma.dispute.update({
+    where: { id: dispute.id },
+    data: { status: "UNDER_REVIEW" },
+    include: disputeInclude,
+  });
+
+  auditAdminAction(req, "dispute.under_review", "Dispute", dispute.id, {
+    previousStatus: dispute.status,
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      dispute: mapDispute(updatedDispute),
     },
   });
 });

@@ -1,13 +1,20 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
+const jwt = require("jsonwebtoken");
+
+const prisma = require("../utils/prisma");
+
+const originalPrisma = {
+  userFindUnique: prisma.user.findUnique,
+};
 
 const loadApp = () => {
   delete require.cache[require.resolve("../app")];
   return require("../app");
 };
 
-const invokeApp = (method, url, { headers } = {}) =>
+const invokeApp = (method, url, { headers, body: requestBody } = {}) =>
   new Promise((resolve, reject) => {
     const app = loadApp();
     const server = http.createServer(app);
@@ -19,15 +26,16 @@ const invokeApp = (method, url, { headers } = {}) =>
         const response = await fetch(`http://127.0.0.1:${port}${url}`, {
           method,
           headers,
+          body: requestBody === undefined ? undefined : JSON.stringify(requestBody),
         });
         const contentType = response.headers.get("content-type") || "";
-        const body = contentType.includes("application/json")
+        const responseBody = contentType.includes("application/json")
           ? await response.json()
           : await response.text();
 
         resolve({
           statusCode: response.status,
-          body,
+          body: responseBody,
           headers: response.headers,
         });
       } catch (error) {
@@ -37,6 +45,16 @@ const invokeApp = (method, url, { headers } = {}) =>
       }
     });
   });
+
+const signTestToken = (id) => {
+  process.env.JWT_SECRET = "test-secret";
+  return jwt.sign({ id }, process.env.JWT_SECRET);
+};
+
+test.afterEach(() => {
+  prisma.user.findUnique = originalPrisma.userFindUnique;
+  delete process.env.JWT_SECRET;
+});
 
 test("GET / returns the root health payload", async () => {
   const result = await invokeApp("GET", "/");
@@ -128,4 +146,71 @@ test("OPTIONS preflight allows legacy frontend CORS request header", async () =>
     result.headers.get("access-control-allow-headers"),
     /Access-Control-Allow-Origin/
   );
+});
+
+test("admin moderation routes require authenticated admin users", async () => {
+  const adminRoutes = [
+    "/api/v1/admin/queue",
+    "/api/v1/admin/accommodations",
+    "/api/v1/admin/reviews",
+    "/api/v1/admin/reports",
+    "/api/v1/admin/disputes",
+    "/api/v1/admin/audit-logs",
+  ];
+
+  for (const route of adminRoutes) {
+    const unauthenticated = await invokeApp("GET", route);
+    assert.equal(unauthenticated.statusCode, 401);
+  }
+
+  prisma.user.findUnique = async () => ({
+    id: "user_1",
+    role: "user",
+    email: "user@example.com",
+  });
+  const token = signTestToken("user_1");
+
+  for (const route of adminRoutes) {
+    const nonAdmin = await invokeApp("GET", route, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(nonAdmin.statusCode, 403);
+  }
+});
+
+test("public dispute and report endpoints require authentication", async () => {
+  const protectedRoutes = ["/api/v1/disputes", "/api/v1/reports"];
+
+  for (const route of protectedRoutes) {
+    const unauthenticated = await invokeApp("POST", route, {
+      headers: { "Content-Type": "application/json" },
+      body: {},
+    });
+    assert.equal(unauthenticated.statusCode, 401);
+  }
+
+  prisma.user.findUnique = async () => ({
+    id: "user_1",
+    role: "user",
+    email: "user@example.com",
+  });
+  const token = signTestToken("user_1");
+
+  const dispute = await invokeApp("POST", "/api/v1/disputes", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: {},
+  });
+  assert.equal(dispute.statusCode, 400);
+
+  const report = await invokeApp("POST", "/api/v1/reports", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: {},
+  });
+  assert.equal(report.statusCode, 400);
 });

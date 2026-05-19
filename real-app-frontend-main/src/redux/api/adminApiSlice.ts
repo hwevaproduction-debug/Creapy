@@ -46,6 +46,13 @@ interface BulkReviveResponse {
   failed: BulkReviveFailure[];
 }
 
+interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  hasMore: boolean;
+}
+
 export interface ProviderFilters {
   verificationStatus?: string;
   search?: string;
@@ -165,6 +172,7 @@ export interface AdminAccommodation {
 interface AdminAccommodationsResponse {
   data: AdminAccommodation[];
   total: number;
+  pagination?: PaginationMeta;
 }
 
 interface ModerationActionRequest {
@@ -209,6 +217,7 @@ interface AdminReviewsResponse {
     reviews: AdminReview[];
   };
   total: number;
+  pagination?: PaginationMeta;
 }
 
 interface ReviewModerationRequest {
@@ -236,11 +245,30 @@ export interface AdminDispute {
   createdAt?: string;
   booking?: {
     _id?: string;
+    id?: string;
     checkIn?: string;
     checkOut?: string;
-    room?: { name?: string } | null;
-    guest?: { email?: string; username?: string } | null;
-    provider?: { email?: string; username?: string } | null;
+    status?: string;
+    totalAmount?: number;
+    room?: {
+      _id?: string;
+      id?: string;
+      name?: string;
+      accommodation?: {
+        _id?: string;
+        id?: string;
+        name?: string;
+        ownerId?: string;
+      } | null;
+    } | null;
+    guest?: { _id?: string; id?: string; email?: string; username?: string } | null;
+    provider?: {
+      _id?: string;
+      id?: string;
+      email?: string;
+      username?: string;
+      phoneNumber?: string | null;
+    } | null;
   } | null;
   raiser?: {
     username?: string;
@@ -251,6 +279,7 @@ export interface AdminDispute {
 interface AdminDisputesResponse {
   data: AdminDispute[];
   total: number;
+  pagination?: PaginationMeta;
 }
 
 interface DisputeActionRequest {
@@ -280,11 +309,13 @@ export interface AdminReport {
     username?: string;
     email?: string;
   } | null;
+  target?: Record<string, unknown> | null;
 }
 
 interface AdminReportsResponse {
   data: AdminReport[];
   total: number;
+  pagination?: PaginationMeta;
 }
 
 interface ReportActionRequest {
@@ -293,7 +324,7 @@ interface ReportActionRequest {
 }
 
 export interface AuditLogFilters {
-  adminId?: string;
+  adminSearch?: string;
   action?: string;
   targetType?: string;
   targetId?: string;
@@ -321,6 +352,7 @@ export interface AdminAuditLog {
 interface AdminAuditLogsResponse {
   data: AdminAuditLog[];
   total: number;
+  pagination?: PaginationMeta;
 }
 
 function buildSearchParams(params: Record<string, string | number | undefined>) {
@@ -597,6 +629,20 @@ export const adminApiSlice = apiSlice.injectEndpoints({
       transformResponse: (response: { data: { dispute: AdminDispute } }) => response.data,
       providesTags: (_result, _error, id) => [{ type: "Dispute", id }],
     }),
+    markDisputeUnderReview: builder.mutation<AdminDispute, DisputeActionRequest>({
+      query: ({ id }) => ({
+        url: `admin/disputes/${id}/review`,
+        method: "POST",
+        body: {},
+      }),
+      transformResponse: (response: { data: { dispute: AdminDispute } }) =>
+        response.data.dispute,
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: "Dispute", id },
+        { type: "Dispute", id: "LIST" },
+        "AuditLog",
+      ],
+    }),
     resolveDispute: builder.mutation<AdminDispute, DisputeActionRequest>({
       query: ({ id, resolution }) => ({
         url: `admin/disputes/${id}/resolve`,
@@ -744,6 +790,7 @@ export const {
   useModerateReviewMutation,
   useGetDisputesQuery,
   useGetDisputeByIdQuery,
+  useMarkDisputeUnderReviewMutation,
   useResolveDisputeMutation,
   useCloseDisputeMutation,
   useGetReportsQuery,

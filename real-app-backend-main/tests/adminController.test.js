@@ -24,6 +24,7 @@ const originalPrisma = {
   disputeCount: prisma.dispute.count,
   reportCount: prisma.report.count,
   reviewCount: prisma.review.count,
+  roomGroupBy: prisma.room.groupBy,
   userFindMany: prisma.user.findMany,
   userFindUnique: prisma.user.findUnique,
   userUpdate: prisma.user.update,
@@ -77,6 +78,7 @@ test.afterEach(() => {
   prisma.dispute.count = originalPrisma.disputeCount;
   prisma.report.count = originalPrisma.reportCount;
   prisma.review.count = originalPrisma.reviewCount;
+  prisma.room.groupBy = originalPrisma.roomGroupBy;
   prisma.user.findMany = originalPrisma.userFindMany;
   prisma.user.findUnique = originalPrisma.userFindUnique;
   prisma.user.update = originalPrisma.userUpdate;
@@ -112,6 +114,13 @@ test("admin routes expose inactive listings and bulk revive endpoints", async ()
       (layer) =>
         layer.route.path === "/reviews/:id/moderate" &&
         layer.route.methods.put
+    )
+  );
+  assert.ok(
+    routeLayers.find(
+      (layer) =>
+        layer.route.path === "/disputes/:id/review" &&
+        layer.route.methods.post
     )
   );
 });
@@ -542,6 +551,45 @@ test("getModerationQueue returns all moderation counts", async () => {
   });
 });
 
+test("getProviders serializes provider suspension fields", async () => {
+  const adminController = loadAdminController();
+
+  prisma.room.groupBy = async () => [
+    {
+      providerId: "provider_1",
+      _count: { id: 2 },
+    },
+  ];
+  prisma.user.findMany = async () => [
+    {
+      id: "provider_1",
+      username: "host",
+      email: "host@example.com",
+      providerProfile: {
+        verificationStatus: "approved",
+        commissionRate: 10,
+        suspendedAt: "2026-05-19T00:00:00.000Z",
+        suspensionReason: "Fraud risk",
+      },
+    },
+  ];
+
+  const result = await invokeController(adminController.getProviders, {
+    query: {},
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.data[0].roomCount, 2);
+  assert.equal(
+    result.body.data[0].providerProfile.suspendedAt,
+    "2026-05-19T00:00:00.000Z"
+  );
+  assert.equal(
+    result.body.data[0].providerProfile.suspensionReason,
+    "Fraud risk"
+  );
+});
+
 test("suspendProvider and reinstateProvider update providerProfile suspension fields", async () => {
   const adminController = loadAdminController();
   const updates = [];
@@ -584,6 +632,16 @@ test("suspendProvider and reinstateProvider update providerProfile suspension fi
   assert.ok(updates[0].suspendedAt);
   assert.equal(updates[1].suspendedAt, undefined);
   assert.equal(updates[1].suspensionReason, undefined);
+  assert.ok(suspended.body.data.provider.providerProfile.suspendedAt);
+  assert.equal(
+    suspended.body.data.provider.providerProfile.suspensionReason,
+    "Fraud risk"
+  );
+  assert.equal(reinstated.body.data.provider.providerProfile.suspendedAt, null);
+  assert.equal(
+    reinstated.body.data.provider.providerProfile.suspensionReason,
+    null
+  );
 });
 
 test("getAuditLogs returns paginated filtered audit entries", async () => {
@@ -613,7 +671,7 @@ test("getAuditLogs returns paginated filtered audit entries", async () => {
 
   const result = await invokeController(adminController.getAuditLogs, {
     query: {
-      adminId: "admin_1",
+      adminSearch: "admin@example.com",
       action: "provider.suspended",
       targetType: "User",
       targetId: "provider_1",
@@ -626,7 +684,20 @@ test("getAuditLogs returns paginated filtered audit entries", async () => {
 
   assert.equal(result.statusCode, 200);
   assert.equal(result.body.total, 1);
-  assert.equal(countArgs.where.adminId, "admin_1");
+  assert.equal(countArgs.where.adminId, undefined);
+  assert.deepEqual(countArgs.where.OR, [
+    { adminId: "admin@example.com" },
+    {
+      admin: {
+        is: {
+          email: {
+            contains: "admin@example.com",
+            mode: "insensitive",
+          },
+        },
+      },
+    },
+  ]);
   assert.equal(countArgs.where.action, "provider.suspended");
   assert.equal(countArgs.where.createdAt.gte instanceof Date, true);
   assert.equal(findArgs.skip, 10);

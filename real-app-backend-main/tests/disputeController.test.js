@@ -145,6 +145,41 @@ test("resolveDispute requires resolution text", async () => {
   assert.equal(result.error.message, "resolution is required");
 });
 
+test("markDisputeUnderReview sets status UNDER_REVIEW and writes audit log", async () => {
+  const adminController = require("../controllers/adminController");
+  let updateArgs = null;
+  let auditArgs = null;
+
+  prisma.dispute.findUnique = async () => ({
+    id: "dispute_1",
+    status: "OPEN",
+    booking: null,
+  });
+  prisma.dispute.update = async (args) => {
+    updateArgs = args;
+    return { id: "dispute_1", ...args.data, booking: null };
+  };
+  prisma.auditLog.create = async ({ data }) => {
+    auditArgs = data;
+    return { id: "audit_1", ...data };
+  };
+
+  const result = await invokeController(adminController.markDisputeUnderReview, {
+    params: { id: "dispute_1" },
+    body: {},
+    user: { id: "admin_1" },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(updateArgs.data.status, "UNDER_REVIEW");
+  assert.equal(result.body.data.dispute.status, "UNDER_REVIEW");
+  assert.equal(auditArgs.adminId, "admin_1");
+  assert.equal(auditArgs.action, "dispute.under_review");
+  assert.equal(auditArgs.targetType, "Dispute");
+  assert.equal(auditArgs.targetId, "dispute_1");
+  assert.deepEqual(auditArgs.metadata, { previousStatus: "OPEN" });
+});
+
 test("resolveDispute sets status RESOLVED and resolvedAt", async () => {
   const adminController = require("../controllers/adminController");
   let updateArgs = null;

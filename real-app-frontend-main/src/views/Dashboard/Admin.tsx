@@ -44,10 +44,13 @@ import {
   useGetAllBookingsQuery,
   useGetAllReviewsQuery,
   useGetAuditLogsQuery,
+  useGetDisputeByIdQuery,
   useGetDisputesQuery,
   useGetModerationQueueQuery,
+  useGetReportByIdQuery,
   useGetProvidersQuery,
   useGetReportsQuery,
+  useMarkDisputeUnderReviewMutation,
   useLazyGetInactiveListingsQuery,
   useModerateReviewMutation,
   useReinstateAccommodationMutation,
@@ -105,6 +108,12 @@ type AdminTab =
   | "expired"
   | "audit";
 type PaginationItem = number | "ellipsis-start" | "ellipsis-end";
+type PaginationMeta = {
+  page?: number;
+  limit?: number;
+  total?: number;
+  hasMore?: boolean;
+};
 
 const MAX_BULK_REVIVE_IDS = 100;
 
@@ -209,6 +218,30 @@ function formatLocation(
   return [value?.province, value?.city].filter(Boolean).join(" / ") || "—";
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function firstStringValue(
+  record: Record<string, unknown> | null,
+  keys: string[]
+) {
+  if (!record) {
+    return null;
+  }
+
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
 const AdminDashboard: React.FC = () => {
   const ROWS_PER_PAGE = 20;
 
@@ -285,31 +318,36 @@ const AdminDashboard: React.FC = () => {
     type: "",
     province: "",
     search: "",
+    page: 1,
   });
   const [reviewFilters, setReviewFilters] = useState({
     isPublished: "",
     accommodationId: "",
     from: "",
     to: "",
+    page: 1,
   });
   const [reportFilters, setReportFilters] = useState({
     status: "",
     targetType: "",
     reason: "",
+    page: 1,
   });
   const [disputeFilters, setDisputeFilters] = useState({
     status: "",
     raisedByRole: "",
+    page: 1,
   });
   const [auditFilters, setAuditFilters] = useState({
     action: "",
     targetType: "",
     from: "",
     to: "",
-    adminId: "",
+    adminSearch: "",
+    page: 1,
   });
-  const [selectedReport, setSelectedReport] = useState<AdminReport | null>(null);
-  const [selectedDispute, setSelectedDispute] = useState<AdminDispute | null>(null);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [selectedDisputeId, setSelectedDisputeId] = useState<string | null>(null);
 
   const [triggerSearch, { data: inactiveData, isFetching: isFetchingInactive }] =
     useLazyGetInactiveListingsQuery();
@@ -347,10 +385,18 @@ const AdminDashboard: React.FC = () => {
       ...reportFilters,
       limit: ROWS_PER_PAGE,
     });
+  const { data: selectedReportData, isFetching: isFetchingReportDetail } =
+    useGetReportByIdQuery(selectedReportId || "", {
+      skip: !selectedReportId,
+    });
   const { data: disputesData, isFetching: isFetchingDisputes } =
     useGetDisputesQuery({
       ...disputeFilters,
       limit: ROWS_PER_PAGE,
+    });
+  const { data: selectedDisputeData, isFetching: isFetchingDisputeDetail } =
+    useGetDisputeByIdQuery(selectedDisputeId || "", {
+      skip: !selectedDisputeId,
     });
   const { data: auditLogsData, isFetching: isFetchingAuditLogs } =
     useGetAuditLogsQuery({
@@ -367,6 +413,7 @@ const AdminDashboard: React.FC = () => {
   const [reviewReport] = useReviewReportMutation();
   const [resolveReport] = useResolveReportMutation();
   const [dismissReport] = useDismissReportMutation();
+  const [markDisputeUnderReview] = useMarkDisputeUnderReviewMutation();
   const [resolveDispute] = useResolveDisputeMutation();
   const [closeDispute] = useCloseDisputeMutation();
 
@@ -393,7 +440,9 @@ const AdminDashboard: React.FC = () => {
   const pendingAccommodations = pendingAccommodationsData?.data ?? [];
   const reviews = reviewsData?.data?.reviews ?? [];
   const reports = reportsData?.data ?? [];
+  const selectedReport = selectedReportData?.report ?? null;
   const disputes = disputesData?.data ?? [];
+  const selectedDispute = selectedDisputeData?.dispute ?? null;
   const auditLogs = auditLogsData?.data ?? [];
   const settledBookingsCount = bookings.filter(
     (booking) => booking.settlementStatus === "settled"
@@ -778,7 +827,19 @@ const AdminDashboard: React.FC = () => {
     );
   };
 
-  const handleDisputeAction = (dispute: AdminDispute, action: "resolve" | "close") => {
+  const handleDisputeAction = (
+    dispute: AdminDispute,
+    action: "review" | "resolve" | "close"
+  ) => {
+    if (action === "review") {
+      runAdminAction(
+        markDisputeUnderReview({ id: dispute._id }).unwrap(),
+        "Dispute marked under review.",
+        "Unable to update dispute."
+      );
+      return;
+    }
+
     if (action === "close") {
       runAdminAction(
         closeDispute({ id: dispute._id }).unwrap(),
@@ -814,6 +875,64 @@ const AdminDashboard: React.FC = () => {
       size="small"
     />
   );
+
+  const renderPaginationControls = (
+    pagination: PaginationMeta | undefined,
+    currentPage: number,
+    onPageChange: (page: number) => void,
+    disabled = false
+  ) => {
+    const limit = pagination?.limit || ROWS_PER_PAGE;
+    const total = pagination?.total || 0;
+    const page = pagination?.page || currentPage;
+    const pages = Math.ceil(total / limit);
+
+    if (pages <= 1) {
+      return null;
+    }
+
+    return (
+      <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, mt: 1.5, flexWrap: "wrap" }}>
+        <AppButton
+          size="small"
+          variant="outlined"
+          disabled={disabled || page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          Previous
+        </AppButton>
+        {buildPageArray(pages, page).map((item) =>
+          typeof item !== "number" ? (
+            <Typography
+              key={item}
+              variant="body2"
+              sx={{ display: "flex", alignItems: "center", px: 0.5, color: "#9ca3af" }}
+            >
+              ...
+            </Typography>
+          ) : (
+            <AppButton
+              key={item}
+              size="small"
+              variant={page === item ? "contained" : "outlined"}
+              disabled={disabled}
+              onClick={() => onPageChange(item)}
+            >
+              {item}
+            </AppButton>
+          )
+        )}
+        <AppButton
+          size="small"
+          variant="outlined"
+          disabled={disabled || page >= pages}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Next
+        </AppButton>
+      </Box>
+    );
+  };
 
   const renderAccommodationActions = (accommodation: AdminAccommodation) => {
     const status = String(accommodation.moderationStatus || "").toUpperCase();
@@ -935,6 +1054,7 @@ const AdminDashboard: React.FC = () => {
                 setAccommodationFilters((previous) => ({
                   ...previous,
                   moderationStatus: String(event.target.value),
+                  page: 1,
                 }))
               }
               options={[
@@ -954,6 +1074,7 @@ const AdminDashboard: React.FC = () => {
                 setAccommodationFilters((previous) => ({
                   ...previous,
                   type: String(event.target.value),
+                  page: 1,
                 }))
               }
               options={[
@@ -976,6 +1097,7 @@ const AdminDashboard: React.FC = () => {
                 setAccommodationFilters((previous) => ({
                   ...previous,
                   province: event.target.value,
+                  page: 1,
                 }))
               }
             />
@@ -989,6 +1111,7 @@ const AdminDashboard: React.FC = () => {
                 setAccommodationFilters((previous) => ({
                   ...previous,
                   search: event.target.value,
+                  page: 1,
                 }))
               }
             />
@@ -1022,6 +1145,12 @@ const AdminDashboard: React.FC = () => {
           ))}
         </MUITable>
       )}
+      {renderPaginationControls(
+        accommodationsData?.pagination,
+        accommodationFilters.page,
+        (page) => setAccommodationFilters((previous) => ({ ...previous, page })),
+        isFetchingAccommodations
+      )}
     </>
   );
 
@@ -1038,6 +1167,7 @@ const AdminDashboard: React.FC = () => {
                 setReviewFilters((previous) => ({
                   ...previous,
                   isPublished: String(event.target.value),
+                  page: 1,
                 }))
               }
               options={[
@@ -1056,6 +1186,7 @@ const AdminDashboard: React.FC = () => {
                 setReviewFilters((previous) => ({
                   ...previous,
                   accommodationId: event.target.value,
+                  page: 1,
                 }))
               }
             />
@@ -1066,7 +1197,7 @@ const AdminDashboard: React.FC = () => {
               type="date"
               value={reviewFilters.from}
               onChange={(event) =>
-                setReviewFilters((previous) => ({ ...previous, from: event.target.value }))
+                setReviewFilters((previous) => ({ ...previous, from: event.target.value, page: 1 }))
               }
             />
           </Box>
@@ -1076,7 +1207,7 @@ const AdminDashboard: React.FC = () => {
               type="date"
               value={reviewFilters.to}
               onChange={(event) =>
-                setReviewFilters((previous) => ({ ...previous, to: event.target.value }))
+                setReviewFilters((previous) => ({ ...previous, to: event.target.value, page: 1 }))
               }
             />
           </Box>
@@ -1136,8 +1267,114 @@ const AdminDashboard: React.FC = () => {
           ))}
         </MUITable>
       )}
+      {renderPaginationControls(
+        reviewsData?.pagination,
+        reviewFilters.page,
+        (page) => setReviewFilters((previous) => ({ ...previous, page })),
+        isFetchingReviews
+      )}
     </>
   );
+
+  const renderReportDetail = () => {
+    if (!selectedReportId) {
+      return null;
+    }
+
+    const target = asRecord(selectedReport?.target);
+    const targetOwner =
+      asRecord(target?.owner) ||
+      asRecord(target?.user) ||
+      asRecord(target?.guest);
+    const targetLabel =
+      firstStringValue(target, ["name", "title", "email", "username", "_id", "id"]) ||
+      selectedReport?.targetId ||
+      "—";
+    const targetOwnerLabel =
+      firstStringValue(targetOwner, ["email", "username", "_id", "id"]) || "—";
+
+    return (
+      <AppCard sx={{ mt: 2, p: 2 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+          Report Detail
+        </Typography>
+        {isFetchingReportDetail ? (
+          <Box sx={{ display: "flex", py: 2 }}>
+            <CircularProgress size={22} />
+          </Box>
+        ) : selectedReport ? (
+          <>
+            <Typography variant="body2">
+              Target: {selectedReport.targetType} {selectedReport.targetId}
+            </Typography>
+            <Typography variant="body2">Target Context: {targetLabel}</Typography>
+            <Typography variant="body2">Target Owner/User: {targetOwnerLabel}</Typography>
+            <Typography variant="body2">
+              Reporter: {selectedReport.reporter?.email || selectedReport.reporter?.username || "—"}
+            </Typography>
+            <Typography variant="body2">Reason: {formatStatusLabel(selectedReport.reason)}</Typography>
+            <Typography variant="body2">Status: {formatStatusLabel(selectedReport.status)}</Typography>
+            <Typography variant="body2">Description: {selectedReport.description || "—"}</Typography>
+            <Typography variant="body2">Resolution: {selectedReport.resolution || "—"}</Typography>
+          </>
+        ) : (
+          <Typography variant="body2">Report detail unavailable.</Typography>
+        )}
+      </AppCard>
+    );
+  };
+
+  const renderDisputeDetail = () => {
+    if (!selectedDisputeId) {
+      return null;
+    }
+
+    const booking = selectedDispute?.booking;
+    const bookingWindow =
+      booking?.checkIn || booking?.checkOut
+        ? `${booking?.checkIn ? convertToFormattedDate(booking.checkIn) : "—"} to ${
+            booking?.checkOut ? convertToFormattedDate(booking.checkOut) : "—"
+          }`
+        : "—";
+
+    return (
+      <AppCard sx={{ mt: 2, p: 2 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+          Dispute Detail
+        </Typography>
+        {isFetchingDisputeDetail ? (
+          <Box sx={{ display: "flex", py: 2 }}>
+            <CircularProgress size={22} />
+          </Box>
+        ) : selectedDispute ? (
+          <>
+            <Typography variant="body2">Booking: {selectedDispute.bookingId}</Typography>
+            <Typography variant="body2">Booking Status: {formatStatusLabel(booking?.status)}</Typography>
+            <Typography variant="body2">Stay: {bookingWindow}</Typography>
+            <Typography variant="body2">Room: {booking?.room?.name || "—"}</Typography>
+            <Typography variant="body2">
+              Accommodation: {booking?.room?.accommodation?.name || "—"}
+            </Typography>
+            <Typography variant="body2">
+              Guest: {booking?.guest?.email || booking?.guest?.username || "—"}
+            </Typography>
+            <Typography variant="body2">
+              Provider: {booking?.provider?.email || booking?.provider?.username || "—"}
+            </Typography>
+            <Typography variant="body2">
+              Raised By: {selectedDispute.raiser?.email || selectedDispute.raiser?.username || "—"}
+            </Typography>
+            <Typography variant="body2">Reason: {formatStatusLabel(selectedDispute.reason)}</Typography>
+            <Typography variant="body2">Status: {formatStatusLabel(selectedDispute.status)}</Typography>
+            <Typography variant="body2">Description: {selectedDispute.description || "—"}</Typography>
+            <Typography variant="body2">Resolution: {selectedDispute.resolution || "—"}</Typography>
+          </>
+        ) : (
+          <Typography variant="body2">Dispute detail unavailable.</Typography>
+        )}
+      </AppCard>
+    );
+  };
 
   const renderReports = () => (
     <>
@@ -1149,7 +1386,11 @@ const AdminDashboard: React.FC = () => {
               size="small"
               value={reportFilters.status}
               onChange={(event) =>
-                setReportFilters((previous) => ({ ...previous, status: String(event.target.value) }))
+                setReportFilters((previous) => ({
+                  ...previous,
+                  status: String(event.target.value),
+                  page: 1,
+                }))
               }
               options={[
                 { label: "All Statuses", value: "" },
@@ -1168,6 +1409,7 @@ const AdminDashboard: React.FC = () => {
                 setReportFilters((previous) => ({
                   ...previous,
                   targetType: String(event.target.value),
+                  page: 1,
                 }))
               }
               options={[
@@ -1183,7 +1425,11 @@ const AdminDashboard: React.FC = () => {
               size="small"
               value={reportFilters.reason}
               onChange={(event) =>
-                setReportFilters((previous) => ({ ...previous, reason: String(event.target.value) }))
+                setReportFilters((previous) => ({
+                  ...previous,
+                  reason: String(event.target.value),
+                  page: 1,
+                }))
               }
               options={[
                 { label: "All Reasons", value: "" },
@@ -1209,7 +1455,7 @@ const AdminDashboard: React.FC = () => {
             <TableRow
               key={report._id}
               hover
-              onClick={() => setSelectedReport(report)}
+              onClick={() => setSelectedReportId(report._id)}
               sx={{ cursor: "pointer" }}
             >
               <TableCell>{report.reporter?.email || report.reporter?.username || "Reporter"}</TableCell>
@@ -1244,18 +1490,14 @@ const AdminDashboard: React.FC = () => {
           ))}
         </MUITable>
       )}
-
-      {selectedReport && (
-        <AppCard sx={{ mt: 2, p: 2 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-            Report Detail
-          </Typography>
-          <Typography variant="body2">Target: {selectedReport.targetType} {selectedReport.targetId}</Typography>
-          <Typography variant="body2">Reason: {formatStatusLabel(selectedReport.reason)}</Typography>
-          <Typography variant="body2">Description: {selectedReport.description || "—"}</Typography>
-          <Typography variant="body2">Resolution: {selectedReport.resolution || "—"}</Typography>
-        </AppCard>
+      {renderPaginationControls(
+        reportsData?.pagination,
+        reportFilters.page,
+        (page) => setReportFilters((previous) => ({ ...previous, page })),
+        isFetchingReports
       )}
+
+      {renderReportDetail()}
     </>
   );
 
@@ -1269,7 +1511,11 @@ const AdminDashboard: React.FC = () => {
               size="small"
               value={disputeFilters.status}
               onChange={(event) =>
-                setDisputeFilters((previous) => ({ ...previous, status: String(event.target.value) }))
+                setDisputeFilters((previous) => ({
+                  ...previous,
+                  status: String(event.target.value),
+                  page: 1,
+                }))
               }
               options={[
                 { label: "All Statuses", value: "" },
@@ -1288,6 +1534,7 @@ const AdminDashboard: React.FC = () => {
                 setDisputeFilters((previous) => ({
                   ...previous,
                   raisedByRole: String(event.target.value),
+                  page: 1,
                 }))
               }
               options={[
@@ -1312,7 +1559,7 @@ const AdminDashboard: React.FC = () => {
             <TableRow
               key={dispute._id}
               hover
-              onClick={() => setSelectedDispute(dispute)}
+              onClick={() => setSelectedDisputeId(dispute._id)}
               sx={{ cursor: "pointer" }}
             >
               <TableCell>{dispute.booking?.room?.name || dispute.bookingId}</TableCell>
@@ -1323,6 +1570,11 @@ const AdminDashboard: React.FC = () => {
               <TableCell>{dispute.createdAt ? convertToFormattedDate(dispute.createdAt) : "—"}</TableCell>
               <TableCell onClick={(event) => event.stopPropagation()}>
                 <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                  {dispute.status === "OPEN" && (
+                    <AppButton size="small" onClick={() => handleDisputeAction(dispute, "review")}>
+                      Review
+                    </AppButton>
+                  )}
                   <AppButton size="small" onClick={() => handleDisputeAction(dispute, "resolve")}>
                     Resolve
                   </AppButton>
@@ -1339,23 +1591,14 @@ const AdminDashboard: React.FC = () => {
           ))}
         </MUITable>
       )}
-
-      {selectedDispute && (
-        <AppCard sx={{ mt: 2, p: 2 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-            Dispute Detail
-          </Typography>
-          <Typography variant="body2">Booking: {selectedDispute.bookingId}</Typography>
-          <Typography variant="body2">
-            Guest: {selectedDispute.booking?.guest?.email || "—"}
-          </Typography>
-          <Typography variant="body2">
-            Provider: {selectedDispute.booking?.provider?.email || "—"}
-          </Typography>
-          <Typography variant="body2">Description: {selectedDispute.description || "—"}</Typography>
-          <Typography variant="body2">Resolution: {selectedDispute.resolution || "—"}</Typography>
-        </AppCard>
+      {renderPaginationControls(
+        disputesData?.pagination,
+        disputeFilters.page,
+        (page) => setDisputeFilters((previous) => ({ ...previous, page })),
+        isFetchingDisputes
       )}
+
+      {renderDisputeDetail()}
     </>
   );
 
@@ -1370,7 +1613,11 @@ const AdminDashboard: React.FC = () => {
               placeholder="Action"
               value={auditFilters.action}
               onChange={(event) =>
-                setAuditFilters((previous) => ({ ...previous, action: event.target.value }))
+                setAuditFilters((previous) => ({
+                  ...previous,
+                  action: event.target.value,
+                  page: 1,
+                }))
               }
             />
           </Box>
@@ -1382,6 +1629,7 @@ const AdminDashboard: React.FC = () => {
                 setAuditFilters((previous) => ({
                   ...previous,
                   targetType: String(event.target.value),
+                  page: 1,
                 }))
               }
               options={[
@@ -1400,7 +1648,7 @@ const AdminDashboard: React.FC = () => {
               type="date"
               value={auditFilters.from}
               onChange={(event) =>
-                setAuditFilters((previous) => ({ ...previous, from: event.target.value }))
+                setAuditFilters((previous) => ({ ...previous, from: event.target.value, page: 1 }))
               }
             />
           </Box>
@@ -1410,17 +1658,21 @@ const AdminDashboard: React.FC = () => {
               type="date"
               value={auditFilters.to}
               onChange={(event) =>
-                setAuditFilters((previous) => ({ ...previous, to: event.target.value }))
+                setAuditFilters((previous) => ({ ...previous, to: event.target.value, page: 1 }))
               }
             />
           </Box>
           <Box sx={{ minWidth: 220 }}>
             <AppInput
               size="small"
-              placeholder="Admin ID"
-              value={auditFilters.adminId}
+              placeholder="Admin email or ID"
+              value={auditFilters.adminSearch}
               onChange={(event) =>
-                setAuditFilters((previous) => ({ ...previous, adminId: event.target.value }))
+                setAuditFilters((previous) => ({
+                  ...previous,
+                  adminSearch: event.target.value,
+                  page: 1,
+                }))
               }
             />
           </Box>
@@ -1462,6 +1714,12 @@ const AdminDashboard: React.FC = () => {
             </TableRow>
           ))}
         </MUITable>
+      )}
+      {renderPaginationControls(
+        auditLogsData?.pagination,
+        auditFilters.page,
+        (page) => setAuditFilters((previous) => ({ ...previous, page })),
+        isFetchingAuditLogs
       )}
     </>
   );
