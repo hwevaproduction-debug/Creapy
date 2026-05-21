@@ -511,12 +511,12 @@ const RoomDetail = () => {
   }
 
   return (
-    <Box sx={{ py: { xs: 4, md: 6 }, background: "#f8fafc", minHeight: "calc(100vh - 72px)" }}>
+    <Box sx={{ py: { xs: 4, md: 6 }, background: "background.default", minHeight: "calc(100vh - 72px)" }}>
       <AppContainer>
         <Grid container spacing={3}>
           <Grid item xs={12} lg={8}>
             <Stack spacing={2.5}>
-              <AppCard sx={{ overflow: "hidden", borderRadius: 3 }}>
+              <AppCard sx={{ overflow: "hidden", borderRadius: "16px" }}>
                 <Box
                   component="img"
                   src={images[0]}
@@ -528,7 +528,7 @@ const RoomDetail = () => {
               <Grid container spacing={2}>
                 {images.slice(1, 4).map((image: string) => (
                   <Grid item xs={12} sm={4} key={image}>
-                    <AppCard sx={{ overflow: "hidden", borderRadius: 3 }}>
+                    <AppCard sx={{ overflow: "hidden", borderRadius: "16px" }}>
                       <Box
                         component="img"
                         src={image}
@@ -546,13 +546,13 @@ const RoomDetail = () => {
                     sx={{
                       p: 2,
                       borderRadius: 3,
-                      background: "#F8FAFC",
-                      border: "1px solid #E2E8F0",
+                      background: "var(--surface-page)",
+                      border: "1px solid var(--border-default)",
                       boxShadow: "none",
                     }}
                   >
                     <Stack direction="row" spacing={2} alignItems="center">
-                      <Avatar sx={{ bgcolor: "#0f766e", width: 52, height: 52 }}>
+                      <Avatar sx={{ bgcolor: "#B8975A", color: "#FFFFFF", width: 52, height: 52 }}>
                         {getProviderInitials(
                           provider?.businessName || room?.provider?.providerProfile?.businessName || ""
                         )}
@@ -567,13 +567,22 @@ const RoomDetail = () => {
                           {(provider?.businessType ||
                             room?.provider?.providerProfile?.businessType ||
                             "Stay provider") +
-                            " · " +
+                            " - " +
                             getProviderLocation(provider || room?.provider?.providerProfile)}
                         </SubHeading>
                       </Box>
                       {(provider?.verificationStatus ||
                         room?.provider?.providerProfile?.verificationStatus) === "approved" ? (
-                        <Chip label="✓ Verified" color="success" sx={{ ml: "auto", flexShrink: 0 }} />
+                        <Chip
+                          label="Verified"
+                          sx={{
+                            ml: "auto",
+                            flexShrink: 0,
+                            background: "#D1EAE0",
+                            color: "#1F4D3A",
+                            fontWeight: 700,
+                          }}
+                        />
                       ) : null}
                     </Stack>
                   </AppCard>
@@ -597,8 +606,9 @@ const RoomDetail = () => {
                           isInstantBooking ? "Instant Booking" : "Request to Book"
                         }
                         sx={{
-                          background: isInstantBooking ? "#DBEAFE" : "#FEF3C7",
-                          color: isInstantBooking ? "#1D4ED8" : "#B45309",
+                          background: isInstantBooking ? "#FDF8F0" : "#FEF3C7",
+                          color: isInstantBooking ? "#9E7E45" : "#92400E",
+                          border: isInstantBooking ? "1px solid #EDD9B0" : "none",
                           fontWeight: 700,
                           alignSelf: "flex-start",
                         }}
@@ -614,7 +624,7 @@ const RoomDetail = () => {
                     />
                   </Stack>
 
-                  <SubHeading sx={{ color: "#334155", lineHeight: 1.8 }}>
+                  <SubHeading sx={{ color: "text.secondary", lineHeight: 1.8 }}>
                     {getRoomDescription(room)}
                   </SubHeading>
 
@@ -624,9 +634,14 @@ const RoomDetail = () => {
                       <Grid container spacing={1.5}>
                         {getAmenities(room).map((amenity: string) => (
                           <Grid item xs={12} sm={6} md={4} key={amenity}>
-                            <SubHeading sx={{ color: "#334155" }}>
-                              ✓ {formatAmenity(amenity)}
-                            </SubHeading>
+                            <Chip
+                              label={formatAmenity(amenity)}
+                              sx={{
+                                background: "#F7EDDA",
+                                color: "#7D6234",
+                                fontWeight: 700,
+                              }}
+                            />
                           </Grid>
                         ))}
                       </Grid>
@@ -635,13 +650,13 @@ const RoomDetail = () => {
                     )}
                   </Box>
 
-                  <Box>
+                  <Box sx={{ background: "var(--success-bg)", borderRadius: "12px", padding: "16px" }}>
                     <Heading sx={{ fontSize: "22px", mb: 1.5 }}>Policies</Heading>
                     <Stack spacing={1}>
-                      <SubHeading sx={{ color: "#334155" }}>
+                      <SubHeading sx={{ color: "text.secondary" }}>
                         Check-in: {checkInTime} / Check-out: {checkOutTime}
                       </SubHeading>
-                      <SubHeading sx={{ color: "#334155" }}>
+                      <SubHeading sx={{ color: "text.secondary" }}>
                         {room?.cancellationPolicyCustomText ||
                           CANCELLATION_POLICY_MAP[policyCode] ||
                           "Cancellation policy will be shared by the provider before confirmation."}
@@ -655,6 +670,7 @@ const RoomDetail = () => {
 
           <Grid item xs={12} lg={4}>
             <AppCard
+              elevation="floating"
               sx={{
                 p: { xs: 2.5, md: 3 },
                 borderRadius: 3,
@@ -672,11 +688,22 @@ const RoomDetail = () => {
                   label={isInstantBooking ? "Instant Booking" : "Request to Book"}
                   sx={{
                     alignSelf: "flex-start",
-                    background: isInstantBooking ? "#DBEAFE" : "#FEF3C7",
-                    color: isInstantBooking ? "#1D4ED8" : "#B45309",
+                    background: isInstantBooking ? "#FDF8F0" : "#FEF3C7",
+                    color: isInstantBooking ? "#9E7E45" : "#92400E",
+                    border: isInstantBooking ? "1px solid #EDD9B0" : "none",
                     fontWeight: 700,
                   }}
                 />
+
+                <Box sx={{ fontSize: "32px", fontWeight: 800, color: "text.primary" }}>
+                  ${thousandSeparatorNumber(nightlyRate)}
+                  <Box
+                    component="span"
+                    sx={{ fontSize: "14px", fontWeight: 600, color: "#64748B", ml: 0.5 }}
+                  >
+                    /night
+                  </Box>
+                </Box>
 
                 <Box component="form" onSubmit={handlePrimaryAction}>
                   <Stack spacing={2}>
@@ -705,7 +732,7 @@ const RoomDetail = () => {
                         />
 
                         {occupancyRule ? (
-                          <Box sx={{ p: 2, background: "#f8fafc", borderRadius: "8px" }}>
+                          <Box sx={{ p: 2, background: "var(--surface-page)", borderRadius: "8px" }}>
                             <Stack spacing={1.5}>
                               {[
                                 {
@@ -737,7 +764,7 @@ const RoomDetail = () => {
                                   alignItems="center"
                                   spacing={1.5}
                                 >
-                                  <SubHeading sx={{ color: "#334155", fontWeight: 700 }}>
+                                  <SubHeading sx={{ color: "text.secondary", fontWeight: 700 }}>
                                     {counter.label}
                                   </SubHeading>
                                   <Stack direction="row" alignItems="center" spacing={1}>
@@ -752,7 +779,7 @@ const RoomDetail = () => {
                                         )
                                       }
                                       disabled={counter.value <= counter.min}
-                                      sx={{ border: "1px solid #cbd5e1" }}
+                                      sx={{ border: "1px solid", borderColor: "divider" }}
                                     >
                                       <FaMinus size={12} />
                                     </IconButton>
@@ -770,7 +797,7 @@ const RoomDetail = () => {
                                         )
                                       }
                                       disabled={counter.value >= counter.max}
-                                      sx={{ border: "1px solid #cbd5e1" }}
+                                      sx={{ border: "1px solid", borderColor: "divider" }}
                                     >
                                       <FaPlus size={12} />
                                     </IconButton>
@@ -816,7 +843,7 @@ const RoomDetail = () => {
                           placeholder="Arrival time, extra needs, notes..."
                         />
 
-                        <Box sx={{ p: 2, background: "#f8fafc", borderRadius: "8px" }}>
+                        <Box sx={{ p: 2, background: "var(--surface-page)", borderRadius: "8px" }}>
                           <SubHeading sx={{ mb: 1 }}>Pricing breakdown</SubHeading>
                           <PriceBreakdown quote={quote} isLoading={isQuoteLoading} />
                         </Box>
@@ -845,6 +872,8 @@ const RoomDetail = () => {
 
                         <AppButton
                           type="submit"
+                          fullWidth
+                          size="large"
                           disabled={
                             isCheckingAvailability ||
                             isQuoteLoading ||
@@ -854,7 +883,7 @@ const RoomDetail = () => {
                             !form.checkOut
                           }
                         >
-                          Continue →
+                          Continue
                         </AppButton>
                       </Stack>
                     ) : null}
@@ -916,9 +945,11 @@ const RoomDetail = () => {
                           </AppButton>
                           <AppButton
                             type="submit"
+                            fullWidth
+                            size="large"
                             disabled={!guestInfo.fullName.trim() || !guestInfo.phone.trim()}
                           >
-                            Continue →
+                            Continue
                           </AppButton>
                         </Stack>
                       </Stack>
@@ -926,7 +957,7 @@ const RoomDetail = () => {
 
                     {bookingStep === 2 ? (
                       <Stack spacing={2}>
-                        <Box sx={{ p: 2, background: "#f8fafc", borderRadius: "8px" }}>
+                        <Box sx={{ p: 2, background: "var(--surface-page)", borderRadius: "8px" }}>
                           <Stack spacing={1}>
                             <Stack direction="row" justifyContent="space-between" spacing={1}>
                               <SubHeading>Room</SubHeading>
@@ -958,8 +989,9 @@ const RoomDetail = () => {
                                 size="small"
                                 label={isInstantBooking ? "Instant Booking" : "Request to Book"}
                                 sx={{
-                                  background: isInstantBooking ? "#DBEAFE" : "#FEF3C7",
-                                  color: isInstantBooking ? "#1D4ED8" : "#B45309",
+                                  background: isInstantBooking ? "#FDF8F0" : "#FEF3C7",
+                                  color: isInstantBooking ? "#9E7E45" : "#92400E",
+                                  border: isInstantBooking ? "1px solid #EDD9B0" : "none",
                                   fontWeight: 700,
                                 }}
                               />
@@ -967,41 +999,41 @@ const RoomDetail = () => {
                           </Stack>
                         </Box>
 
-                        <Box sx={{ p: 2, background: "#f8fafc", borderRadius: "8px" }}>
+                        <Box sx={{ p: 2, background: "var(--surface-page)", borderRadius: "8px" }}>
                           <SubHeading sx={{ mb: 1 }}>Pricing breakdown</SubHeading>
                           <PriceBreakdown quote={quote} isLoading={isQuoteLoading} />
                         </Box>
 
-                        <Box sx={{ p: 2, background: "#f8fafc", borderRadius: "8px" }}>
+                        <Box sx={{ p: 2, background: "var(--surface-page)", borderRadius: "8px" }}>
                           <SubHeading sx={{ mb: 1 }}>Guest information</SubHeading>
                           <Stack spacing={0.75}>
-                            <SubHeading sx={{ color: "#334155" }}>
+                            <SubHeading sx={{ color: "text.secondary" }}>
                               {guestInfo.fullName || "Guest name not set"}
                             </SubHeading>
-                            <SubHeading sx={{ color: "#334155" }}>
+                            <SubHeading sx={{ color: "text.secondary" }}>
                               {guestInfo.phone || "Guest phone not set"}
                             </SubHeading>
                             {guestInfo.nationalId ? (
-                              <SubHeading sx={{ color: "#334155" }}>
+                              <SubHeading sx={{ color: "text.secondary" }}>
                                 National ID: {guestInfo.nationalId}
                               </SubHeading>
                             ) : null}
                             {guestInfo.estimatedArrivalTime ? (
-                              <SubHeading sx={{ color: "#334155" }}>
+                              <SubHeading sx={{ color: "text.secondary" }}>
                                 Arrival: {guestInfo.estimatedArrivalTime}
                               </SubHeading>
                             ) : null}
                             {guestInfo.additionalNotes ? (
-                              <SubHeading sx={{ color: "#334155" }}>
+                              <SubHeading sx={{ color: "text.secondary" }}>
                                 Notes: {guestInfo.additionalNotes}
                               </SubHeading>
                             ) : null}
                           </Stack>
                         </Box>
 
-                        <Box sx={{ p: 2, background: "#f8fafc", borderRadius: "8px" }}>
+                        <Box sx={{ p: 2, background: "var(--success-bg)", borderRadius: "12px" }}>
                           <SubHeading sx={{ mb: 1 }}>Cancellation policy</SubHeading>
-                          <SubHeading sx={{ color: "#334155", lineHeight: 1.7 }}>
+                          <SubHeading sx={{ color: "text.secondary", lineHeight: 1.7 }}>
                             {room?.cancellationPolicyCustomText ||
                               CANCELLATION_POLICY_MAP[policyCode] ||
                               "Cancellation policy will be shared by the provider before confirmation."}
@@ -1018,6 +1050,8 @@ const RoomDetail = () => {
                           </AppButton>
                           <AppButton
                             type="submit"
+                            fullWidth
+                            size="large"
                             disabled={isBooking || isSubmittingGuestInfo || isQuoteLoading}
                           >
                             {isBooking || isSubmittingGuestInfo ? "Confirming..." : "Confirm Booking"}

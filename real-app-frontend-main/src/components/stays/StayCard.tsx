@@ -83,39 +83,57 @@ const StayCard = ({ room, onOpen }: StayCardProps) => {
       onKeyDown={handleKeyDown}
       sx={{
         height: "100%",
-        borderRadius: "8px",
+        borderRadius: "16px",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         outline: "none",
+        transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
+        "&:hover": {
+          transform: "translateY(-3px)",
+          boxShadow: "0 12px 40px rgba(31,41,55,0.16)",
+        },
         "&:focus-visible": {
-          boxShadow: "0 0 0 3px rgba(20, 184, 166, 0.35)",
+          outline: "2px solid #B8975A",
+          outlineOffset: "2px",
         },
       }}
     >
-      <Box
-        component="img"
-        src={getRoomImage(room)}
-        alt={getRoomName(room)}
-        sx={{ height: 220, objectFit: "cover", width: "100%" }}
-      />
+      <Box sx={{ position: "relative", height: 240, overflow: "hidden" }}>
+        <Box
+          component="img"
+          src={getRoomImage(room)}
+          alt={getRoomName(room)}
+          sx={{ height: "100%", objectFit: "cover", width: "100%" }}
+        />
+        <Box
+          sx={{
+            position: "absolute",
+            inset: "auto 0 0",
+            height: "42%",
+            background: "linear-gradient(to top, rgba(31,41,55,0.42), transparent)",
+            pointerEvents: "none",
+          }}
+        />
+      </Box>
       <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 1.5, flex: 1 }}>
         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
           <Chip
             size="small"
-            label={bookingMode === "INSTANT" ? "⚡ Instant" : "📋 Request"}
+            label={bookingMode === "INSTANT" ? "Instant" : "Request"}
             sx={{
               alignSelf: "flex-start",
-              background: bookingMode === "INSTANT" ? "#DBEAFE" : "#FEF3C7",
-              color: bookingMode === "INSTANT" ? "#1D4ED8" : "#B45309",
+              background: bookingMode === "INSTANT" ? "#FDF8F0" : "#FEF3C7",
+              color: bookingMode === "INSTANT" ? "#9E7E45" : "#92400E",
+              border: bookingMode === "INSTANT" ? "1px solid #EDD9B0" : "none",
               fontWeight: 700,
             }}
           />
           {rating ? (
             <Chip
               size="small"
-              label={`★ ${rating}`}
-              sx={{ background: "#ECFDF5", color: "#047857", fontWeight: 700 }}
+              label={`Rating ${rating}`}
+              sx={{ background: "#D1EAE0", color: "#1F4D3A", fontWeight: 700 }}
             />
           ) : null}
         </Stack>
@@ -133,9 +151,9 @@ const StayCard = ({ room, onOpen }: StayCardProps) => {
 
         <SubHeading
           sx={{
-            color: "#334155",
+            color: "#475569",
             display: "-webkit-box",
-            WebkitLineClamp: 3,
+            WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
           }}
@@ -150,11 +168,14 @@ const StayCard = ({ room, onOpen }: StayCardProps) => {
             alignItems: "center",
             justifyContent: "space-between",
             gap: 2,
+            borderTop: "1px solid",
+            borderColor: "divider",
+            paddingTop: "14px",
           }}
         >
-          <Box sx={{ fontSize: "22px", fontWeight: 700, color: "#0f172a" }}>
+          <Box sx={{ fontSize: "24px", fontWeight: 800, color: "text.primary" }}>
             ${thousandSeparatorNumber(price)}
-            <Box component="span" sx={{ fontSize: "14px", color: "#64748b", ml: 0.5 }}>
+            <Box component="span" sx={{ fontSize: "14px", color: "#94A3B8", ml: 0.5 }}>
               /night
             </Box>
           </Box>

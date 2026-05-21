@@ -17,6 +17,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tabs,
   Typography,
 } from "@mui/material";
 import AppContainer from "../../components/ui/AppContainer";
@@ -29,39 +30,13 @@ import { Heading } from "../../components/Heading";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import {
   AdminBooking,
-  AdminAccommodation,
-  AdminAuditLog,
-  AdminDispute,
-  AdminReport,
-  AdminReview,
   BulkReviveFailure,
   ProviderRecord,
-  useApproveAccommodationMutation,
   useBulkReviveListingsMutation,
-  useCloseDisputeMutation,
-  useDismissReportMutation,
-  useGetAccommodationsQuery,
   useGetAllBookingsQuery,
-  useGetAllReviewsQuery,
-  useGetAuditLogsQuery,
-  useGetDisputeByIdQuery,
-  useGetDisputesQuery,
-  useGetModerationQueueQuery,
-  useGetReportByIdQuery,
   useGetProvidersQuery,
-  useGetReportsQuery,
-  useMarkDisputeUnderReviewMutation,
   useLazyGetInactiveListingsQuery,
-  useModerateReviewMutation,
-  useReinstateAccommodationMutation,
-  useReinstateProviderMutation,
-  useRejectAccommodationMutation,
-  useResolveDisputeMutation,
-  useResolveReportMutation,
-  useReviewReportMutation,
   useSettleBookingMutation,
-  useSuspendAccommodationMutation,
-  useSuspendProviderMutation,
   useUpdateCommissionRateMutation,
   useVerifyProviderMutation,
 } from "../../redux/api/adminApiSlice";
@@ -97,23 +72,8 @@ interface ToastState {
   type: "success" | "error" | "warning";
 }
 
-type AdminTab =
-  | "queue"
-  | "accommodations"
-  | "reviews"
-  | "reports"
-  | "disputes"
-  | "providers"
-  | "bookings"
-  | "expired"
-  | "audit";
+type AdminTab = "expired" | "providers" | "bookings";
 type PaginationItem = number | "ellipsis-start" | "ellipsis-end";
-type PaginationMeta = {
-  page?: number;
-  limit?: number;
-  total?: number;
-  hasMore?: boolean;
-};
 
 const MAX_BULK_REVIVE_IDS = 100;
 
@@ -191,21 +151,14 @@ function getStatusChipColor(
     case "active":
     case "confirmed":
     case "settled":
-    case "resolved":
       return "success";
     case "pending":
     case "pending_payment":
-    case "pending_review":
-    case "under_review":
-    case "open":
       return "warning";
     case "rejected":
     case "cancelled":
     case "canceled":
     case "expired":
-    case "suspended":
-    case "dismissed":
-    case "closed":
       return "error";
     default:
       return "default";
@@ -218,62 +171,10 @@ function formatLocation(
   return [value?.province, value?.city].filter(Boolean).join(" / ") || "—";
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function firstStringValue(
-  record: Record<string, unknown> | null,
-  keys: string[]
-) {
-  if (!record) {
-    return null;
-  }
-
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) {
-      return value;
-    }
-  }
-
-  return null;
-}
-
-function formatDetailLabel(value: string) {
-  return value
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function formatDetailValue(value: unknown): string {
-  if (value == null || value === "") {
-    return "—";
-  }
-
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-
-  if (Array.isArray(value)) {
-    return value.length ? value.map(formatDetailValue).join(", ") : "—";
-  }
-
-  const record = asRecord(value);
-  if (record) {
-    return firstStringValue(record, ["name", "title", "email", "username", "status", "_id", "id"]) || "—";
-  }
-
-  return "—";
-}
-
 const AdminDashboard: React.FC = () => {
   const ROWS_PER_PAGE = 20;
 
-  const [activeTab, setActiveTab] = useState<AdminTab>("queue");
+  const [activeTab, setActiveTab] = useState<AdminTab>("expired");
   const [toast, setToast] = useState<ToastState>({
     open: false,
     message: "",
@@ -326,56 +227,6 @@ const AdminDashboard: React.FC = () => {
     onConfirm: (() => void) | null;
     commissionRate?: string;
   }>({ open: false, title: "", body: "", onConfirm: null });
-  const [textActionDialog, setTextActionDialog] = useState<{
-    open: boolean;
-    title: string;
-    body: string;
-    label: string;
-    value: string;
-    onConfirm: ((value: string) => void) | null;
-  }>({
-    open: false,
-    title: "",
-    body: "",
-    label: "Reason",
-    value: "",
-    onConfirm: null,
-  });
-  const [accommodationFilters, setAccommodationFilters] = useState({
-    moderationStatus: "",
-    type: "",
-    province: "",
-    search: "",
-    page: 1,
-  });
-  const [reviewFilters, setReviewFilters] = useState({
-    isPublished: "",
-    accommodationId: "",
-    from: "",
-    to: "",
-    page: 1,
-  });
-  const [reportFilters, setReportFilters] = useState({
-    status: "",
-    targetType: "",
-    reason: "",
-    page: 1,
-  });
-  const [disputeFilters, setDisputeFilters] = useState({
-    status: "",
-    raisedByRole: "",
-    page: 1,
-  });
-  const [auditFilters, setAuditFilters] = useState({
-    action: "",
-    targetType: "",
-    from: "",
-    to: "",
-    adminSearch: "",
-    page: 1,
-  });
-  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
-  const [selectedDisputeId, setSelectedDisputeId] = useState<string | null>(null);
 
   const [triggerSearch, { data: inactiveData, isFetching: isFetchingInactive }] =
     useLazyGetInactiveListingsQuery();
@@ -391,59 +242,6 @@ const AdminDashboard: React.FC = () => {
     useGetAllBookingsQuery(bookingFilters);
   const [settleBooking, { isLoading: isSettlingBooking }] =
     useSettleBookingMutation();
-  const { data: queueData, isFetching: isFetchingQueue } =
-    useGetModerationQueueQuery();
-  const { data: accommodationsData, isFetching: isFetchingAccommodations } =
-    useGetAccommodationsQuery({
-      ...accommodationFilters,
-      limit: ROWS_PER_PAGE,
-    });
-  const { data: pendingAccommodationsData, isFetching: isFetchingPendingAccommodations } =
-    useGetAccommodationsQuery({
-      moderationStatus: "PENDING_REVIEW",
-      limit: 10,
-    });
-  const { data: reviewsData, isFetching: isFetchingReviews } =
-    useGetAllReviewsQuery({
-      ...reviewFilters,
-      limit: ROWS_PER_PAGE,
-    });
-  const { data: reportsData, isFetching: isFetchingReports } =
-    useGetReportsQuery({
-      ...reportFilters,
-      limit: ROWS_PER_PAGE,
-    });
-  const { data: selectedReportData, isFetching: isFetchingReportDetail } =
-    useGetReportByIdQuery(selectedReportId || "", {
-      skip: !selectedReportId,
-    });
-  const { data: disputesData, isFetching: isFetchingDisputes } =
-    useGetDisputesQuery({
-      ...disputeFilters,
-      limit: ROWS_PER_PAGE,
-    });
-  const { data: selectedDisputeData, isFetching: isFetchingDisputeDetail } =
-    useGetDisputeByIdQuery(selectedDisputeId || "", {
-      skip: !selectedDisputeId,
-    });
-  const { data: auditLogsData, isFetching: isFetchingAuditLogs } =
-    useGetAuditLogsQuery({
-      ...auditFilters,
-      limit: ROWS_PER_PAGE,
-    });
-  const [approveAccommodation] = useApproveAccommodationMutation();
-  const [rejectAccommodation] = useRejectAccommodationMutation();
-  const [suspendAccommodation] = useSuspendAccommodationMutation();
-  const [reinstateAccommodation] = useReinstateAccommodationMutation();
-  const [suspendProvider] = useSuspendProviderMutation();
-  const [reinstateProvider] = useReinstateProviderMutation();
-  const [moderateReview] = useModerateReviewMutation();
-  const [reviewReport] = useReviewReportMutation();
-  const [resolveReport] = useResolveReportMutation();
-  const [dismissReport] = useDismissReportMutation();
-  const [markDisputeUnderReview] = useMarkDisputeUnderReviewMutation();
-  const [resolveDispute] = useResolveDisputeMutation();
-  const [closeDispute] = useCloseDisputeMutation();
 
   const listings = inactiveData?.data ?? [];
   const totalListings = inactiveData?.total ?? 0;
@@ -464,14 +262,6 @@ const AdminDashboard: React.FC = () => {
   );
   const allProviders = providerOptionsData?.data ?? [];
   const bookings = bookingsData?.data ?? [];
-  const accommodations = accommodationsData?.data ?? [];
-  const pendingAccommodations = pendingAccommodationsData?.data ?? [];
-  const reviews = reviewsData?.data?.reviews ?? [];
-  const reports = reportsData?.data ?? [];
-  const selectedReport = selectedReportData?.report ?? null;
-  const disputes = disputesData?.data ?? [];
-  const selectedDispute = selectedDisputeData?.dispute ?? null;
-  const auditLogs = auditLogsData?.data ?? [];
   const settledBookingsCount = bookings.filter(
     (booking) => booking.settlementStatus === "settled"
   ).length;
@@ -708,1069 +498,10 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const openTextAction = (
-    title: string,
-    body: string,
-    label: string,
-    onConfirm: (value: string) => void
-  ) => {
-    setTextActionDialog({
-      open: true,
-      title,
-      body,
-      label,
-      value: "",
-      onConfirm,
-    });
-  };
-
-  const closeTextAction = () => {
-    setTextActionDialog({
-      open: false,
-      title: "",
-      body: "",
-      label: "Reason",
-      value: "",
-      onConfirm: null,
-    });
-  };
-
-  const runAdminAction = async (
-    action: Promise<unknown>,
-    successMessage: string,
-    fallbackMessage: string
-  ) => {
-    try {
-      await action;
-      setToast({ open: true, message: successMessage, type: "success" });
-    } catch (error) {
-      setToast({
-        open: true,
-        message: getErrorMessage(error, fallbackMessage),
-        type: "error",
-      });
-    }
-  };
-
-  const handleAccommodationAction = (
-    accommodation: AdminAccommodation,
-    action: "approve" | "reject" | "suspend" | "reinstate"
-  ) => {
-    if (action === "approve") {
-      runAdminAction(
-        approveAccommodation({ id: accommodation._id }).unwrap(),
-        "Accommodation approved.",
-        "Unable to approve accommodation."
-      );
-      return;
-    }
-
-    if (action === "reinstate") {
-      runAdminAction(
-        reinstateAccommodation({ id: accommodation._id }).unwrap(),
-        "Accommodation reinstated.",
-        "Unable to reinstate accommodation."
-      );
-      return;
-    }
-
-    openTextAction(
-      action === "reject" ? "Reject Accommodation" : "Suspend Accommodation",
-      `${action === "reject" ? "Reject" : "Suspend"} ${accommodation.name}?`,
-      "Reason",
-      (reason) => {
-        const mutation =
-          action === "reject" ? rejectAccommodation : suspendAccommodation;
-
-        runAdminAction(
-          mutation({ id: accommodation._id, reason }).unwrap(),
-          action === "reject"
-            ? "Accommodation rejected."
-            : "Accommodation suspended.",
-          "Unable to update accommodation."
-        );
-      }
-    );
-  };
-
-  const handleProviderSuspension = (provider: ProviderRecord, suspend: boolean) => {
-    if (suspend) {
-      openTextAction(
-        "Suspend Provider",
-        `Suspend ${provider.username}? New bookings will be blocked.`,
-        "Reason",
-        (reason) =>
-          runAdminAction(
-            suspendProvider({ id: provider._id, reason }).unwrap(),
-            "Provider suspended.",
-            "Unable to suspend provider."
-          )
-      );
-      return;
-    }
-
-    runAdminAction(
-      reinstateProvider({ id: provider._id }).unwrap(),
-      "Provider reinstated.",
-      "Unable to reinstate provider."
-    );
-  };
-
-  const handleReviewModeration = (
-    review: AdminReview,
-    action: "publish" | "unpublish" | "delete" | "restore"
-  ) => {
-    runAdminAction(
-      moderateReview({ id: review._id, action }).unwrap(),
-      "Review updated.",
-      "Unable to update review."
-    );
-  };
-
-  const handleReportAction = (
-    report: AdminReport,
-    action: "review" | "resolve" | "dismiss"
-  ) => {
-    if (action === "review") {
-      runAdminAction(
-        reviewReport({ id: report._id }).unwrap(),
-        "Report marked under review.",
-        "Unable to update report."
-      );
-      return;
-    }
-
-    openTextAction(
-      action === "resolve" ? "Resolve Report" : "Dismiss Report",
-      `${action === "resolve" ? "Resolve" : "Dismiss"} this report?`,
-      "Resolution",
-      (resolution) => {
-        const mutation = action === "resolve" ? resolveReport : dismissReport;
-        runAdminAction(
-          mutation({ id: report._id, resolution }).unwrap(),
-          action === "resolve" ? "Report resolved." : "Report dismissed.",
-          "Unable to update report."
-        );
-      }
-    );
-  };
-
-  const handleDisputeAction = (
-    dispute: AdminDispute,
-    action: "review" | "resolve" | "close"
-  ) => {
-    if (action === "review") {
-      runAdminAction(
-        markDisputeUnderReview({ id: dispute._id }).unwrap(),
-        "Dispute marked under review.",
-        "Unable to update dispute."
-      );
-      return;
-    }
-
-    if (action === "close") {
-      runAdminAction(
-        closeDispute({ id: dispute._id }).unwrap(),
-        "Dispute closed.",
-        "Unable to close dispute."
-      );
-      return;
-    }
-
-    openTextAction(
-      "Resolve Dispute",
-      "Enter a resolution note before resolving this dispute.",
-      "Resolution",
-      (resolution) =>
-        runAdminAction(
-          resolveDispute({ id: dispute._id, resolution }).unwrap(),
-          "Dispute resolved.",
-          "Unable to resolve dispute."
-        )
-    );
-  };
-
   const renderEmptyState = (message: string) => (
     <AppCard sx={{ p: "40px", textAlign: "center", color: "#9ca3af" }}>
       {message}
     </AppCard>
-  );
-
-  const renderStatusChip = (value?: string | null) => (
-    <Chip
-      label={formatStatusLabel(value)}
-      color={getStatusChipColor(value)}
-      size="small"
-    />
-  );
-
-  const renderPaginationControls = (
-    pagination: PaginationMeta | undefined,
-    currentPage: number,
-    onPageChange: (page: number) => void,
-    disabled = false
-  ) => {
-    const limit = pagination?.limit || ROWS_PER_PAGE;
-    const total = pagination?.total || 0;
-    const page = pagination?.page || currentPage;
-    const pages = Math.ceil(total / limit);
-
-    if (pages <= 1) {
-      return null;
-    }
-
-    return (
-      <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, mt: 1.5, flexWrap: "wrap" }}>
-        <AppButton
-          size="small"
-          variant="outlined"
-          disabled={disabled || page <= 1}
-          onClick={() => onPageChange(page - 1)}
-        >
-          Previous
-        </AppButton>
-        {buildPageArray(pages, page).map((item) =>
-          typeof item !== "number" ? (
-            <Typography
-              key={item}
-              variant="body2"
-              sx={{ display: "flex", alignItems: "center", px: 0.5, color: "#9ca3af" }}
-            >
-              ...
-            </Typography>
-          ) : (
-            <AppButton
-              key={item}
-              size="small"
-              variant={page === item ? "contained" : "outlined"}
-              disabled={disabled}
-              onClick={() => onPageChange(item)}
-            >
-              {item}
-            </AppButton>
-          )
-        )}
-        <AppButton
-          size="small"
-          variant="outlined"
-          disabled={disabled || page >= pages}
-          onClick={() => onPageChange(page + 1)}
-        >
-          Next
-        </AppButton>
-      </Box>
-    );
-  };
-
-  const renderAccommodationActions = (accommodation: AdminAccommodation) => {
-    const status = String(accommodation.moderationStatus || "").toUpperCase();
-
-    return (
-      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-        {status !== "APPROVED" && (
-          <AppButton
-            size="small"
-            onClick={() => handleAccommodationAction(accommodation, "approve")}
-          >
-            Approve
-          </AppButton>
-        )}
-        {status !== "REJECTED" && (
-          <AppButton
-            size="small"
-            variant="outlined"
-            color="error"
-            onClick={() => handleAccommodationAction(accommodation, "reject")}
-          >
-            Reject
-          </AppButton>
-        )}
-        {status !== "SUSPENDED" && (
-          <AppButton
-            size="small"
-            variant="outlined"
-            color="warning"
-            onClick={() => handleAccommodationAction(accommodation, "suspend")}
-          >
-            Suspend
-          </AppButton>
-        )}
-        {status === "SUSPENDED" && (
-          <AppButton
-            size="small"
-            onClick={() => handleAccommodationAction(accommodation, "reinstate")}
-          >
-            Reinstate
-          </AppButton>
-        )}
-      </Box>
-    );
-  };
-
-  const renderModerationQueue = () => (
-    <>
-      <Heading sx={{ mb: "20px" }}>Moderation Queue</Heading>
-
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" },
-          gap: 2,
-          mb: 2,
-        }}
-      >
-        {[
-          ["Pending Accommodations", queueData?.pendingAccommodations ?? 0],
-          ["Open Reports", queueData?.openReports ?? 0],
-          ["Open Disputes", queueData?.openDisputes ?? 0],
-          ["Pending Reviews", queueData?.pendingReviews ?? 0],
-        ].map(([label, value]) => (
-          <AppCard key={label} sx={{ p: 2 }}>
-            <Typography variant="body2" sx={{ color: "#6b7280", mb: 0.5 }}>
-              {label}
-            </Typography>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              {isFetchingQueue ? "..." : value}
-            </Typography>
-          </AppCard>
-        ))}
-      </Box>
-
-      <Heading sx={{ mb: "14px", fontSize: "18px" }}>Pending Accommodations</Heading>
-      {isFetchingPendingAccommodations ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-          <CircularProgress />
-        </Box>
-      ) : pendingAccommodations.length === 0 ? (
-        renderEmptyState("No accommodations are pending review.")
-      ) : (
-        <MUITable tableHead={["Name", "Owner", "Location", "Submitted", "Status", "Actions"]}>
-          {pendingAccommodations.map((accommodation) => (
-            <TableRow key={accommodation._id}>
-              <TableCell sx={{ fontWeight: 600 }}>{accommodation.name}</TableCell>
-              <TableCell>
-                <Box>{accommodation.owner?.username || "Unknown owner"}</Box>
-                <Box sx={{ fontSize: "12px", color: "#6b7280" }}>
-                  {accommodation.owner?.email || ""}
-                </Box>
-              </TableCell>
-              <TableCell>{formatLocation(accommodation)}</TableCell>
-              <TableCell>
-                {accommodation.createdAt
-                  ? convertToFormattedDate(accommodation.createdAt)
-                  : "—"}
-              </TableCell>
-              <TableCell>{renderStatusChip(accommodation.moderationStatus)}</TableCell>
-              <TableCell>{renderAccommodationActions(accommodation)}</TableCell>
-            </TableRow>
-          ))}
-        </MUITable>
-      )}
-    </>
-  );
-
-  const renderAccommodations = () => (
-    <>
-      <Heading sx={{ mb: "20px" }}>Accommodations</Heading>
-      <Paper sx={{ p: 2, mb: 2, border: "1px solid #e5e7eb", boxShadow: "none" }}>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-          <Box sx={{ minWidth: 180 }}>
-            <AppSelect
-              size="small"
-              value={accommodationFilters.moderationStatus}
-              onChange={(event) =>
-                setAccommodationFilters((previous) => ({
-                  ...previous,
-                  moderationStatus: String(event.target.value),
-                  page: 1,
-                }))
-              }
-              options={[
-                { label: "All Statuses", value: "" },
-                { label: "Pending Review", value: "PENDING_REVIEW" },
-                { label: "Approved", value: "APPROVED" },
-                { label: "Rejected", value: "REJECTED" },
-                { label: "Suspended", value: "SUSPENDED" },
-              ]}
-            />
-          </Box>
-          <Box sx={{ minWidth: 180 }}>
-            <AppSelect
-              size="small"
-              value={accommodationFilters.type}
-              onChange={(event) =>
-                setAccommodationFilters((previous) => ({
-                  ...previous,
-                  type: String(event.target.value),
-                  page: 1,
-                }))
-              }
-              options={[
-                { label: "All Types", value: "" },
-                { label: "Hotel", value: "HOTEL" },
-                { label: "Lodge", value: "LODGE" },
-                { label: "BNB", value: "BNB" },
-                { label: "Apartment", value: "APARTMENT" },
-                { label: "Guest House", value: "GUEST_HOUSE" },
-                { label: "Hostel", value: "HOSTEL" },
-              ]}
-            />
-          </Box>
-          <Box sx={{ minWidth: 180 }}>
-            <AppInput
-              size="small"
-              placeholder="Province"
-              value={accommodationFilters.province}
-              onChange={(event) =>
-                setAccommodationFilters((previous) => ({
-                  ...previous,
-                  province: event.target.value,
-                  page: 1,
-                }))
-              }
-            />
-          </Box>
-          <Box sx={{ minWidth: 240 }}>
-            <AppInput
-              size="small"
-              placeholder="Search name or owner"
-              value={accommodationFilters.search}
-              onChange={(event) =>
-                setAccommodationFilters((previous) => ({
-                  ...previous,
-                  search: event.target.value,
-                  page: 1,
-                }))
-              }
-            />
-          </Box>
-        </Box>
-      </Paper>
-
-      {isFetchingAccommodations ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-          <CircularProgress />
-        </Box>
-      ) : accommodations.length === 0 ? (
-        renderEmptyState("No accommodations match the current filters.")
-      ) : (
-        <MUITable tableHead={["Name", "Type", "Owner", "Location", "Status", "Published", "Actions"]}>
-          {accommodations.map((accommodation) => (
-            <TableRow key={accommodation._id}>
-              <TableCell sx={{ fontWeight: 600 }}>{accommodation.name}</TableCell>
-              <TableCell>{formatStatusLabel(accommodation.type)}</TableCell>
-              <TableCell>
-                <Box>{accommodation.owner?.username || "Unknown owner"}</Box>
-                <Box sx={{ fontSize: "12px", color: "#6b7280" }}>
-                  {accommodation.owner?.email || ""}
-                </Box>
-              </TableCell>
-              <TableCell>{formatLocation(accommodation)}</TableCell>
-              <TableCell>{renderStatusChip(accommodation.moderationStatus)}</TableCell>
-              <TableCell>{accommodation.isPublished ? "Yes" : "No"}</TableCell>
-              <TableCell>{renderAccommodationActions(accommodation)}</TableCell>
-            </TableRow>
-          ))}
-        </MUITable>
-      )}
-      {renderPaginationControls(
-        accommodationsData?.pagination,
-        accommodationFilters.page,
-        (page) => setAccommodationFilters((previous) => ({ ...previous, page })),
-        isFetchingAccommodations
-      )}
-    </>
-  );
-
-  const renderReviewModeration = () => (
-    <>
-      <Heading sx={{ mb: "20px" }}>Review Moderation</Heading>
-      <Paper sx={{ p: 2, mb: 2, border: "1px solid #e5e7eb", boxShadow: "none" }}>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-          <Box sx={{ minWidth: 180 }}>
-            <AppSelect
-              size="small"
-              value={reviewFilters.isPublished}
-              onChange={(event) =>
-                setReviewFilters((previous) => ({
-                  ...previous,
-                  isPublished: String(event.target.value),
-                  page: 1,
-                }))
-              }
-              options={[
-                { label: "All", value: "" },
-                { label: "Published", value: "true" },
-                { label: "Unpublished", value: "false" },
-              ]}
-            />
-          </Box>
-          <Box sx={{ minWidth: 220 }}>
-            <AppInput
-              size="small"
-              placeholder="Accommodation ID"
-              value={reviewFilters.accommodationId}
-              onChange={(event) =>
-                setReviewFilters((previous) => ({
-                  ...previous,
-                  accommodationId: event.target.value,
-                  page: 1,
-                }))
-              }
-            />
-          </Box>
-          <Box sx={{ minWidth: 170 }}>
-            <AppInput
-              size="small"
-              type="date"
-              value={reviewFilters.from}
-              onChange={(event) =>
-                setReviewFilters((previous) => ({ ...previous, from: event.target.value, page: 1 }))
-              }
-            />
-          </Box>
-          <Box sx={{ minWidth: 170 }}>
-            <AppInput
-              size="small"
-              type="date"
-              value={reviewFilters.to}
-              onChange={(event) =>
-                setReviewFilters((previous) => ({ ...previous, to: event.target.value, page: 1 }))
-              }
-            />
-          </Box>
-        </Box>
-      </Paper>
-
-      {isFetchingReviews ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-          <CircularProgress />
-        </Box>
-      ) : reviews.length === 0 ? (
-        renderEmptyState("No reviews match the current filters.")
-      ) : (
-        <MUITable tableHead={["Guest", "Accommodation", "Rating", "Comment", "Status", "Actions"]}>
-          {reviews.map((review) => (
-            <TableRow key={review._id}>
-              <TableCell>{review.guest?.username || "Guest"}</TableCell>
-              <TableCell>{review.accommodation?.name || "Accommodation"}</TableCell>
-              <TableCell>{review.overallRating ?? "—"}</TableCell>
-              <TableCell sx={{ maxWidth: 260 }}>{review.comment || "—"}</TableCell>
-              <TableCell>
-                {renderStatusChip(review.deletedAt ? "deleted" : review.isPublished ? "published" : "unpublished")}
-              </TableCell>
-              <TableCell>
-                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                  {!review.isPublished && (
-                    <AppButton size="small" onClick={() => handleReviewModeration(review, "publish")}>
-                      Publish
-                    </AppButton>
-                  )}
-                  {review.isPublished && (
-                    <AppButton
-                      size="small"
-                      variant="outlined"
-                      onClick={() => handleReviewModeration(review, "unpublish")}
-                    >
-                      Unpublish
-                    </AppButton>
-                  )}
-                  {!review.deletedAt ? (
-                    <AppButton
-                      size="small"
-                      variant="outlined"
-                      color="error"
-                      onClick={() => handleReviewModeration(review, "delete")}
-                    >
-                      Delete
-                    </AppButton>
-                  ) : (
-                    <AppButton size="small" onClick={() => handleReviewModeration(review, "restore")}>
-                      Restore
-                    </AppButton>
-                  )}
-                </Box>
-              </TableCell>
-            </TableRow>
-          ))}
-        </MUITable>
-      )}
-      {renderPaginationControls(
-        reviewsData?.pagination,
-        reviewFilters.page,
-        (page) => setReviewFilters((previous) => ({ ...previous, page })),
-        isFetchingReviews
-      )}
-    </>
-  );
-
-  const renderReportDetail = () => {
-    if (!selectedReportId) {
-      return null;
-    }
-
-    const target = asRecord(selectedReport?.target);
-    const targetOwner =
-      asRecord(target?.owner) ||
-      asRecord(target?.user) ||
-      asRecord(target?.guest);
-    const targetLabel =
-      firstStringValue(target, ["name", "title", "email", "username", "_id", "id"]) ||
-      selectedReport?.targetId ||
-      "—";
-    const targetOwnerLabel =
-      firstStringValue(targetOwner, ["email", "username", "_id", "id"]) || "—";
-    const targetDetails = target
-      ? Object.entries(target).filter(([, value]) => value != null && value !== "")
-      : [];
-
-    return (
-      <AppCard sx={{ mt: 2, p: 2 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-          Report Detail
-        </Typography>
-        {isFetchingReportDetail && !selectedReport ? (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-            <CircularProgress />
-          </Box>
-        ) : selectedReport ? (
-          <>
-            <Typography variant="body2">
-              Target: {selectedReport.targetType} {selectedReport.targetId}
-            </Typography>
-            <Typography variant="body2">Target Context: {targetLabel}</Typography>
-            <Typography variant="body2">Target Owner/User: {targetOwnerLabel}</Typography>
-            <Typography variant="body2">
-              Reporter: {selectedReport.reporter?.email || selectedReport.reporter?.username || "—"}
-            </Typography>
-            <Typography variant="body2">Reason: {formatStatusLabel(selectedReport.reason)}</Typography>
-            <Typography variant="body2">Status: {formatStatusLabel(selectedReport.status)}</Typography>
-            <Typography variant="body2">Description: {selectedReport.description || "—"}</Typography>
-            <Typography variant="body2">Resolution: {selectedReport.resolution || "—"}</Typography>
-            {targetDetails.length > 0 && (
-              <Box sx={{ mt: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Target Details
-                </Typography>
-                {targetDetails.map(([key, value]) => (
-                  <Typography key={key} variant="body2">
-                    {formatDetailLabel(key)}: {formatDetailValue(value)}
-                  </Typography>
-                ))}
-              </Box>
-            )}
-          </>
-        ) : (
-          <Typography variant="body2">Report detail unavailable.</Typography>
-        )}
-      </AppCard>
-    );
-  };
-
-  const renderDisputeDetail = () => {
-    if (!selectedDisputeId) {
-      return null;
-    }
-
-    const booking = selectedDispute?.booking;
-    const bookingWindow =
-      booking?.checkIn || booking?.checkOut
-        ? `${booking?.checkIn ? convertToFormattedDate(booking.checkIn) : "—"} to ${
-            booking?.checkOut ? convertToFormattedDate(booking.checkOut) : "—"
-          }`
-        : "—";
-
-    return (
-      <AppCard sx={{ mt: 2, p: 2 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-          Dispute Detail
-        </Typography>
-        {isFetchingDisputeDetail && !selectedDispute ? (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-            <CircularProgress />
-          </Box>
-        ) : selectedDispute ? (
-          <>
-            <Typography variant="body2">Booking: {selectedDispute.bookingId}</Typography>
-            <Typography variant="body2">Booking Status: {formatStatusLabel(booking?.status)}</Typography>
-            <Typography variant="body2">Stay: {bookingWindow}</Typography>
-            <Typography variant="body2">
-              Check-in: {booking?.checkIn ? convertToFormattedDate(booking.checkIn) : "—"}
-            </Typography>
-            <Typography variant="body2">
-              Check-out: {booking?.checkOut ? convertToFormattedDate(booking.checkOut) : "—"}
-            </Typography>
-            <Typography variant="body2">Room: {booking?.room?.name || "—"}</Typography>
-            <Typography variant="body2">
-              Accommodation: {booking?.room?.accommodation?.name || "—"}
-            </Typography>
-            <Typography variant="body2">
-              Guest: {booking?.guest?.email || booking?.guest?.username || "—"}
-            </Typography>
-            <Typography variant="body2">
-              Provider: {booking?.provider?.email || booking?.provider?.username || "—"}
-            </Typography>
-            <Typography variant="body2">
-              Raised By: {selectedDispute.raiser?.email || selectedDispute.raiser?.username || "—"}
-            </Typography>
-            <Typography variant="body2">Reason: {formatStatusLabel(selectedDispute.reason)}</Typography>
-            <Typography variant="body2">Status: {formatStatusLabel(selectedDispute.status)}</Typography>
-            <Typography variant="body2">Description: {selectedDispute.description || "—"}</Typography>
-            <Typography variant="body2">Resolution: {selectedDispute.resolution || "—"}</Typography>
-          </>
-        ) : (
-          <Typography variant="body2">Dispute detail unavailable.</Typography>
-        )}
-      </AppCard>
-    );
-  };
-
-  const renderReports = () => (
-    <>
-      <Heading sx={{ mb: "20px" }}>Reports</Heading>
-      <Paper sx={{ p: 2, mb: 2, border: "1px solid #e5e7eb", boxShadow: "none" }}>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-          <Box sx={{ minWidth: 180 }}>
-            <AppSelect
-              size="small"
-              value={reportFilters.status}
-              onChange={(event) =>
-                setReportFilters((previous) => ({
-                  ...previous,
-                  status: String(event.target.value),
-                  page: 1,
-                }))
-              }
-              options={[
-                { label: "All Statuses", value: "" },
-                { label: "Open", value: "OPEN" },
-                { label: "Under Review", value: "UNDER_REVIEW" },
-                { label: "Resolved", value: "RESOLVED" },
-                { label: "Dismissed", value: "DISMISSED" },
-              ]}
-            />
-          </Box>
-          <Box sx={{ minWidth: 180 }}>
-            <AppSelect
-              size="small"
-              value={reportFilters.targetType}
-              onChange={(event) =>
-                setReportFilters((previous) => ({
-                  ...previous,
-                  targetType: String(event.target.value),
-                  page: 1,
-                }))
-              }
-              options={[
-                { label: "All Targets", value: "" },
-                { label: "Listing", value: "Listing" },
-                { label: "Accommodation", value: "Accommodation" },
-                { label: "Review", value: "Review" },
-              ]}
-            />
-          </Box>
-          <Box sx={{ minWidth: 180 }}>
-            <AppSelect
-              size="small"
-              value={reportFilters.reason}
-              onChange={(event) =>
-                setReportFilters((previous) => ({
-                  ...previous,
-                  reason: String(event.target.value),
-                  page: 1,
-                }))
-              }
-              options={[
-                { label: "All Reasons", value: "" },
-                { label: "Spam", value: "spam" },
-                { label: "Inappropriate", value: "inappropriate" },
-                { label: "Fraud", value: "fraud" },
-                { label: "Other", value: "other" },
-              ]}
-            />
-          </Box>
-        </Box>
-      </Paper>
-
-      {isFetchingReports ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-          <CircularProgress />
-        </Box>
-      ) : reports.length === 0 ? (
-        renderEmptyState("No reports match the current filters.")
-      ) : (
-        <MUITable tableHead={["Reporter", "Target", "Reason", "Status", "Created", "Actions"]}>
-          {reports.map((report) => (
-            <TableRow
-              key={report._id}
-              hover
-              onClick={() => setSelectedReportId(report._id)}
-              sx={{ cursor: "pointer" }}
-            >
-              <TableCell>{report.reporter?.email || report.reporter?.username || "Reporter"}</TableCell>
-              <TableCell>
-                <Box>{report.targetType}</Box>
-                <Box sx={{ fontSize: "12px", color: "#6b7280" }}>{report.targetId}</Box>
-              </TableCell>
-              <TableCell>{formatStatusLabel(report.reason)}</TableCell>
-              <TableCell>{renderStatusChip(report.status)}</TableCell>
-              <TableCell>{report.createdAt ? convertToFormattedDate(report.createdAt) : "—"}</TableCell>
-              <TableCell onClick={(event) => event.stopPropagation()}>
-                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                  {report.status === "OPEN" && (
-                    <AppButton size="small" onClick={() => handleReportAction(report, "review")}>
-                      Review
-                    </AppButton>
-                  )}
-                  <AppButton size="small" onClick={() => handleReportAction(report, "resolve")}>
-                    Resolve
-                  </AppButton>
-                  <AppButton
-                    size="small"
-                    variant="outlined"
-                    color="error"
-                    onClick={() => handleReportAction(report, "dismiss")}
-                  >
-                    Dismiss
-                  </AppButton>
-                </Box>
-              </TableCell>
-            </TableRow>
-          ))}
-        </MUITable>
-      )}
-      {renderPaginationControls(
-        reportsData?.pagination,
-        reportFilters.page,
-        (page) => setReportFilters((previous) => ({ ...previous, page })),
-        isFetchingReports
-      )}
-
-      {renderReportDetail()}
-    </>
-  );
-
-  const renderDisputes = () => (
-    <>
-      <Heading sx={{ mb: "20px" }}>Disputes</Heading>
-      <Paper sx={{ p: 2, mb: 2, border: "1px solid #e5e7eb", boxShadow: "none" }}>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-          <Box sx={{ minWidth: 180 }}>
-            <AppSelect
-              size="small"
-              value={disputeFilters.status}
-              onChange={(event) =>
-                setDisputeFilters((previous) => ({
-                  ...previous,
-                  status: String(event.target.value),
-                  page: 1,
-                }))
-              }
-              options={[
-                { label: "All Statuses", value: "" },
-                { label: "Open", value: "OPEN" },
-                { label: "Under Review", value: "UNDER_REVIEW" },
-                { label: "Resolved", value: "RESOLVED" },
-                { label: "Closed", value: "CLOSED" },
-              ]}
-            />
-          </Box>
-          <Box sx={{ minWidth: 180 }}>
-            <AppSelect
-              size="small"
-              value={disputeFilters.raisedByRole}
-              onChange={(event) =>
-                setDisputeFilters((previous) => ({
-                  ...previous,
-                  raisedByRole: String(event.target.value),
-                  page: 1,
-                }))
-              }
-              options={[
-                { label: "All Roles", value: "" },
-                { label: "Guest", value: "guest" },
-                { label: "Provider", value: "provider" },
-              ]}
-            />
-          </Box>
-        </Box>
-      </Paper>
-
-      {isFetchingDisputes ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-          <CircularProgress />
-        </Box>
-      ) : disputes.length === 0 ? (
-        renderEmptyState("No disputes match the current filters.")
-      ) : (
-        <MUITable tableHead={["Booking", "Raised By", "Role", "Reason", "Status", "Created", "Actions"]}>
-          {disputes.map((dispute) => (
-            <TableRow
-              key={dispute._id}
-              hover
-              onClick={() => setSelectedDisputeId(dispute._id)}
-              sx={{ cursor: "pointer" }}
-            >
-              <TableCell>{dispute.booking?.room?.name || dispute.bookingId}</TableCell>
-              <TableCell>{dispute.raiser?.email || dispute.raiser?.username || "User"}</TableCell>
-              <TableCell>{formatStatusLabel(dispute.raisedByRole)}</TableCell>
-              <TableCell>{formatStatusLabel(dispute.reason)}</TableCell>
-              <TableCell>{renderStatusChip(dispute.status)}</TableCell>
-              <TableCell>{dispute.createdAt ? convertToFormattedDate(dispute.createdAt) : "—"}</TableCell>
-              <TableCell onClick={(event) => event.stopPropagation()}>
-                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                  {dispute.status?.toUpperCase() === "OPEN" && (
-                    <AppButton size="small" onClick={() => handleDisputeAction(dispute, "review")}>
-                      Mark Under Review
-                    </AppButton>
-                  )}
-                  <AppButton size="small" onClick={() => handleDisputeAction(dispute, "resolve")}>
-                    Resolve
-                  </AppButton>
-                  <AppButton
-                    size="small"
-                    variant="outlined"
-                    onClick={() => handleDisputeAction(dispute, "close")}
-                  >
-                    Close
-                  </AppButton>
-                </Box>
-              </TableCell>
-            </TableRow>
-          ))}
-        </MUITable>
-      )}
-      {renderPaginationControls(
-        disputesData?.pagination,
-        disputeFilters.page,
-        (page) => setDisputeFilters((previous) => ({ ...previous, page })),
-        isFetchingDisputes
-      )}
-
-      {renderDisputeDetail()}
-    </>
-  );
-
-  const renderAuditLog = () => (
-    <>
-      <Heading sx={{ mb: "20px" }}>Audit Log</Heading>
-      <Paper sx={{ p: 2, mb: 2, border: "1px solid #e5e7eb", boxShadow: "none" }}>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-          <Box sx={{ minWidth: 220 }}>
-            <AppInput
-              size="small"
-              placeholder="Action"
-              value={auditFilters.action}
-              onChange={(event) =>
-                setAuditFilters((previous) => ({
-                  ...previous,
-                  action: event.target.value,
-                  page: 1,
-                }))
-              }
-            />
-          </Box>
-          <Box sx={{ minWidth: 180 }}>
-            <AppSelect
-              size="small"
-              value={auditFilters.targetType}
-              onChange={(event) =>
-                setAuditFilters((previous) => ({
-                  ...previous,
-                  targetType: String(event.target.value),
-                  page: 1,
-                }))
-              }
-              options={[
-                { label: "All Targets", value: "" },
-                { label: "Accommodation", value: "Accommodation" },
-                { label: "User", value: "User" },
-                { label: "Review", value: "Review" },
-                { label: "Dispute", value: "Dispute" },
-                { label: "Report", value: "Report" },
-              ]}
-            />
-          </Box>
-          <Box sx={{ minWidth: 170 }}>
-            <AppInput
-              size="small"
-              type="date"
-              value={auditFilters.from}
-              onChange={(event) =>
-                setAuditFilters((previous) => ({ ...previous, from: event.target.value, page: 1 }))
-              }
-            />
-          </Box>
-          <Box sx={{ minWidth: 170 }}>
-            <AppInput
-              size="small"
-              type="date"
-              value={auditFilters.to}
-              onChange={(event) =>
-                setAuditFilters((previous) => ({ ...previous, to: event.target.value, page: 1 }))
-              }
-            />
-          </Box>
-          <Box sx={{ minWidth: 220 }}>
-            <AppInput
-              size="small"
-              placeholder="Admin email or ID"
-              value={auditFilters.adminSearch}
-              onChange={(event) =>
-                setAuditFilters((previous) => ({
-                  ...previous,
-                  adminSearch: event.target.value,
-                  page: 1,
-                }))
-              }
-            />
-          </Box>
-        </Box>
-      </Paper>
-
-      {isFetchingAuditLogs ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-          <CircularProgress />
-        </Box>
-      ) : auditLogs.length === 0 ? (
-        renderEmptyState("No audit log entries match the current filters.")
-      ) : (
-        <MUITable tableHead={["Timestamp", "Admin", "Action", "Target", "Target ID", "Notes"]}>
-          {auditLogs.map((entry: AdminAuditLog) => (
-            <TableRow key={entry._id}>
-              <TableCell>{entry.createdAt ? convertToFormattedDate(entry.createdAt) : "—"}</TableCell>
-              <TableCell>{entry.admin?.email || entry.admin?.username || "—"}</TableCell>
-              <TableCell>
-                <Box component="span" sx={{ fontFamily: "monospace", fontSize: "12px" }}>
-                  {entry.action}
-                </Box>
-              </TableCell>
-              <TableCell>{entry.targetType}</TableCell>
-              <TableCell>
-                <Box component="span" sx={{ fontFamily: "monospace", fontSize: "12px" }}>
-                  {entry.targetId}
-                </Box>
-              </TableCell>
-              <TableCell sx={{ maxWidth: 260 }}>
-                {entry.metadata
-                  ? String(
-                      (entry.metadata.reason as string | undefined) ||
-                        (entry.metadata.resolution as string | undefined) ||
-                        ""
-                    )
-                  : "—"}
-              </TableCell>
-            </TableRow>
-          ))}
-        </MUITable>
-      )}
-      {renderPaginationControls(
-        auditLogsData?.pagination,
-        auditFilters.page,
-        (page) => setAuditFilters((previous) => ({ ...previous, page })),
-        isFetchingAuditLogs
-      )}
-    </>
   );
 
   const renderExpiredListings = () => (
@@ -2154,16 +885,11 @@ const AdminDashboard: React.FC = () => {
                 </TableCell>
                 <TableCell>{provider.roomCount ?? 0}</TableCell>
                 <TableCell>
-                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                    <Chip
-                      label={formatStatusLabel(verificationStatus)}
-                      color={getStatusChipColor(verificationStatus)}
-                      size="small"
-                    />
-                    {provider.providerProfile?.suspendedAt && (
-                      <Chip label="Suspended" color="error" size="small" />
-                    )}
-                  </Box>
+                  <Chip
+                    label={formatStatusLabel(verificationStatus)}
+                    color={getStatusChipColor(verificationStatus)}
+                    size="small"
+                  />
                 </TableCell>
                 <TableCell sx={{ minWidth: 170 }}>
                   {isApproved ? (
@@ -2206,68 +932,46 @@ const AdminDashboard: React.FC = () => {
                   {provider.createdAt ? convertToFormattedDate(provider.createdAt) : "—"}
                 </TableCell>
                 <TableCell>
-                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                    {isPending && (
-                      <>
-                        <AppButton
-                          size="small"
-                          onClick={() =>
-                            setActionDialog({
-                              open: true,
-                              title: "Approve Provider",
-                              body: "Approve this provider? They will gain access to create rooms and accept bookings.",
-                              onConfirm: () =>
-                                handleVerifyProvider(provider._id, "approved"),
-                            })
-                          }
-                          disabled={isBusy}
-                        >
-                          Approve
-                        </AppButton>
-                        <AppButton
-                          size="small"
-                          variant="outlined"
-                          color="error"
-                          onClick={() =>
-                            setActionDialog({
-                              open: true,
-                              title: "Reject Provider",
-                              body: "Reject this provider? They will be notified.",
-                              onConfirm: () =>
-                                handleVerifyProvider(provider._id, "rejected"),
-                            })
-                          }
-                          disabled={isBusy}
-                        >
-                          Reject
-                        </AppButton>
-                      </>
-                    )}
-                    {provider.providerProfile?.suspendedAt ? (
+                  {isPending ? (
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                       <AppButton
                         size="small"
-                        onClick={() => handleProviderSuspension(provider, false)}
+                        onClick={() =>
+                          setActionDialog({
+                            open: true,
+                            title: "Approve Provider",
+                            body: "Approve this provider? They will gain access to create rooms and accept bookings.",
+                            onConfirm: () =>
+                              handleVerifyProvider(provider._id, "approved"),
+                          })
+                        }
                         disabled={isBusy}
                       >
-                        Reinstate
+                        Approve
                       </AppButton>
-                    ) : (
                       <AppButton
                         size="small"
                         variant="outlined"
                         color="error"
-                        onClick={() => handleProviderSuspension(provider, true)}
+                        onClick={() =>
+                          setActionDialog({
+                            open: true,
+                            title: "Reject Provider",
+                            body: "Reject this provider? They will be notified.",
+                            onConfirm: () =>
+                              handleVerifyProvider(provider._id, "rejected"),
+                          })
+                        }
                         disabled={isBusy}
                       >
-                        Suspend
+                        Reject
                       </AppButton>
-                    )}
-                    {!isPending && !isApproved && (
-                      <Typography variant="body2" sx={{ color: "#6b7280" }}>
-                        Review completed
-                      </Typography>
-                    )}
-                  </Box>
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" sx={{ color: "#6b7280" }}>
+                      {isApproved ? "Approved provider" : "Review completed"}
+                    </Typography>
+                  )}
                 </TableCell>
               </TableRow>
             );
@@ -2538,97 +1242,24 @@ const AdminDashboard: React.FC = () => {
     </>
   );
 
-  const sidebarItems: Array<{ value: AdminTab; label: string; badge?: number }> = [
-    {
-      value: "queue",
-      label: "Moderation Queue",
-      badge:
-        (queueData?.pendingAccommodations ?? 0) +
-        (queueData?.openReports ?? 0) +
-        (queueData?.openDisputes ?? 0) +
-        (queueData?.pendingReviews ?? 0),
-    },
-    {
-      value: "accommodations",
-      label: "Accommodations",
-      badge: queueData?.pendingAccommodations,
-    },
-    { value: "reviews", label: "Review Moderation", badge: queueData?.pendingReviews },
-    { value: "reports", label: "Reports", badge: queueData?.openReports },
-    { value: "disputes", label: "Disputes", badge: queueData?.openDisputes },
-    { value: "providers", label: "Providers" },
-    { value: "bookings", label: "Bookings" },
-    { value: "expired", label: "Expired Listings" },
-    { value: "audit", label: "Audit Log" },
-  ];
-
   return (
     <Box sx={{ mt: { xs: 5, md: 6 } }}>
       <AppContainer>
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "220px 1fr" },
-            gap: 3,
-            alignItems: "start",
-          }}
+        <Tabs
+          value={activeTab}
+          onChange={(_event, value: AdminTab) => setActiveTab(value)}
+          sx={{ mb: 3 }}
+          variant="scrollable"
+          allowScrollButtonsMobile
         >
-          <Paper
-            sx={{
-              p: 1,
-              border: "1px solid #e5e7eb",
-              boxShadow: "none",
-              position: { md: "sticky" },
-              top: { md: 80 },
-            }}
-          >
-            {sidebarItems.map((item) => {
-              const isActive = activeTab === item.value;
+          <Tab value="expired" label="Expired Listings" />
+          <Tab value="providers" label="Providers" />
+          <Tab value="bookings" label="Bookings & Settlements" />
+        </Tabs>
 
-              return (
-                <Box
-                  key={item.value}
-                  component="button"
-                  type="button"
-                  onClick={() => setActiveTab(item.value)}
-                  sx={{
-                    width: "100%",
-                    border: 0,
-                    borderRadius: "6px",
-                    background: isActive ? "#e8f0fe" : "transparent",
-                    color: isActive ? "#1a73e8" : "#374151",
-                    fontWeight: isActive ? 700 : 500,
-                    textAlign: "left",
-                    px: 1.5,
-                    py: 1.2,
-                    mb: 0.5,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Box component="span">{item.label}</Box>
-                  {item.badge ? (
-                    <Chip label={item.badge} color="error" size="small" />
-                  ) : null}
-                </Box>
-              );
-            })}
-          </Paper>
-
-          <Box>
-            {activeTab === "queue" && renderModerationQueue()}
-            {activeTab === "accommodations" && renderAccommodations()}
-            {activeTab === "reviews" && renderReviewModeration()}
-            {activeTab === "reports" && renderReports()}
-            {activeTab === "disputes" && renderDisputes()}
-            {activeTab === "providers" && renderProviders()}
-            {activeTab === "bookings" && renderBookings()}
-            {activeTab === "expired" && renderExpiredListings()}
-            {activeTab === "audit" && renderAuditLog()}
-          </Box>
-        </Box>
+        {activeTab === "expired" && renderExpiredListings()}
+        {activeTab === "providers" && renderProviders()}
+        {activeTab === "bookings" && renderBookings()}
       </AppContainer>
 
       <ToastAlert
@@ -2676,38 +1307,6 @@ const AdminDashboard: React.FC = () => {
                 body: "",
                 onConfirm: null,
               });
-            }}
-          >
-            Confirm
-          </AppButton>
-        </DialogActions>
-      </Dialog>
-      <Dialog open={textActionDialog.open} onClose={closeTextAction} fullWidth maxWidth="sm">
-        <DialogTitle>{textActionDialog.title}</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>{textActionDialog.body}</DialogContentText>
-          <AppInput
-            multiline
-            minRows={3}
-            label={textActionDialog.label}
-            value={textActionDialog.value}
-            onChange={(event) =>
-              setTextActionDialog((previous) => ({
-                ...previous,
-                value: event.target.value,
-              }))
-            }
-          />
-        </DialogContent>
-        <DialogActions>
-          <AppButton variant="outlined" onClick={closeTextAction}>
-            Cancel
-          </AppButton>
-          <AppButton
-            disabled={!textActionDialog.value.trim()}
-            onClick={() => {
-              textActionDialog.onConfirm?.(textActionDialog.value.trim());
-              closeTextAction();
             }}
           >
             Confirm

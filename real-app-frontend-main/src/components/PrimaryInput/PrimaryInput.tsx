@@ -95,6 +95,12 @@ const PrimaryInput: React.FC<PrimaryInputProps> = ({
           "& .MuiOutlinedInput-input": {
             cursor: readOnly ? "not-allowed" : "",
           },
+          "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+            borderColor: "#B8975A",
+          },
+          "& .MuiInputLabel-root.Mui-focused": {
+            color: "#B8975A",
+          },
         },
         sx,
       ]}
@@ -114,7 +120,8 @@ const PrimaryInput: React.FC<PrimaryInputProps> = ({
       InputProps={{
         sx: {
           borderRadius: borderRadius ? borderRadius : "12px",
-          background: "#fff",
+          background: "var(--surface-card)",
+          color: "var(--text-primary)",
           minHeight: multiline ? "auto" : "48px",
           border: "none",
         },

@@ -1,16 +1,16 @@
 import React, { Suspense, useMemo, useState } from "react";
 import {
   Box,
-  Button,
   Chip,
   Grid,
-  Paper,
   Tab,
   Tabs,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import AppContainer from "../../../components/ui/AppContainer";
+import AppButton from "../../../components/ui/AppButton";
+import AppCard from "../../../components/ui/AppCard";
 import {
   toEntityArray,
   toEntityObject,
@@ -61,17 +61,25 @@ const ProviderDashboardShell = () => {
   return (
     <Box sx={{ mt: { xs: 5, md: 6 }, mb: 6 }}>
       <AppContainer>
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
+        <AppCard elevation="raised" sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: { xs: "flex-start", md: "center" }, flexDirection: { xs: "column", md: "row" }, gap: 2 }}>
             <Box>
-              <Typography variant="h4" fontWeight={800}>{businessName}</Typography>
-              <Chip size="small" label={String(accommodation?.verificationStatus || profile?.providerProfile?.verificationStatus || "PENDING").replace(/_/g, " ")} color={String(accommodation?.verificationStatus || "").toUpperCase() === "APPROVED" ? "success" : "warning"} sx={{ mt: 1 }} />
+              <Typography variant="h4" fontWeight={800} color="text.primary">{businessName}</Typography>
+              <Chip
+                size="small"
+                label={String(accommodation?.verificationStatus || profile?.providerProfile?.verificationStatus || "PENDING").replace(/_/g, " ")}
+                sx={
+                  String(accommodation?.verificationStatus || "").toUpperCase() === "APPROVED"
+                    ? { mt: 1, background: "#D1EAE0", color: "#1F4D3A", fontWeight: 700 }
+                    : { mt: 1, background: "#FDF8F0", color: "#9E7E45", fontWeight: 700 }
+                }
+              />
             </Box>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setWizardOpen(true)}>
+            <AppButton startIcon={<AddIcon />} onClick={() => setWizardOpen(true)}>
               Create Listing
-            </Button>
+            </AppButton>
           </Box>
-        </Paper>
+        </AppCard>
 
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid item xs={12} md={3}><StatCard label="Total Rooms" value={rooms.length} /></Grid>
@@ -80,11 +88,26 @@ const ProviderDashboardShell = () => {
           <Grid item xs={12} md={3}><StatCard label="Occupancy (30d)" value={occupancyRate != null ? `${Number(occupancyRate).toFixed(1)}%` : "-"} /></Grid>
         </Grid>
 
-        <Paper variant="outlined" sx={{ mb: 3 }}>
-          <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value)} variant="scrollable" scrollButtons="auto">
+        <AppCard elevation="flat" sx={{ mb: 3, p: 0.5 }}>
+          <Tabs
+            value={activeTab}
+            onChange={(_, value) => setActiveTab(value)}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+              "& .MuiTabs-indicator": { backgroundColor: "#B8975A" },
+              "& .MuiTab-root": {
+                color: "#64748B",
+                borderRadius: "10px",
+                minHeight: 44,
+                "&:hover": { background: "#F7EDDA" },
+                "&.Mui-selected": { color: "text.primary" },
+              },
+            }}
+          >
             {tabs.map((tab) => <Tab key={tab} label={tab} />)}
           </Tabs>
-        </Paper>
+        </AppCard>
 
         <Suspense fallback={<Typography>Loading tab...</Typography>}>
           {activeTab === 0 ? (

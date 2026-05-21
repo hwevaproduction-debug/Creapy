@@ -9,7 +9,7 @@ const About = () => {
   return (
     <Box sx={{ margin: "65px 0 0 0" }}>
       <AppContainer>
-        <Heading>About RealEstate</Heading>
+        <Heading>About Town Ruins</Heading>
         <AppCard sx={{ marginTop: "20px", p: { xs: 2, md: 3 } }}>
         <Box sx={{ color: "#334155", fontSize: "16px", lineHeight: 1.7 }}>
   This platform is an agent-free rental housing marketplace built to connect

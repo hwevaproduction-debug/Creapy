@@ -96,14 +96,17 @@ const Home = () => {
   };
 
   const filterButtonSx = {
-    background: "#f1f5f9",
-    color: "#334155",
+    background: "#F7EDDA",
+    color: "#7D6234",
     borderRadius: "999px",
     padding: "6px 14px",
     fontSize: "13px",
     cursor: "pointer",
-    border: "none",
+    border: "1px solid #EDD9B0",
     fontWeight: 600,
+    "&:hover": {
+      background: "#EDD9B0",
+    },
   };
 
   const handleHeroSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -128,11 +131,12 @@ const Home = () => {
         <AppContainer>
           <Box
             sx={{
-              background: "#fff",
-              border: "1px solid #e2e8f0",
+              background: "background.paper",
+              border: "1px solid",
+              borderColor: "divider",
               borderRadius: "10px",
               padding: "12px 14px",
-              color: "#334155",
+              color: "text.secondary",
               fontSize: "14px",
             }}
           >
@@ -142,7 +146,13 @@ const Home = () => {
         </AppContainer>
       )}
       <AppContainer sx={{ marginTop: { xs: 2, md: 3 } }}>
-        <AppCard sx={{ p: { xs: 2, md: 3 } }}>
+        <AppCard
+          sx={{
+            p: { xs: 2.5, md: "28px 32px" },
+            borderRadius: "20px",
+            boxShadow: "0 8px 32px rgba(31,41,55,0.10)",
+          }}
+        >
           <Box component="form" onSubmit={handleHeroSubmit}>
             <Box
               sx={{
@@ -156,10 +166,24 @@ const Home = () => {
                 placeholder="Search by location, address, or keyword"
                 value={heroSearch}
                 onChange={(e) => setHeroSearch(e.target.value)}
+                sx={{
+                  "& .MuiInputBase-root": {
+                    height: 52,
+                    borderRadius: "12px",
+                  },
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    border: "1.5px solid #E2E8F0",
+                  },
+                }}
               />
               <AppButton
                 type="submit"
-                sx={{ flexShrink: 0, width: { xs: "100%", sm: "auto" } }}
+                sx={{
+                  flexShrink: 0,
+                  width: { xs: "100%", sm: "auto" },
+                  borderRadius: "12px",
+                  minHeight: 52,
+                }}
               >
                 Search Properties
               </AppButton>
@@ -173,7 +197,7 @@ const Home = () => {
                 }
                 sx={filterButtonSx}
               >
-                📍 Location ▾
+                Location
               </Box>
               <Menu
                 anchorEl={locationAnchor}
@@ -200,7 +224,7 @@ const Home = () => {
                 }
                 sx={filterButtonSx}
               >
-                🏠 Rooms ▾
+                Rooms
               </Box>
               <Menu
                 anchorEl={roomsAnchor}
@@ -227,7 +251,7 @@ const Home = () => {
                 }
                 sx={filterButtonSx}
               >
-                💰 Price ▾
+                Price
               </Box>
               <Menu
                 anchorEl={priceAnchor}
@@ -275,7 +299,7 @@ const Home = () => {
                 }
                 sx={filterButtonSx}
               >
-                ✨ Amenities ▾
+                Amenities
               </Box>
               <Menu
                 anchorEl={amenitiesAnchor}
@@ -313,7 +337,7 @@ const Home = () => {
                   fontWeight: 500,
                 }}
               >
-                More Options →
+                More Options -&gt;
               </Box>
             </Box>
           </Box>
@@ -325,7 +349,12 @@ const Home = () => {
       </AppContainer>
 
       {!highlightedLoading && highlightedHeroListings.length > 0 ? (
-        <AppContainer sx={{ my: { xs: 3, md: 4 } }}>
+        <AppContainer
+          sx={{
+            my: { xs: 3, md: 4 },
+            "& .swiper-pagination-bullet-active": { background: "#B8975A" },
+          }}
+        >
           <Swiper
             modules={[Autoplay, Pagination]}
             slidesPerView={1}
@@ -341,7 +370,7 @@ const Home = () => {
                     height: { xs: 280, md: 420 },
                     cursor: "pointer",
                     overflow: "hidden",
-                    borderRadius: "14px",
+                    borderRadius: "16px",
                     background: "#e2e8f0",
                   }}
                 >
@@ -361,7 +390,7 @@ const Home = () => {
                       left: 0,
                       right: 0,
                       background:
-                        "linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)",
+                        "linear-gradient(to top, rgba(31,41,55,0.75) 0%, transparent 60%)",
                       height: "50%",
                     }}
                   />
@@ -372,7 +401,8 @@ const Home = () => {
                       left: 16,
                       color: "#fff",
                       fontWeight: 700,
-                      fontSize: "18px",
+                      fontSize: "20px",
+                      textShadow: "0 1px 4px rgba(0,0,0,0.4)",
                       zIndex: 1,
                     }}
                   >
@@ -381,8 +411,8 @@ const Home = () => {
                   {item?.status === "early_access" ? (
                     <Box
                       sx={{
-                        background: "#dbeafe",
-                        color: "#1e40af",
+                        background: "#FDF8F0",
+                        color: "#9E7E45",
                         fontSize: "11px",
                         fontWeight: 700,
                         borderRadius: "999px",
@@ -395,7 +425,7 @@ const Home = () => {
                         pointerEvents: "none",
                       }}
                     >
-                      ⚡ Early Access
+                      Early Access
                     </Box>
                   ) : null}
                   {item?.studentAccommodation ? (
@@ -405,7 +435,7 @@ const Home = () => {
                         top: item?.status === "early_access" ? 36 : 8,
                       }}
                     >
-                      🎓 Student Accommodation
+                      Student Accommodation
                     </Box>
                   ) : null}
                 </Box>
@@ -415,7 +445,11 @@ const Home = () => {
         </AppContainer>
       ) : null}
 
-      <AppContainer>
+      <AppContainer
+        sx={{
+          "& .swiper-pagination-bullet-active": { background: "#B8975A" },
+        }}
+      >
         <Box
           sx={{
             my: { xs: 6, md: 8 },
@@ -442,7 +476,7 @@ const Home = () => {
                 <SwiperSlide key={group?.location} style={Banner}>
                   <AppCard sx={{ width: "100%" }}>
                     <Box sx={{ p: { xs: 2, md: 2.5 } }}>
-                      <Heading sx={{ color: "#475569", marginBottom: 1 }}>
+                      <Heading sx={{ color: "text.primary", fontWeight: 700, marginBottom: 1 }}>
                         {group?.location}
                       </Heading>
                       <Grid container spacing={2}>
@@ -461,6 +495,10 @@ const Home = () => {
                                   position: "relative",
                                   borderRadius: "12px",
                                   background: "#e2e8f0",
+                                  transition: "transform 0.2s ease",
+                                  "&:hover": {
+                                    transform: "scale(1.03)",
+                                  },
                                 }}
                               >
                                 {getListingImage(item) ? (
@@ -475,8 +513,8 @@ const Home = () => {
                                 {item?.status === "early_access" ? (
                                   <Box
                                     sx={{
-                                      background: "#dbeafe",
-                                      color: "#1e40af",
+                                      background: "#FDF8F0",
+                                      color: "#9E7E45",
                                       fontSize: "11px",
                                       fontWeight: 700,
                                       borderRadius: "999px",
@@ -489,7 +527,7 @@ const Home = () => {
                                       pointerEvents: "none",
                                     }}
                                   >
-                                    ⚡ Early Access
+                                    Early Access
                                   </Box>
                                 ) : null}
                                 {item?.studentAccommodation ? (
@@ -499,7 +537,7 @@ const Home = () => {
                                       top: item?.status === "early_access" ? 36 : 8,
                                     }}
                                   >
-                                    🎓 Student Accommodation
+                                    Student Accommodation
                                   </Box>
                                 ) : null}
                               </Box>
@@ -507,7 +545,7 @@ const Home = () => {
                                 sx={{
                                   fontWeight: 600,
                                   fontSize: "14px",
-                                  color: "#1f2937",
+                                  color: "text.primary",
                                   marginTop: 1,
                                 }}
                               >
@@ -527,10 +565,11 @@ const Home = () => {
               <Box
                 sx={{
                   p: { xs: 2, md: 2.5 },
-                  background: "#fff",
-                  border: "1px solid #e2e8f0",
+                  background: "background.paper",
+                  border: "1px solid",
+                  borderColor: "divider",
                   borderRadius: "10px",
-                  color: "#334155",
+                  color: "text.secondary",
                   fontSize: "14px",
                 }}
               >

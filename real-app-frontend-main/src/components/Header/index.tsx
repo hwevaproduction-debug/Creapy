@@ -1,6 +1,6 @@
 // React Imports
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useContext, useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 // Material UI Imports
 import {
@@ -17,6 +17,7 @@ import {
   ListItemButton,
   ListItemText,
   Divider,
+  useTheme,
 } from "@mui/material";
 // Component Imports
 import { Heading } from "../Heading";
@@ -24,6 +25,7 @@ import SearchBar from "../SearchBar";
 import AppButton from "../ui/AppButton";
 import AppContainer from "../ui/AppContainer";
 import NotificationBell from "./NotificationBell";
+import { ColorModeContext } from "../../App";
 // Hooks Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
@@ -39,6 +41,8 @@ import { ImProfile } from "react-icons/im";
 import { IoLogOutOutline } from "react-icons/io5";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
+import WbSunny from "@mui/icons-material/WbSunny";
+import DarkMode from "@mui/icons-material/DarkMode";
 import {
   selectedSearchText,
   setSearchText,
@@ -46,10 +50,50 @@ import {
 
 const menuStyle = {
   cursor: "pointer",
+  color: "text.secondary",
+  position: "relative",
+  py: 0.5,
+  whiteSpace: "nowrap",
+  transition: "color 0.2s cubic-bezier(0.4,0,0.2,1)",
+  "&::after": {
+    content: '""',
+    position: "absolute",
+    left: 0,
+    bottom: 0,
+    width: 0,
+    height: "2px",
+    background: "#B8975A",
+    transition: "width 0.2s cubic-bezier(0.4,0,0.2,1)",
+  },
   "&:hover": {
-    textDecoration: "underline",
+    color: "text.primary",
+  },
+  "&:hover::after": {
+    width: "100%",
   },
 };
+
+const getActiveMenuStyle = (active: boolean) => ({
+  ...menuStyle,
+  ...(active
+    ? {
+        color: "text.primary",
+        "&::after": {
+          width: "100%",
+        },
+      }
+    : {}),
+});
+
+const getMobileItemSx = (active: boolean) =>
+  active
+    ? {
+        borderLeft: "4px solid #B8975A",
+        color: "#B8975A",
+        background: "rgba(184,151,90,0.08)",
+        pl: 1.5,
+      }
+    : undefined;
 
 const getInitials = (name?: string) => {
   if (!name) {
@@ -77,15 +121,15 @@ const StyledMenu = styled((props: MenuProps) => (
     }}
     {...props}
   />
-))(() => ({
+))(({ theme }) => ({
   "& .MuiPaper-root": {
-    borderRadius: 12,
+    borderRadius: 16,
     width: "100%",
     maxWidth: 260,
-    background: "#fff",
-    color: "#334155",
-    boxShadow:
-      "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(0, 0, 0, 0.05) 0px 0px 0px 1px, rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.05) 0px 4px 6px -2px",
+    background: theme.palette.background.paper,
+    color: theme.palette.text.primary,
+    border: `1px solid ${theme.palette.divider}`,
+    boxShadow: "0 12px 40px rgba(31,41,55,0.14)",
     "& .MuiMenu-list": {
       padding: "10px 5px",
     },
@@ -100,6 +144,9 @@ const StyledMenu = styled((props: MenuProps) => (
 const Header = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const theme = useTheme();
+  const colorMode = useContext(ColorModeContext);
   const token = useTypedSelector(selectedUserToken);
   const avatar = useTypedSelector(selectedUserAvatar);
   const userName = useTypedSelector(selectedUserName);
@@ -110,6 +157,10 @@ const Header = () => {
   const [anchorEl, setAnchorEl] = useState<Element | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isActive = (path: string) =>
+    path === "/"
+      ? location.pathname === "/"
+      : location.pathname === path || location.pathname.startsWith(`${path}/`);
 
   const handleSearch = (event: any) => {
     let value = event.target.value.toLowerCase();
@@ -142,9 +193,12 @@ const Header = () => {
           position: "sticky",
           top: 0,
           zIndex: 1100,
-          background: "rgba(243, 246, 241, 0.9)",
-          backdropFilter: "blur(8px)",
-          borderBottom: "1px solid rgba(226, 232, 240, 0.7)",
+          background:
+            theme.palette.mode === "dark"
+              ? "rgba(13,17,23,0.92)"
+              : "rgba(245, 240, 235, 0.92)",
+          backdropFilter: "blur(12px)",
+          borderBottom: "1px solid rgba(184, 151, 90, 0.18)",
         }}
       >
         <AppContainer>
@@ -169,10 +223,16 @@ const Header = () => {
             >
               <Box
                 onClick={() => navigate("/")}
-                sx={{ display: "flex", cursor: "pointer", alignItems: "center" }}
+                sx={{
+                  display: "flex",
+                  cursor: "pointer",
+                  alignItems: "center",
+                  transition: "transform 0.2s ease",
+                  "&:hover": { transform: "scale(1.02)" },
+                }}
               >
-                <Heading sx={{ color: "#2B6A50" }}>Real</Heading>
-                <Heading sx={{ color: "#1F2937" }}>Estate</Heading>
+                <Heading sx={{ color: "text.primary" }}>Town</Heading>
+                <Heading sx={{ color: "#B8975A" }}>&nbsp;Ruins</Heading>
               </Box>
               <IconButton
                 sx={{
@@ -207,21 +267,21 @@ const Header = () => {
                   display: "flex",
                 },
                 alignItems: "center",
-                gap: { xs: 1.5, md: 2 },
+                gap: { xs: 1.5, md: 3 },
                 flexWrap: "wrap",
                 justifyContent: { xs: "center", md: "flex-end" },
               }}
             >
-              <Box sx={menuStyle} onClick={() => navigate("/")}>
+              <Box sx={getActiveMenuStyle(isActive("/"))} onClick={() => navigate("/")}>
                 Home
               </Box>
-              <Box sx={menuStyle} onClick={() => navigate("/about")}>
+              <Box sx={getActiveMenuStyle(isActive("/about"))} onClick={() => navigate("/about")}>
                 About
               </Box>
-              <Box sx={menuStyle} onClick={() => navigate("/search")}>
+              <Box sx={getActiveMenuStyle(isActive("/search"))} onClick={() => navigate("/search")}>
                 Properties
               </Box>
-              <Box sx={menuStyle} onClick={() => navigate("/stays")}>
+              <Box sx={getActiveMenuStyle(isActive("/stays"))} onClick={() => navigate("/stays")}>
                 Temporary Stays
               </Box>
               <AppButton
@@ -230,11 +290,28 @@ const Header = () => {
               >
                 List Your Stay
               </AppButton>
+              <Tooltip title={theme.palette.mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+                <IconButton
+                  onClick={colorMode.toggleColorMode}
+                  aria-label="toggle color mode"
+                  sx={{ color: "text.secondary" }}
+                >
+                  {theme.palette.mode === "dark" ? (
+                    <WbSunny fontSize="small" />
+                  ) : (
+                    <DarkMode fontSize="small" />
+                  )}
+                </IconButton>
+              </Tooltip>
 
               {isAuthenticated ? (
                 <>
                   <Box
-                    sx={menuStyle}
+                    sx={getActiveMenuStyle(
+                      isActive("/dashboard/landlord") ||
+                        isActive("/dashboard/tenant") ||
+                        isActive("/dashboard/admin")
+                    )}
                     onClick={() => {
                       if (userRole === "landlord") {
                         navigate("/dashboard/landlord");
@@ -263,7 +340,11 @@ const Header = () => {
                       onClick={(e) => setAnchorEl(e.currentTarget)}
                       color="inherit"
                     >
-                      <Avatar alt={userName || "User Avatar"} src={avatar || undefined}>
+                      <Avatar
+                        alt={userName || "User Avatar"}
+                        src={avatar || undefined}
+                        sx={{ bgcolor: "#B8975A", color: "#FFFFFF" }}
+                      >
                         {getInitials(userName)}
                       </Avatar>
                     </IconButton>
@@ -283,7 +364,11 @@ const Header = () => {
                         <Box
                           sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
-                          <Avatar alt={userName || "User Avatar"} src={avatar || undefined}>
+                          <Avatar
+                            alt={userName || "User Avatar"}
+                            src={avatar || undefined}
+                            sx={{ bgcolor: "#B8975A", color: "#FFFFFF" }}
+                          >
                             {getInitials(userName)}
                           </Avatar>
                           <Box>{userName}</Box>
@@ -309,7 +394,7 @@ const Header = () => {
                           <Tooltip title="See Profile" placement="bottom">
                             <Box
                               sx={{
-                                background: "#eff1f7",
+                                background: "rgba(31,77,58,0.08)",
                                 borderTopLeftRadius: "12px",
                                 borderBottomLeftRadius: "12px",
                                 width: "100%",
@@ -317,6 +402,9 @@ const Header = () => {
                                 display: "flex",
                                 alignItems: "center",
                                 gap: 1,
+                                "&:hover": {
+                                  background: "rgba(31,77,58,0.14)",
+                                },
                               }}
                               onClick={() => {
                                 navigate("/profile");
@@ -329,7 +417,7 @@ const Header = () => {
                           <Tooltip title="Logout Profile" placement="bottom">
                             <Box
                               sx={{
-                                background: "#eff1f7",
+                                background: "rgba(31,77,58,0.08)",
                                 borderTopRightRadius: "12px",
                                 borderBottomRightRadius: "12px",
                                 width: "100%",
@@ -337,6 +425,9 @@ const Header = () => {
                                 display: "flex",
                                 alignItems: "center",
                                 gap: 1,
+                                "&:hover": {
+                                  background: "rgba(31,77,58,0.14)",
+                                },
                               }}
                               onClick={() => {
                                 dispatch(setUser(null));
@@ -355,7 +446,7 @@ const Header = () => {
                 </>
               ) : (
                 <>
-                  <Box sx={menuStyle} onClick={() => navigate("/login")}>
+                  <Box sx={getActiveMenuStyle(isActive("/login"))} onClick={() => navigate("/login")}>
                     Log in
                   </Box>
                   <AppButton onClick={() => navigate("/signup")}>Sign up</AppButton>
@@ -369,10 +460,27 @@ const Header = () => {
         anchor="right"
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
-        PaperProps={{ sx: { width: 260, pt: 2, px: 2 } }}
+        PaperProps={{
+          sx: {
+            width: 280,
+            pt: 2,
+            px: 2,
+            background: theme.palette.mode === "dark" ? "#161B22" : "#F5F0EB",
+          },
+        }}
       >
         <List>
+          <Box sx={{ padding: "16px 16px 8px", fontSize: "22px", fontWeight: 800 }}>
+            <Box component="span" sx={{ color: "text.primary" }}>
+              Town
+            </Box>
+            <Box component="span" sx={{ color: "#B8975A" }}>
+              {" "}
+              Ruins
+            </Box>
+          </Box>
           <ListItemButton
+            sx={getMobileItemSx(isActive("/"))}
             onClick={() => {
               navigate("/");
               setMobileOpen(false);
@@ -381,6 +489,16 @@ const Header = () => {
             <ListItemText primary="Home" />
           </ListItemButton>
           <ListItemButton
+            sx={getMobileItemSx(isActive("/about"))}
+            onClick={() => {
+              navigate("/about");
+              setMobileOpen(false);
+            }}
+          >
+            <ListItemText primary="About" />
+          </ListItemButton>
+          <ListItemButton
+            sx={getMobileItemSx(isActive("/search"))}
             onClick={() => {
               navigate("/search");
               setMobileOpen(false);
@@ -389,6 +507,7 @@ const Header = () => {
             <ListItemText primary="Search / Properties" />
           </ListItemButton>
           <ListItemButton
+            sx={getMobileItemSx(isActive("/stays"))}
             onClick={() => {
               navigate("/stays");
               setMobileOpen(false);
@@ -397,12 +516,18 @@ const Header = () => {
             <ListItemText primary="Temporary Stays" />
           </ListItemButton>
           <ListItemButton
+            sx={getMobileItemSx(isActive("/provider-signup"))}
             onClick={() => {
               navigate("/provider-signup");
               setMobileOpen(false);
             }}
           >
             <ListItemText primary="List Your Stay" />
+          </ListItemButton>
+          <ListItemButton onClick={colorMode.toggleColorMode}>
+            <ListItemText
+              primary={theme.palette.mode === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            />
           </ListItemButton>
 
           {isAuthenticated ? (
@@ -418,6 +543,11 @@ const Header = () => {
                 <NotificationBell />
               </Box>
               <ListItemButton
+                sx={getMobileItemSx(
+                  isActive("/dashboard/landlord") ||
+                    isActive("/dashboard/tenant") ||
+                    isActive("/dashboard/admin")
+                )}
                 onClick={() => {
                   if (userRole === "landlord") {
                     navigate("/dashboard/landlord");
@@ -434,6 +564,7 @@ const Header = () => {
                 <ListItemText primary="Dashboard" />
               </ListItemButton>
               <ListItemButton
+                sx={getMobileItemSx(isActive("/profile"))}
                 onClick={() => {
                   navigate("/profile");
                   setMobileOpen(false);
@@ -443,6 +574,7 @@ const Header = () => {
               </ListItemButton>
               <Divider sx={{ my: 1 }} />
               <ListItemButton
+                sx={getMobileItemSx(isActive("/login"))}
                 onClick={() => {
                   dispatch(setUser(null));
                   localStorage.removeItem("user");

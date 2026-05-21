@@ -15,9 +15,9 @@ interface BookingCalendarProps {
 }
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-const SELECTED_COLOR = "#0f766e";
-const IN_RANGE_COLOR = "#ccfbf1";
-const UNAVAILABLE_COLOR = "#f1f5f9";
+const SELECTED_COLOR = "#B8975A";
+const IN_RANGE_COLOR = "#F7EDDA";
+const UNAVAILABLE_COLOR = "#F1F3F5";
 const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 const toLocalIsoDate = (date: Date) => {
@@ -113,13 +113,13 @@ const getCellStyles = ({
     font: "inherit",
     cursor: isPast || muted ? "not-allowed" : "pointer",
     opacity: isPast ? 0.35 : 1,
-    background: isSelected ? SELECTED_COLOR : isInRange ? IN_RANGE_COLOR : muted ? UNAVAILABLE_COLOR : "#fff",
-    color: isSelected ? "#fff" : isInRange ? SELECTED_COLOR : "#0f172a",
+    background: isSelected ? SELECTED_COLOR : isInRange ? IN_RANGE_COLOR : muted ? UNAVAILABLE_COLOR : "var(--surface-card)",
+    color: isSelected ? "#fff" : isInRange ? "#7D6234" : "var(--text-primary)",
     textDecoration: isUnavailable ? "line-through" : "none",
     transition: "background 120ms ease, border-color 120ms ease",
     "&:hover": {
-      background: isPast || muted || isSelected ? undefined : "#ecfdf5",
-      borderColor: isPast || muted || isSelected ? "transparent" : "#99f6e4",
+      background: isPast || muted || isSelected ? undefined : "#FDF8F0",
+      borderColor: isPast || muted || isSelected ? "transparent" : "#EDD9B0",
     },
   };
 };
@@ -228,7 +228,7 @@ const BookingCalendar = ({
   };
 
   return (
-    <Box sx={{ border: "1px solid #e2e8f0", borderRadius: "8px", p: 2, background: "#fff" }}>
+    <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: "12px", p: 2, background: "background.paper" }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
         <IconButton
           aria-label="Previous month"
@@ -239,7 +239,7 @@ const BookingCalendar = ({
         >
           <FaChevronLeft size={14} />
         </IconButton>
-        <Box sx={{ fontWeight: 700, color: "#0f172a" }}>{monthTitle}</Box>
+        <Box sx={{ fontWeight: 700, color: "text.primary" }}>{monthTitle}</Box>
         <IconButton
           aria-label="Next month"
           size="small"

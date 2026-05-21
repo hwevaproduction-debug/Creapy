@@ -14,19 +14,12 @@ const webhookRouter = require("./routes/webhookRoutes");
 const roomRouter = require("./routes/roomRoutes");
 const providerRouter = require("./routes/providerRoutes");
 const stayRouter = require("./routes/stayRoutes");
-const pricingRouter = require("./routes/pricingRoutes");
-const promotionRouter = require("./routes/promotionRoutes");
-const accommodationRouter = require("./routes/accommodationRoutes");
-const reviewRouter = require("./routes/reviewRoutes");
-const disputeRouter = require("./routes/disputeRoutes");
-const reportRouter = require("./routes/reportRoutes");
 const { globalLimiter } = require("./middleware/rateLimiter");
 
 const listingRoutes = require("./routes/listingRoutes");
 const listingDraftRoutes = require("./routes/listingDraftRoutes");
 const adminRouter = require("./routes/adminRoutes");
 const bookingRouter = require("./routes/bookingRoutes");
-const notificationRouter = require("./routes/notificationRoutes");
 
 const normalizeOrigin = (value = "") => value.trim().replace(/\/$/, "");
 const configuredOrigins = [
@@ -107,10 +100,6 @@ app.use("/api/v1/saved-searches", savedSearchRouter);
 app.use("/api/v1/payments", paymentRouter);
 app.use("/api/v1/uploads", uploadRouter);
 app.use("/api/v1/rooms", roomRouter);
-app.use("/api/v1/accommodations", accommodationRouter);
-app.use("/api/v1/reviews", reviewRouter);
-app.use("/api/v1/disputes", disputeRouter);
-app.use("/api/v1/reports", reportRouter);
 app.use("/api/v1/providers", providerRouter);
 // Listings routes
 // Primary (matches client + SRS)
@@ -120,11 +109,7 @@ app.use("/api/listings", listingRoutes);
 app.use("/api/v1/listing-drafts", listingDraftRoutes);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/bookings", bookingRouter);
-app.use("/api/v1/notifications", notificationRouter);
-app.use("/api/notifications", notificationRouter);
 app.use("/api/v1/stays", stayRouter);
-app.use("/api/v1/pricing", pricingRouter);
-app.use("/api/v1/promotions", promotionRouter);
 
 // PRODUCTION SETUP
 app.get("/", (req, res) => {

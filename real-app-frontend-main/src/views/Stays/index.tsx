@@ -47,6 +47,26 @@ const SORT_OPTIONS = [
   { label: "Distance", value: "distance" },
 ];
 
+const heroInputSx = {
+  "& .MuiInputBase-root": {
+    background: "rgba(255,255,255,0.10)",
+    color: "#FFFFFF",
+  },
+  "& .MuiOutlinedInput-notchedOutline": {
+    borderColor: "rgba(184,151,90,0.35)",
+  },
+  "& .MuiInputBase-input::placeholder": {
+    color: "rgba(255,255,255,0.55)",
+    opacity: 1,
+  },
+  "& .MuiInputLabel-root": {
+    color: "rgba(255,255,255,0.72)",
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+    color: "#E0C285",
+  },
+};
+
 const cloneFilters = (filters: StayFilterState): StayFilterState => ({
   ...filters,
   amenities: [...filters.amenities],
@@ -153,15 +173,15 @@ const Stays = () => {
   };
 
   return (
-    <Box sx={{ py: { xs: 4, md: 6 }, background: "#f8fafc", minHeight: "calc(100vh - 72px)" }}>
+    <Box sx={{ py: { xs: 4, md: 6 }, background: "background.default", minHeight: "calc(100vh - 72px)" }}>
       <AppContainer>
         <Stack spacing={3}>
           <AppCard
             sx={{
               p: { xs: 2.5, md: 4 },
-              borderRadius: "8px",
+              borderRadius: "20px",
               background:
-                "linear-gradient(135deg, rgba(15,23,42,1) 0%, rgba(30,41,59,0.96) 45%, rgba(15,118,110,0.88) 100%)",
+                "linear-gradient(135deg, #1F2937 0%, #2D3748 55%, #1F4D3A 100%)",
               color: "#fff",
             }}
           >
@@ -182,7 +202,7 @@ const Stays = () => {
                       onChange={(event) => updateField("location", event.target.value)}
                       placeholder="Harare"
                       InputLabelProps={{ shrink: true }}
-                      sx={{ "& .MuiInputBase-root": { background: "#fff" } }}
+                      sx={heroInputSx}
                     />
                   </Grid>
                   <Grid item xs={12} md={2}>
@@ -192,7 +212,7 @@ const Stays = () => {
                       value={filters.checkIn}
                       onChange={(event) => updateField("checkIn", event.target.value)}
                       InputLabelProps={{ shrink: true }}
-                      sx={{ "& .MuiInputBase-root": { background: "#fff" } }}
+                      sx={heroInputSx}
                     />
                   </Grid>
                   <Grid item xs={12} md={2}>
@@ -202,7 +222,7 @@ const Stays = () => {
                       value={filters.checkOut}
                       onChange={(event) => updateField("checkOut", event.target.value)}
                       InputLabelProps={{ shrink: true }}
-                      sx={{ "& .MuiInputBase-root": { background: "#fff" } }}
+                      sx={heroInputSx}
                     />
                   </Grid>
                   <Grid item xs={12} md={2}>
@@ -213,7 +233,7 @@ const Stays = () => {
                       onChange={(event) => updateField("guests", event.target.value)}
                       inputProps={{ min: 1 }}
                       InputLabelProps={{ shrink: true }}
-                      sx={{ "& .MuiInputBase-root": { background: "#fff" } }}
+                      sx={heroInputSx}
                     />
                   </Grid>
                   <Grid item xs={12} md={3}>
@@ -223,13 +243,21 @@ const Stays = () => {
                       onChange={(event) => updateField("searchTerm", event.target.value)}
                       placeholder="Suite, wifi, city center..."
                       InputLabelProps={{ shrink: true }}
-                      sx={{ "& .MuiInputBase-root": { background: "#fff" } }}
+                      sx={heroInputSx}
                     />
                   </Grid>
                 </Grid>
                 <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
-                  <AppButton type="submit" size="large" sx={{ background: "#fff", color: "#0f172a" }}>
-                    Search stays
+                  <AppButton
+                    type="submit"
+                    size="large"
+                    sx={{
+                      background: "#B8975A",
+                      color: "#fff",
+                      "&:hover": { background: "#9E7E45" },
+                    }}
+                  >
+                    Search Stays
                   </AppButton>
                 </Box>
               </Box>
@@ -252,7 +280,7 @@ const Stays = () => {
                         color: "#fff",
                         cursor: "pointer",
                         font: "inherit",
-                        backgroundColor: isActive ? "#0f766e" : "rgba(255,255,255,0.08)",
+                        backgroundColor: isActive ? "#B8975A" : "rgba(255,255,255,0.08)",
                       }}
                     >
                       {type.label}
@@ -300,7 +328,7 @@ const Stays = () => {
                     flexDirection: { xs: "column", sm: "row" },
                   }}
                 >
-                  <SubHeading sx={{ color: "#334155" }}>
+                  <SubHeading sx={{ color: "#475569", fontWeight: 600 }}>
                     {resultCount} result{resultCount === 1 ? "" : "s"}
                   </SubHeading>
                   <Box sx={{ minWidth: 200, maxWidth: 300, flex: "0 0 auto", width: { xs: "100%" } }}>
@@ -377,7 +405,7 @@ const Stays = () => {
                 pt: 1.5,
                 pb: 1,
                 borderBottom: "1px solid #E2E8F0",
-                background: "#fff",
+                background: "background.default",
               }}
             >
               <Box
@@ -411,7 +439,7 @@ const Stays = () => {
               />
             </Box>
 
-            <Box sx={{ p: 2, borderTop: "1px solid #E2E8F0", background: "#fff" }}>
+            <Box sx={{ p: 2, borderTop: "1px solid #E2E8F0", background: "background.paper" }}>
               <AppButton
                 fullWidth
                 size="large"
@@ -436,10 +464,10 @@ const Stays = () => {
                 variant="extended"
                 onClick={() => setMobileFiltersOpen(true)}
                 sx={{
-                  background: "#0f766e",
+                  background: "#B8975A",
                   color: "#fff",
                   "&:hover": {
-                    background: "#115e59",
+                    background: "#9E7E45",
                   },
                 }}
               >

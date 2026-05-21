@@ -7,6 +7,7 @@ import {
   DialogTitle,
   TextField,
 } from "@mui/material";
+import AppButton from "../../../../components/ui/AppButton";
 
 type DeclineDialogProps = {
   open: boolean;
@@ -19,7 +20,13 @@ const DeclineDialog = ({ open, onDecline, onClose, loading }: DeclineDialogProps
   const [reason, setReason] = useState("");
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+    PaperProps={{ sx: { borderRadius: "20px", p: 1 } }}
+    >
       <DialogTitle>Decline Booking</DialogTitle>
       <DialogContent>
         <TextField
@@ -36,14 +43,14 @@ const DeclineDialog = ({ open, onDecline, onClose, loading }: DeclineDialogProps
         <Button onClick={onClose} disabled={loading}>
           Cancel
         </Button>
-        <Button
+        <AppButton
           color="error"
-          variant="contained"
+          variant="outlined"
           disabled={loading}
           onClick={() => onDecline(reason)}
         >
           {loading ? "Declining..." : "Decline"}
-        </Button>
+        </AppButton>
       </DialogActions>
     </Dialog>
   );

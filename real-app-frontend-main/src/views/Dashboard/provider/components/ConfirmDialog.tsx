@@ -6,6 +6,7 @@ import {
   DialogContentText,
   DialogTitle,
 } from "@mui/material";
+import AppButton from "../../../../components/ui/AppButton";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -24,7 +25,13 @@ const ConfirmDialog = ({
   onClose,
   loading,
 }: ConfirmDialogProps) => (
-  <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+  <Dialog
+    open={open}
+    onClose={onClose}
+    fullWidth
+    maxWidth="xs"
+    PaperProps={{ sx: { borderRadius: "20px", p: 1 } }}
+  >
     <DialogTitle>{title}</DialogTitle>
     <DialogContent>
       <DialogContentText>{message}</DialogContentText>
@@ -33,9 +40,9 @@ const ConfirmDialog = ({
       <Button onClick={onClose} disabled={loading}>
         Cancel
       </Button>
-      <Button onClick={onConfirm} disabled={loading} variant="contained">
+      <AppButton onClick={onConfirm} disabled={loading}>
         {loading ? "Working..." : "Confirm"}
-      </Button>
+      </AppButton>
     </DialogActions>
   </Dialog>
 );

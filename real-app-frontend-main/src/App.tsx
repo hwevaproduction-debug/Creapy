@@ -1,4 +1,6 @@
+import React, { useLayoutEffect, useMemo, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { CssBaseline, ThemeProvider } from "@mui/material";
 import Home from "./views/Home";
 import NotFound from "./views/NotFound";
 import Login from "./views/Login";
@@ -25,152 +27,185 @@ import StayRoomDetail from "./views/Stays/RoomDetail";
 import BookingConfirmation from "./views/Stays/BookingConfirmation";
 import MyStayBookings from "./views/Stays/MyBookings";
 import ProviderSignUp from "./views/ProviderSignUp";
+import { createAppTheme } from "./theme";
+
+export const ColorModeContext = React.createContext({ toggleColorMode: () => {} });
+
+const getInitialColorMode = (): "light" | "dark" => {
+  const storedMode = localStorage.getItem("colorMode");
+
+  return storedMode === "dark" ? "dark" : "light";
+};
 
 function App() {
+  const [mode, setMode] = useState<"light" | "dark">(getInitialColorMode);
+  const colorModeValue = useMemo(
+    () => ({
+      toggleColorMode: () => {
+        setMode((prev) => {
+          const next = prev === "light" ? "dark" : "light";
+          localStorage.setItem("colorMode", next);
+          return next;
+        });
+      },
+    }),
+    []
+  );
+  const theme = useMemo(() => createAppTheme(mode), [mode]);
+
+  useLayoutEffect(() => {
+    document.documentElement.setAttribute("data-color-scheme", mode);
+  }, [mode]);
+
   return (
-    <Router>
-      <Header />
-      <Routes>
-        <Route
-          path="/signup"
-          element={
-            <PublicRoutes>
-              <SignUp />
-            </PublicRoutes>
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            <PublicRoutes>
-              <Login />
-            </PublicRoutes>
-          }
-        />
-        <Route
-          path="/forgot-password"
-          element={
-            <PublicRoutes>
-              <ForgotPassword />
-            </PublicRoutes>
-          }
-        />
-        <Route
-          path="/provider-signup"
-          element={
-            <PublicRoutes>
-              <ProviderSignUp />
-            </PublicRoutes>
-          }
-        />
-        <Route path="/verify-email" element={<VerifyEmail />} />
-        <Route path="/verify-phone" element={<VerifyPhone />} />
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/stays" element={<Stays />} />
-        <Route path="/stays/rooms/:roomId" element={<StayRoomDetail />} />
-        <Route path="/listing/:id" element={<ViewListing />} />
-        {/* Protected Routes */}
-        <Route
-          path="/saved-searches"
-          element={
-            <ProtectedRoutes>
-              <SavedSearches />
-            </ProtectedRoutes>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoutes>
-              <Profile />
-            </ProtectedRoutes>
-          }
-        />
-        <Route
-          path="/stays/bookings/:id"
-          element={
-            <ProtectedRoutes>
-              <BookingConfirmation />
-            </ProtectedRoutes>
-          }
-        />
-        <Route
-          path="/stays/bookings"
-          element={
-            <ProtectedRoutes>
-              <MyStayBookings />
-            </ProtectedRoutes>
-          }
-        />
-        <Route
-          path="/dashboard/landlord"
-          element={
-            <ProtectedRoutes allowedRoles={["landlord"]}>
-              <LandlordDashboard />
-            </ProtectedRoutes>
-          }
-        />
-        <Route
-          path="/dashboard/provider"
-          element={
-            <ProtectedRoutes allowedRoles={["provider"]}>
-              <ProviderDashboardShell />
-            </ProtectedRoutes>
-          }
-        />
-        <Route
-          path="/dashboard/tenant"
-          element={
-            <ProtectedRoutes allowedRoles={["tenant"]}>
-              <TenantDashboard />
-            </ProtectedRoutes>
-          }
-        />
-        <Route
-          path="/dashboard/admin"
-          element={
-            <ProtectedRoutes allowedRoles={["admin", "super_admin"]}>
-              <AdminDashboard />
-            </ProtectedRoutes>
-          }
-        />
-        <Route
-          path="/create-listing"
-          element={
-            <ProtectedRoutes allowedRoles={["landlord"]}>
-              <CreateListing />
-            </ProtectedRoutes>
-          }
-        />
-        <Route
-          path="/listings/:id/pay"
-          element={
-            <ProtectedRoutes allowedRoles={["landlord"]}>
-              <ListingPayment />
-            </ProtectedRoutes>
-          }
-        />
-        <Route
-          path="/listings"
-          element={
-            <ProtectedRoutes allowedRoles={["landlord"]}>
-              <Navigate to="/dashboard/landlord" replace />
-            </ProtectedRoutes>
-          }
-        />
-        <Route
-          path="/listings/:id"
-          element={
-            <ProtectedRoutes allowedRoles={["landlord"]}>
-              <CreateListing />
-            </ProtectedRoutes>
-          }
-        />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </Router>
+    <ColorModeContext.Provider value={colorModeValue}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Router>
+          <Header />
+          <Routes>
+            <Route
+              path="/signup"
+              element={
+                <PublicRoutes>
+                  <SignUp />
+                </PublicRoutes>
+              }
+            />
+            <Route
+              path="/login"
+              element={
+                <PublicRoutes>
+                  <Login />
+                </PublicRoutes>
+              }
+            />
+            <Route
+              path="/forgot-password"
+              element={
+                <PublicRoutes>
+                  <ForgotPassword />
+                </PublicRoutes>
+              }
+            />
+            <Route
+              path="/provider-signup"
+              element={
+                <PublicRoutes>
+                  <ProviderSignUp />
+                </PublicRoutes>
+              }
+            />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/verify-phone" element={<VerifyPhone />} />
+            <Route path="/" element={<Home />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/stays" element={<Stays />} />
+            <Route path="/stays/rooms/:roomId" element={<StayRoomDetail />} />
+            <Route path="/listing/:id" element={<ViewListing />} />
+            {/* Protected Routes */}
+            <Route
+              path="/saved-searches"
+              element={
+                <ProtectedRoutes>
+                  <SavedSearches />
+                </ProtectedRoutes>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoutes>
+                  <Profile />
+                </ProtectedRoutes>
+              }
+            />
+            <Route
+              path="/stays/bookings/:id"
+              element={
+                <ProtectedRoutes>
+                  <BookingConfirmation />
+                </ProtectedRoutes>
+              }
+            />
+            <Route
+              path="/stays/bookings"
+              element={
+                <ProtectedRoutes>
+                  <MyStayBookings />
+                </ProtectedRoutes>
+              }
+            />
+            <Route
+              path="/dashboard/landlord"
+              element={
+                <ProtectedRoutes allowedRoles={["landlord"]}>
+                  <LandlordDashboard />
+                </ProtectedRoutes>
+              }
+            />
+            <Route
+              path="/dashboard/provider"
+              element={
+                <ProtectedRoutes allowedRoles={["provider"]}>
+                  <ProviderDashboardShell />
+                </ProtectedRoutes>
+              }
+            />
+            <Route
+              path="/dashboard/tenant"
+              element={
+                <ProtectedRoutes allowedRoles={["tenant"]}>
+                  <TenantDashboard />
+                </ProtectedRoutes>
+              }
+            />
+            <Route
+              path="/dashboard/admin"
+              element={
+                <ProtectedRoutes allowedRoles={["admin", "super_admin"]}>
+                  <AdminDashboard />
+                </ProtectedRoutes>
+              }
+            />
+            <Route
+              path="/create-listing"
+              element={
+                <ProtectedRoutes allowedRoles={["landlord"]}>
+                  <CreateListing />
+                </ProtectedRoutes>
+              }
+            />
+            <Route
+              path="/listings/:id/pay"
+              element={
+                <ProtectedRoutes allowedRoles={["landlord"]}>
+                  <ListingPayment />
+                </ProtectedRoutes>
+              }
+            />
+            <Route
+              path="/listings"
+              element={
+                <ProtectedRoutes allowedRoles={["landlord"]}>
+                  <Navigate to="/dashboard/landlord" replace />
+                </ProtectedRoutes>
+              }
+            />
+            <Route
+              path="/listings/:id"
+              element={
+                <ProtectedRoutes allowedRoles={["landlord"]}>
+                  <CreateListing />
+                </ProtectedRoutes>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Router>
+      </ThemeProvider>
+    </ColorModeContext.Provider>
   );
 }
 

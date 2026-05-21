@@ -2,8 +2,8 @@ import { Theme } from "@mui/material/styles";
 import { SxProps } from "@mui/system";
 
 export const studentAccommodationBadgeSx: SxProps<Theme> = {
-  background: "#ede9fe",
-  color: "#5b21b6",
+  background: "#F7EDDA",
+  color: "#7D6234",
   borderRadius: "999px",
   padding: "6px 12px",
   fontSize: "12px",

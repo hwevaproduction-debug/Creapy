@@ -19,11 +19,23 @@ const subRoot = {
 interface HeadingProps {
   children?: React.ReactNode;
   sx?: SxProps;
+  variant?: "default" | "section";
 }
 
 export const Heading = (props: HeadingProps) => {
   const styles: any = props.sx;
-  return <Box sx={{ ...root, ...styles }}>{props.children}</Box>;
+  const variantStyles =
+    props.variant === "section"
+      ? {
+          textTransform: "uppercase",
+          fontSize: "0.6875rem",
+          fontWeight: 700,
+          letterSpacing: "0.1em",
+          color: "#94A3B8",
+        }
+      : {};
+
+  return <Box sx={{ ...root, ...variantStyles, ...styles }}>{props.children}</Box>;
 };
 
 export const SubHeading = (props: HeadingProps) => {

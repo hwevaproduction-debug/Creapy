@@ -56,8 +56,8 @@ const getListingStatusBadge = (status: string) => {
     return (
       <Box
         sx={{
-          background: "#dbeafe",
-          color: "#1e40af",
+          background: "#FDF8F0",
+          color: "#9E7E45",
           borderRadius: "999px",
           padding: "6px 12px",
           fontSize: "12px",
@@ -74,8 +74,8 @@ const getListingStatusBadge = (status: string) => {
     return (
       <Box
         sx={{
-          background: "#dcfce7",
-          color: "#166534",
+          background: "#D1EAE0",
+          color: "#1F4D3A",
           borderRadius: "999px",
           padding: "6px 12px",
           fontSize: "12px",
@@ -204,6 +204,7 @@ const AllListings = () => {
                       width: "100%",
                       p: { xs: 2, md: 2.5 },
                       my: { xs: 2, md: 2.5 },
+                      borderRadius: "16px",
                     }}
                     key={item?._id}
                   >
@@ -220,7 +221,7 @@ const AllListings = () => {
                           width="100%"
                           height={140}
                           alt="listing"
-                          style={{ borderRadius: "5px" }}
+                          style={{ borderRadius: "12px", objectFit: "cover" }}
                         />
                       </Box>
                       <Box sx={{ flex: 1 }}>
@@ -246,10 +247,10 @@ const AllListings = () => {
                                 sx={{
                                   fontSize: "18px",
                                   fontWeight: 600,
-                                  color: "#49454F",
+                                  color: "text.primary",
                                   "&:hover": {
                                     cursor: "pointer",
-                                    textDecoration: "underline",
+                                    color: "#B8975A",
                                   },
                                 }}
                                 onClick={() => {
@@ -261,13 +262,13 @@ const AllListings = () => {
                               {getListingStatusBadge(item?.status)}
                               {item?.studentAccommodation ? (
                                 <Box sx={studentAccommodationBadgeSx}>
-                                  🎓 Student Accommodation
+                                  Student Accommodation
                                 </Box>
                               ) : null}
                             </Box>
                             <Box
                               sx={{
-                                color: "#1e293b",
+                                color: "text.secondary",
                                 marginTop: "8px",
                               }}
                             >
@@ -345,7 +346,6 @@ const AllListings = () => {
 
                                 <AppButton
                                   variant="outlined"
-                                  color="success"
                                   startIcon={<CiEdit />}
                                   onClick={() => {
                                     navigate(`/listings/${item?._id}`);
@@ -374,7 +374,7 @@ const AllListings = () => {
                           <Box>
                             <Box
                               sx={{
-                                background: "#2B6A50",
+                                background: "#B8975A",
                                 fontSize: "12px",
                                 color: "#fff",
                                 borderRadius: "999px",

@@ -125,11 +125,25 @@ const SignUp = () => {
   };
 
   return (
-    <Box sx={{ margin: "70px 0" }}>
+    <Box sx={{ minHeight: "calc(100vh - 72px)", display: "flex", alignItems: "center", py: 4 }}>
       <AppContainer>
         <Grid container spacing={2} justifyContent="center">
           <Grid item xs={12} md={6} lg={5}>
-            <AppCard sx={{ p: { xs: 2.5, md: 3.5 } }}>
+            <AppCard
+              sx={{
+                p: { xs: 3, md: "48px 44px" },
+                borderRadius: "24px",
+                boxShadow: "0 16px 60px rgba(31,41,55,0.12)",
+              }}
+            >
+              <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
+                <Box component="span" sx={{ color: "text.primary", fontSize: "26px", fontWeight: 800 }}>
+                  Town
+                </Box>
+                <Box component="span" sx={{ color: "#B8975A", fontSize: "26px", fontWeight: 800 }}>
+                  &nbsp;Ruins
+                </Box>
+              </Box>
               {pendingVerificationEmail ? (
                 <Box
                   sx={{
@@ -296,9 +310,9 @@ const SignUp = () => {
                           sx={{
                             marginTop: "12px",
                             padding: "16px",
-                            border: "1px solid #e2e8f0",
+                            border: "1px solid var(--border-default)",
                             borderRadius: "14px",
-                            background: "#f8fafc",
+                            background: "var(--surface-page)",
                           }}
                         >
                           <Box
@@ -370,6 +384,7 @@ const SignUp = () => {
                         <AppButton
                           type="submit"
                           fullWidth
+                          size="large"
                           disabled={isLoading}
                           sx={{ margin: "0 0 16px 0" }}
                         >
@@ -380,7 +395,22 @@ const SignUp = () => {
                           )}
                         </AppButton>
                       </Box>
-                      <GoogleOAuth />
+                      <Box
+                        sx={{
+                          "& .MuiButton-root": {
+                            background: "var(--surface-card)",
+                            color: "var(--text-primary)",
+                            border: "1.5px solid var(--border-default)",
+                            borderRadius: "999px",
+                            lineHeight: 1.2,
+                            "&:hover": {
+                              background: "var(--surface-page)",
+                            },
+                          },
+                        }}
+                      >
+                        <GoogleOAuth />
+                      </Box>
                       <Box
                         sx={{
                           margin: "0 0 10px 0",

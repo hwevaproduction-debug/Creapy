@@ -47,7 +47,31 @@ const AMENITY_OPTIONS = [
   { label: "Family Friendly", value: "family-friendly" },
 ];
 
-const sectionTitleSx = { fontSize: "17px", mb: 1.25 };
+const sectionTitleSx = {
+  fontSize: "11px",
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+  color: "#94A3B8",
+  mb: 1.25,
+};
+
+const filterChipSx = (active: boolean) =>
+  active
+    ? {
+        background: "#B8975A",
+        color: "#FFFFFF",
+        border: "1px solid #B8975A",
+        fontWeight: 700,
+        "&:hover": {
+          background: "#9E7E45",
+        },
+      }
+    : {
+        border: "1px solid #E2E8F0",
+        color: "#475569",
+        fontWeight: 600,
+      };
 
 const FilterPanel = ({ filters, onChange, onClear }: FilterPanelProps) => {
   const toggleAmenity = (amenityValue: string) => {
@@ -59,11 +83,11 @@ const FilterPanel = ({ filters, onChange, onClear }: FilterPanelProps) => {
   };
 
   return (
-    <AppCard sx={{ p: 2.5, borderRadius: "8px", boxShadow: "none", border: "1px solid #E2E8F0" }}>
+    <AppCard elevation="flat" sx={{ p: 2.5, borderRadius: "16px" }}>
       <Stack spacing={2}>
         <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, alignItems: "center" }}>
-          <Heading sx={{ fontSize: "20px" }}>Filters</Heading>
-          <AppButton size="small" variant="text" onClick={onClear}>
+          <Heading sx={{ fontSize: "18px", fontWeight: 700 }}>Filters</Heading>
+          <AppButton size="small" variant="text" sx={{ color: "#1F4D3A" }} onClick={onClear}>
             Clear
           </AppButton>
         </Box>
@@ -99,8 +123,8 @@ const FilterPanel = ({ filters, onChange, onClear }: FilterPanelProps) => {
               <Chip
                 key={option.value}
                 label={option.label}
-                color={filters.roomType === option.value ? "primary" : "default"}
-                variant={filters.roomType === option.value ? "filled" : "outlined"}
+                variant="outlined"
+                sx={filterChipSx(filters.roomType === option.value)}
                 onClick={() => onChange("roomType", filters.roomType === option.value ? "" : option.value)}
               />
             ))}
@@ -116,8 +140,8 @@ const FilterPanel = ({ filters, onChange, onClear }: FilterPanelProps) => {
               <Chip
                 key={option.label}
                 label={option.label}
-                color={filters.minRating === option.value ? "primary" : "default"}
-                variant={filters.minRating === option.value ? "filled" : "outlined"}
+                variant="outlined"
+                sx={filterChipSx(filters.minRating === option.value)}
                 onClick={() => onChange("minRating", option.value)}
               />
             ))}
