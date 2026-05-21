@@ -21,7 +21,12 @@ import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
 import AppInput from "../../components/ui/AppInput";
+import useTypedSelector from "../../hooks/useTypedSelector";
 import { ZIMBABWE_PROVINCES } from "../../config/zimbabweProvinces";
+import {
+  selectedUserRole,
+  selectedUserToken,
+} from "../../redux/auth/authSlice";
 import { studentAccommodationOverlayBadgeSx } from "../../styles/listingBadges";
 import { thousandSeparatorNumber } from "../../utils";
 
@@ -71,6 +76,9 @@ const amenityLabels = [
 const Home = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const token = useTypedSelector(selectedUserToken);
+  const userRole = useTypedSelector(selectedUserRole);
+  const isAuthenticated = Boolean(token);
   const [heroSearch, setHeroSearch] = useState("");
   const [activeTab, setActiveTab] = useState<SearchTab>("rent");
   const [locationAnchor, setLocationAnchor] = useState<null | HTMLElement>(null);
@@ -152,6 +160,32 @@ const Home = () => {
     const urlParams = new URLSearchParams();
     urlParams.set("searchTerm", heroSearch.trim().toLowerCase());
     navigate(`/search?${urlParams.toString()}`);
+  };
+
+  const getAuthenticatedListPropertyPath = () => {
+    if (userRole === "landlord") {
+      return "/create-listing";
+    }
+
+    if (userRole === "provider") {
+      return "/dashboard/provider";
+    }
+
+    if (userRole === "admin" || userRole === "super_admin") {
+      return "/dashboard/admin";
+    }
+
+    if (userRole === "tenant") {
+      return "/dashboard/tenant";
+    }
+
+    return "/profile";
+  };
+
+  const handleListPropertyClick = () => {
+    navigate(
+      isAuthenticated ? getAuthenticatedListPropertyPath() : "/provider-signup"
+    );
   };
 
   const renderPropertyBadge = (item: any) => {
@@ -344,7 +378,7 @@ const Home = () => {
   );
 
   return (
-    <Box sx={{ mt: { xs: 5, md: 7.5 }, background: "background.default" }}>
+    <Box sx={{ background: "background.default" }}>
       {showOverlay && <OverlayLoader />}
       {timedOut && (
         <AppContainer>
@@ -373,7 +407,8 @@ const Home = () => {
             "linear-gradient(135deg, #1F2937 0%, #1F4D3A 60%, #0D1117 100%)",
           display: "flex",
           alignItems: "center",
-          py: { xs: 6, md: 8 },
+          pt: { xs: 12, md: 14 },
+          pb: { xs: 6, md: 8 },
         }}
       >
         <AppContainer>
@@ -891,7 +926,7 @@ const Home = () => {
           <AppButton
             variant="outlined"
             size="large"
-            onClick={() => navigate("/provider-signup")}
+            onClick={handleListPropertyClick}
             sx={{
               color: "#fff",
               borderColor: "rgba(255,255,255,0.6)",

@@ -202,8 +202,11 @@ const Header = () => {
     <header>
       <Box
         sx={{
-          position: "sticky",
+          position: isHomePage ? "fixed" : "sticky",
           top: 0,
+          left: isHomePage ? 0 : undefined,
+          right: isHomePage ? 0 : undefined,
+          width: isHomePage ? "100%" : undefined,
           zIndex: 1100,
           background:
             isHomePage && !scrolled
