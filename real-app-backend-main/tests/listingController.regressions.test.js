@@ -11,6 +11,17 @@ const originalListing = {
 const assertPublicContactFieldsAbsent = (listing) => {
   assert.equal(Object.prototype.hasOwnProperty.call(listing, "phoneNumber"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(listing, "address"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(listing, "addressLine"), false);
+  if (
+    listing.location &&
+    typeof listing.location === "object" &&
+    !Array.isArray(listing.location)
+  ) {
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(listing.location, "addressLine"),
+      false
+    );
+  }
 };
 
 const invokeController = (handler, req) =>
@@ -93,10 +104,10 @@ test("getListing hides early access listings from non-premium users and preserve
   assert.deepEqual(allowed.body.data.location, {
     province: "Harare",
     city: "Borrowdale",
-    addressLine: "1 Samora Machel Ave",
     country: "Zimbabwe",
   });
   assert.equal(allowed.body.data.province, "Harare");
+  assertPublicContactFieldsAbsent(allowed.body.data);
 });
 
 test("getListing strips landlord contact fields from public detail responses", async () => {
@@ -211,7 +222,7 @@ test("transitionListingToPendingPayment enforces active status and valid payment
   );
 });
 
-test("listing responses rebuild the legacy location object from flat columns", async () => {
+test("public listing responses rebuild the legacy location object without street address", async () => {
   prisma.listing.updateMany = async () => ({ count: 0 });
   prisma.listing.findMany = async () => [
     {
@@ -233,7 +244,6 @@ test("listing responses rebuild the legacy location object from flat columns", a
   assert.deepEqual(result.body.data[0].location, {
     province: "Bulawayo",
     city: "Suburbs",
-    addressLine: "22 Main Street",
     country: "Zimbabwe",
   });
   assert.equal(result.body.data[0].province, "Bulawayo");

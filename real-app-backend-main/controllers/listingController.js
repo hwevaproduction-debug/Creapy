@@ -35,7 +35,16 @@ const mapListingWithUser = (listing) =>
 const sanitizeListingForPublic = (listing) => {
   if (!listing) return listing;
 
-  const { phoneNumber, address, ...publicListing } = listing;
+  const { phoneNumber, address, addressLine, ...publicListing } = listing;
+  if (
+    publicListing.location &&
+    typeof publicListing.location === "object" &&
+    !Array.isArray(publicListing.location)
+  ) {
+    publicListing.location = { ...publicListing.location };
+    delete publicListing.location.addressLine;
+  }
+
   return publicListing;
 };
 
