@@ -8,6 +8,11 @@ const originalListing = {
   ...prisma.listing,
 };
 
+const assertPublicContactFieldsAbsent = (listing) => {
+  assert.equal(Object.prototype.hasOwnProperty.call(listing, "phoneNumber"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(listing, "address"), false);
+};
+
 const invokeController = (handler, req) =>
   new Promise((resolve, reject) => {
     const res = {
@@ -94,6 +99,48 @@ test("getListing hides early access listings from non-premium users and preserve
   assert.equal(allowed.body.data.province, "Harare");
 });
 
+test("getListing strips landlord contact fields from public detail responses", async () => {
+  prisma.listing.findUnique = async () => ({
+    id: "listing_public_detail",
+    userId: "owner_1",
+    status: "active",
+    province: "Harare",
+    city: "Avondale",
+    addressLine: "12 King George Road",
+    address: "12 King George Road, Avondale",
+    phoneNumber: "+263771234567",
+  });
+
+  const result = await invokeController(listingController.getListing, {
+    params: { id: "listing_public_detail" },
+    user: { id: "tenant_1", role: "tenant" },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assertPublicContactFieldsAbsent(result.body.data);
+});
+
+test("getListing keeps landlord contact fields for the owner", async () => {
+  prisma.listing.findUnique = async () => ({
+    id: "listing_owner_detail",
+    userId: "owner_1",
+    status: "active",
+    province: "Harare",
+    city: "Avondale",
+    address: "12 King George Road, Avondale",
+    phoneNumber: "+263771234567",
+  });
+
+  const result = await invokeController(listingController.getListing, {
+    params: { id: "listing_owner_detail" },
+    user: { id: "owner_1", role: "landlord" },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.data.address, "12 King George Road, Avondale");
+  assert.equal(result.body.data.phoneNumber, "+263771234567");
+});
+
 test("updateListing rejects lifecycle-managed fields", async () => {
   let updateCalled = false;
 
@@ -172,6 +219,8 @@ test("listing responses rebuild the legacy location object from flat columns", a
       province: "Bulawayo",
       city: "Suburbs",
       addressLine: "22 Main Street",
+      address: "22 Main Street, Bulawayo",
+      phoneNumber: "+263771234567",
       status: "active",
     },
   ];
@@ -188,4 +237,47 @@ test("listing responses rebuild the legacy location object from flat columns", a
     country: "Zimbabwe",
   });
   assert.equal(result.body.data[0].province, "Bulawayo");
+  assertPublicContactFieldsAbsent(result.body.data[0]);
+});
+
+test("getHomeHighlighted strips landlord contact fields from public listing cards", async () => {
+  prisma.listing.updateMany = async () => ({ count: 0 });
+  prisma.listing.findMany = async () => [
+    {
+      id: "listing_home_highlighted",
+      status: "active",
+      address: "7 Borrowdale Road",
+      phoneNumber: "+263772345678",
+    },
+  ];
+
+  const result = await invokeController(listingController.getHomeHighlighted, {
+    query: {},
+  });
+
+  assert.equal(result.statusCode, 200);
+  assertPublicContactFieldsAbsent(result.body.data[0]);
+});
+
+test("getHomeGroupedByLocation strips landlord contact fields from public grouped listings", async () => {
+  prisma.listing.updateMany = async () => ({ count: 0 });
+  prisma.listing.findMany = async () => [
+    {
+      id: "listing_grouped",
+      name: "Grouped listing",
+      province: "Harare",
+      imageUrls: ["grouped.jpg"],
+      createdAt: new Date("2025-01-02T00:00:00.000Z"),
+      status: "active",
+      address: "9 Samora Machel Avenue",
+      phoneNumber: "+263773456789",
+    },
+  ];
+
+  const result = await invokeController(listingController.getHomeGroupedByLocation, {
+    query: {},
+  });
+
+  assert.equal(result.statusCode, 200);
+  assertPublicContactFieldsAbsent(result.body.data[0].listings[0]);
 });

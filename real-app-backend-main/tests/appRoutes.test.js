@@ -148,6 +148,50 @@ test("OPTIONS preflight allows legacy frontend CORS request header", async () =>
   );
 });
 
+test("OPTIONS preflight succeeds for Townruins app API requests", async () => {
+  const routes = [
+    "/api/v1/listings/home/grouped-by-location?locationsLimit=6&perLocation=3",
+    "/api/v1/listings/home/highlighted?limit=5",
+    "/api/v1/stays?guests=1&limit=12&page=1&sort=newest",
+    "/api/v1/notifications/unread-count",
+  ];
+
+  for (const route of routes) {
+    const result = await invokeApp("OPTIONS", route, {
+      headers: {
+        Origin: "https://app.townruins.com",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers":
+          "authorization,content-type,x-requested-with",
+      },
+    });
+
+    assert.equal(result.statusCode, 204);
+    assert.equal(
+      result.headers.get("access-control-allow-origin"),
+      "https://app.townruins.com"
+    );
+    assert.match(
+      result.headers.get("access-control-allow-headers"),
+      /X-Requested-With/
+    );
+  }
+});
+
+test("GET /api/v1/notifications/unread-count is mounted and keeps CORS on auth errors", async () => {
+  const result = await invokeApp("GET", "/api/v1/notifications/unread-count", {
+    headers: {
+      Origin: "https://app.townruins.com",
+    },
+  });
+
+  assert.equal(result.statusCode, 401);
+  assert.equal(
+    result.headers.get("access-control-allow-origin"),
+    "https://app.townruins.com"
+  );
+});
+
 test("admin moderation routes require authenticated admin users", async () => {
   const adminRoutes = [
     "/api/v1/admin/queue",

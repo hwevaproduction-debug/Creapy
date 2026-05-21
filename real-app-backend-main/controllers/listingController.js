@@ -32,6 +32,13 @@ const mapListingWithUser = (listing) =>
       }
     : listing;
 
+const sanitizeListingForPublic = (listing) => {
+  if (!listing) return listing;
+
+  const { phoneNumber, address, ...publicListing } = listing;
+  return publicListing;
+};
+
 const getListingImage = (imageUrls) => {
   if (Array.isArray(imageUrls)) {
     return imageUrls[0] || null;
@@ -280,7 +287,7 @@ exports.getListing = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: "success",
-    data: mapListingId(listing),
+    data: sanitizeListingForPublic(mapListingId(listing)),
   });
 });
 
@@ -492,7 +499,9 @@ exports.getListings = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: "success",
     results: listings.length,
-    data: listings.map(mapListingId),
+    data: listings.map((listing) =>
+      sanitizeListingForPublic(mapListingId(listing))
+    ),
   });
 });
 
@@ -512,7 +521,9 @@ exports.getHomeHighlighted = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: "success",
     results: listings.length,
-    data: listings.map(mapListingId),
+    data: listings.map((listing) =>
+      sanitizeListingForPublic(mapListingId(listing))
+    ),
   });
 });
 
@@ -545,19 +556,23 @@ exports.getHomeGroupedByLocation = catchAsync(async (req, res, next) => {
     .map(([locationName, groupedListings]) => ({
       location: locationName,
       mostRecentListing: groupedListings[0]?.createdAt || null,
-      listings: groupedListings.slice(0, perLocation).map((listing) => ({
-        _id: listing.id,
-        name: listing.name,
-        monthlyRent: listing.monthlyRent,
-        bedrooms: listing.bedrooms,
-        totalRooms: listing.totalRooms,
-        amenities: listing.amenities,
-        status: listing.status,
-        studentAccommodation: listing.studentAccommodation,
-        createdAt: listing.createdAt,
-        location: listing.province,
-        image: getListingImage(listing.imageUrls),
-      })),
+      listings: groupedListings
+        .slice(0, perLocation)
+        .map((listing) =>
+          sanitizeListingForPublic({
+            _id: listing.id,
+            name: listing.name,
+            monthlyRent: listing.monthlyRent,
+            bedrooms: listing.bedrooms,
+            totalRooms: listing.totalRooms,
+            amenities: listing.amenities,
+            status: listing.status,
+            studentAccommodation: listing.studentAccommodation,
+            createdAt: listing.createdAt,
+            location: listing.province,
+            image: getListingImage(listing.imageUrls),
+          })
+        ),
     }))
     .sort((left, right) => {
       const leftTime = left.mostRecentListing ? new Date(left.mostRecentListing).getTime() : 0;
@@ -581,4 +596,5 @@ exports.getHomeGroupedByLocation = catchAsync(async (req, res, next) => {
 
 exports.__testables = {
   matchesSavedSearch,
+  sanitizeListingForPublic,
 };

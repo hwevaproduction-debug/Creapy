@@ -20,7 +20,6 @@ import {
   useTheme,
 } from "@mui/material";
 // Component Imports
-import { Heading } from "../Heading";
 import SearchBar from "../SearchBar";
 import AppButton from "../ui/AppButton";
 import AppContainer from "../ui/AppContainer";
@@ -157,6 +156,8 @@ const Header = () => {
   const [anchorEl, setAnchorEl] = useState<Element | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isHomePage = location.pathname === "/";
+  const [scrolled, setScrolled] = useState(false);
   const isActive = (path: string) =>
     path === "/"
       ? location.pathname === "/"
@@ -186,6 +187,17 @@ const Header = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [window.location.search]);
 
+  useEffect(() => {
+    if (!isHomePage) {
+      setScrolled(false);
+      return;
+    }
+    const handleScroll = () => setScrolled(window.scrollY > 80);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isHomePage]);
+
   return (
     <header>
       <Box
@@ -194,11 +206,17 @@ const Header = () => {
           top: 0,
           zIndex: 1100,
           background:
-            theme.palette.mode === "dark"
+            isHomePage && !scrolled
+              ? "transparent"
+              : theme.palette.mode === "dark"
               ? "rgba(13,17,23,0.92)"
               : "rgba(245, 240, 235, 0.92)",
-          backdropFilter: "blur(12px)",
-          borderBottom: "1px solid rgba(184, 151, 90, 0.18)",
+          backdropFilter: isHomePage && !scrolled ? "none" : "blur(12px)",
+          borderBottom:
+            isHomePage && !scrolled
+              ? "none"
+              : "1px solid rgba(184, 151, 90, 0.18)",
+          transition: "background 0.3s ease, backdrop-filter 0.3s ease",
         }}
       >
         <AppContainer>
@@ -231,8 +249,17 @@ const Header = () => {
                   "&:hover": { transform: "scale(1.02)" },
                 }}
               >
-                <Heading sx={{ color: "text.primary" }}>Town</Heading>
-                <Heading sx={{ color: "#B8975A" }}>&nbsp;Ruins</Heading>
+                <Box
+                  component="img"
+                  src="/app logob.PNG"
+                  alt="Town Ruins"
+                  sx={{
+                    height: { xs: 32, md: 40 },
+                    width: "auto",
+                    objectFit: "contain",
+                    display: "block",
+                  }}
+                />
               </Box>
               <IconButton
                 sx={{
@@ -248,7 +275,14 @@ const Header = () => {
               </IconButton>
             </Box>
 
-            <Box sx={{ flex: 1, minWidth: { xs: "100%", md: 320 }, maxWidth: { md: 480 } }}>
+            <Box
+              sx={{
+                flex: 1,
+                minWidth: { xs: "100%", md: 320 },
+                maxWidth: { md: 480 },
+                display: isHomePage ? "none" : undefined,
+              }}
+            >
               <form onSubmit={handleSubmit}>
                 <SearchBar
                   placeholder="Search locations, listings..."
@@ -270,6 +304,10 @@ const Header = () => {
                 gap: { xs: 1.5, md: 3 },
                 flexWrap: "wrap",
                 justifyContent: { xs: "center", md: "flex-end" },
+                color: isHomePage && !scrolled ? "#fff" : "inherit",
+                "& > *": {
+                  color: isHomePage && !scrolled ? "#fff !important" : undefined,
+                },
               }}
             >
               <Box sx={getActiveMenuStyle(isActive("/"))} onClick={() => navigate("/")}>
@@ -284,12 +322,6 @@ const Header = () => {
               <Box sx={getActiveMenuStyle(isActive("/stays"))} onClick={() => navigate("/stays")}>
                 Temporary Stays
               </Box>
-              <AppButton
-                variant="outlined"
-                onClick={() => navigate("/provider-signup")}
-              >
-                List Your Stay
-              </AppButton>
               <Tooltip title={theme.palette.mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
                 <IconButton
                   onClick={colorMode.toggleColorMode}
@@ -470,14 +502,13 @@ const Header = () => {
         }}
       >
         <List>
-          <Box sx={{ padding: "16px 16px 8px", fontSize: "22px", fontWeight: 800 }}>
-            <Box component="span" sx={{ color: "text.primary" }}>
-              Town
-            </Box>
-            <Box component="span" sx={{ color: "#B8975A" }}>
-              {" "}
-              Ruins
-            </Box>
+          <Box sx={{ padding: "16px 16px 12px" }}>
+            <Box
+              component="img"
+              src="/app logob.PNG"
+              alt="Town Ruins"
+              sx={{ height: 32, width: "auto", objectFit: "contain", display: "block" }}
+            />
           </Box>
           <ListItemButton
             sx={getMobileItemSx(isActive("/"))}
@@ -514,15 +545,6 @@ const Header = () => {
             }}
           >
             <ListItemText primary="Temporary Stays" />
-          </ListItemButton>
-          <ListItemButton
-            sx={getMobileItemSx(isActive("/provider-signup"))}
-            onClick={() => {
-              navigate("/provider-signup");
-              setMobileOpen(false);
-            }}
-          >
-            <ListItemText primary="List Your Stay" />
           </ListItemButton>
           <ListItemButton onClick={colorMode.toggleColorMode}>
             <ListItemText

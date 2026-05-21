@@ -14,6 +14,9 @@ const webhookRouter = require("./routes/webhookRoutes");
 const roomRouter = require("./routes/roomRoutes");
 const providerRouter = require("./routes/providerRoutes");
 const stayRouter = require("./routes/stayRoutes");
+const notificationRouter = require("./routes/notificationRoutes");
+const disputeRouter = require("./routes/disputeRoutes");
+const reportRouter = require("./routes/reportRoutes");
 const { globalLimiter } = require("./middleware/rateLimiter");
 
 const listingRoutes = require("./routes/listingRoutes");
@@ -21,8 +24,14 @@ const listingDraftRoutes = require("./routes/listingDraftRoutes");
 const adminRouter = require("./routes/adminRoutes");
 const bookingRouter = require("./routes/bookingRoutes");
 
-const normalizeOrigin = (value = "") => value.trim().replace(/\/$/, "");
+const normalizeOrigin = (value = "") => value.trim().replace(/\/+$/, "");
+const defaultAllowedOrigins = [
+  "https://townruins.com",
+  "https://www.townruins.com",
+  "https://app.townruins.com",
+];
 const configuredOrigins = [
+  ...defaultAllowedOrigins,
   process.env.FRONTEND_URL,
   process.env.CORS_ALLOWED_ORIGINS,
 ]
@@ -30,6 +39,7 @@ const configuredOrigins = [
   .flatMap((value) => value.split(","))
   .map(normalizeOrigin)
   .filter(Boolean);
+const configuredOriginSet = new Set(configuredOrigins);
 
 const allowedOriginPatterns = [
   /^https?:\/\/localhost(?::\d+)?$/i,
@@ -45,7 +55,7 @@ const corsOrigin = (origin, callback) => {
   }
 
   const normalizedOrigin = normalizeOrigin(origin);
-  const isConfiguredOrigin = configuredOrigins.includes(normalizedOrigin);
+  const isConfiguredOrigin = configuredOriginSet.has(normalizedOrigin);
   const matchesKnownPattern = allowedOriginPatterns.some((pattern) =>
     pattern.test(normalizedOrigin)
   );
@@ -65,6 +75,9 @@ const corsOptions = {
     "Content-Type",
     "Authorization",
     "Accept",
+    "Origin",
+    "X-Requested-With",
+    "X-Seed-Api-Key",
     "Access-Control-Allow-Origin",
   ],
   credentials: true,
@@ -101,6 +114,9 @@ app.use("/api/v1/payments", paymentRouter);
 app.use("/api/v1/uploads", uploadRouter);
 app.use("/api/v1/rooms", roomRouter);
 app.use("/api/v1/providers", providerRouter);
+app.use("/api/v1/notifications", notificationRouter);
+app.use("/api/v1/disputes", disputeRouter);
+app.use("/api/v1/reports", reportRouter);
 // Listings routes
 // Primary (matches client + SRS)
 app.use("/api/v1/listings", listingRoutes);

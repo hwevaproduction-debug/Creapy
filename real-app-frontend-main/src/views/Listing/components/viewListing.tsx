@@ -14,19 +14,16 @@ import AppContainer from "../../../components/ui/AppContainer";
 import AppCard from "../../../components/ui/AppCard";
 import { studentAccommodationBadgeSx } from "../../../styles/listingBadges";
 // Utils Imports
-import { maskingPhoneNumber, thousandSeparatorNumber } from "../../../utils";
+import { thousandSeparatorNumber } from "../../../utils";
 // React Icons
 import { FaLocationDot } from "react-icons/fa6";
 import { FaBath } from "react-icons/fa";
 import { FaParking } from "react-icons/fa";
 import { FaChair } from "react-icons/fa6";
 import { FaBed } from "react-icons/fa";
-import { IoIosCall } from "react-icons/io";
-import { HiOutlineMail } from "react-icons/hi";
 // Redux Imports
 import useTypedSelector from "../../../hooks/useTypedSelector";
 import { selectedUserToken } from "../../../redux/auth/authSlice";
-import { useGetUserQuery } from "../../../redux/api/userApiSlice";
 import { useGetSingleListingQuery } from "../../../redux/api/listingApiSlice";
 
 const iconStyle = {
@@ -49,27 +46,17 @@ const ViewListing = () => {
   });
   const images = data?.data?.imageUrls;
 
-  // User API Query
-  const { data: userData, isLoading: isUserLoading } = useGetUserQuery(
-    id as string,
-    {
-      skip: !id || !isLoggedIn,
-    }
-  );
-
   const locationData = data?.data?.location;
   const publicLocation = [locationData?.city, locationData?.province, locationData?.country]
     .filter(Boolean)
     .join(", ");
-  const displayLocation = isLoggedIn
-    ? data?.data?.address || publicLocation || "Location unavailable"
-    : publicLocation || "Location available after login";
+  const locationText = publicLocation || "Location unavailable";
 
   if (!id) return <div>Missing listing id</div>;
 
   return (
     <>
-      {(isLoading || (isLoggedIn && isUserLoading)) && <OverlayLoader />}
+      {isLoading && <OverlayLoader />}
       <Box>
         <Swiper navigation={true}>
           {images?.map((image: any) => (
@@ -105,7 +92,7 @@ const ViewListing = () => {
                     }}
                   >
                     <FaLocationDot style={{ color: "#2B6A50" }} />
-                    {displayLocation}
+                    {locationText}
                   </Box>
                   <Box
                     sx={{
@@ -248,104 +235,49 @@ const ViewListing = () => {
                       gap: 1,
                     }}
                   >
-                    Owner Details
+                    Contact Landlord
                   </Heading>
                   <Divider />
                   <Box
                     sx={{
-                      margin: "15px 0 10px 0",
-                      display: "flex",
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                      rowGap: 1,
+                      marginTop: 2,
+                      padding: "20px",
+                      borderRadius: "10px",
+                      border: "1px dashed #cbd5e1",
+                      background: "#f8fafc",
+                      color: "text.secondary",
+                      textAlign: "center",
+                      lineHeight: 1.6,
                     }}
                   >
-                    <Box
-                      sx={{
-                        minWidth: { xs: "80px", sm: "100px" },
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "3px",
-                      }}
-                    >
-                      <FaLocationDot /> Address
+                    <Box sx={{ fontSize: "28px", marginBottom: 1 }}>🔒</Box>
+                    <Box>
+                      Landlord contact details are shared privately once your booking is
+                      accepted.
                     </Box>
-                    <Box sx={{ wordBreak: "break-word" }}>{data?.data?.address}</Box>
-                  </Box>
-                  {isLoggedIn ? (
-                    <>
+                    <Box sx={{ marginTop: 1, fontSize: "13px", color: "#94a3b8" }}>
+                      Send a booking request to get started.
+                    </Box>
+                    {!isLoggedIn ? (
                       <Box
-                        sx={{
-                          margin: "15px 0 10px 0",
-                          display: "flex",
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                          rowGap: 1,
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            minWidth: { xs: "80px", sm: "100px" },
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "3px",
-                          }}
-                        >
-                          <HiOutlineMail /> Email
-                        </Box>
-                        <Box sx={{ wordBreak: "break-all" }}>{userData?.data?.email}</Box>
-                      </Box>
-                      <Box
-                        sx={{
-                          margin: "15px 0 10px 0",
-                          display: "flex",
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                          rowGap: 1,
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            minWidth: { xs: "80px", sm: "100px" },
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "3px",
-                          }}
-                        >
-                          <IoIosCall /> Phone
-                        </Box>
-                        <Box sx={{ wordBreak: "break-all" }}>
-                          {maskingPhoneNumber(data?.data?.phoneNumber) || "Not provided"}
-                        </Box>
-                      </Box>
-                    </>
-                  ) : (
-                    <Box
-                      sx={{
-                        marginTop: 2,
-                        padding: "16px",
-                        borderRadius: "12px",
-                        border: "1px dashed #cbd5e1",
-                        background: "#f8fafc",
-                        color: "text.secondary",
-                        textAlign: "center",
-                      }}
-                    >
-                      {"🔒 "}
-                      <Box
-                        component="span"
-                        sx={{
-                          color: "#1F4D3A",
-                          fontWeight: 600,
-                          cursor: "pointer",
-                        }}
+                        component="button"
+                        type="button"
                         onClick={() => navigate("/login")}
+                        sx={{
+                          marginTop: 2,
+                          border: 0,
+                          background: "transparent",
+                          color: "#1F4D3A",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          padding: 0,
+                          font: "inherit",
+                        }}
                       >
-                        Log in
+                        Log in to send a booking request
                       </Box>
-                      {" to view the landlord's contact details"}
-                    </Box>
-                  )}
+                    ) : null}
+                  </Box>
                 </AppCard>
               </Grid>
             </Grid>
