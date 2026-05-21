@@ -158,6 +158,7 @@ const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const isHomePage = location.pathname === "/";
   const [scrolled, setScrolled] = useState(false);
+  const headerIconColor = isHomePage && !scrolled ? "#fff" : "#1F2937";
   const isActive = (path: string) =>
     path === "/"
       ? location.pathname === "/"
@@ -369,7 +370,7 @@ const Header = () => {
                       Create Listing
                     </AppButton>
                   )}
-                  <NotificationBell />
+                  <NotificationBell iconColor={headerIconColor} />
                   <Box sx={{ cursor: "pointer" }}>
                     <IconButton
                       onClick={(e) => setAnchorEl(e.currentTarget)}

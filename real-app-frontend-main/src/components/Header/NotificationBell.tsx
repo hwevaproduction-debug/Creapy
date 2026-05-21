@@ -20,7 +20,11 @@ import NotificationItem from "./NotificationItem";
 
 const recentNotificationsParams = { page: 1, limit: 5 };
 
-const NotificationBell = () => {
+type NotificationBellProps = {
+  iconColor?: string;
+};
+
+const NotificationBell = ({ iconColor = "#1F2937" }: NotificationBellProps) => {
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
   const open = Boolean(anchorEl);
@@ -75,7 +79,7 @@ const NotificationBell = () => {
         onClick={handleOpen}
         size="large"
         sx={{
-          color: "#1F2937",
+          color: iconColor,
           height: 40,
           width: 40,
         }}
