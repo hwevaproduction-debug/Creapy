@@ -321,6 +321,27 @@ export const useStayFilters = () => {
     [commitFilters]
   );
 
+  const updateFields = useCallback(
+    (updates: Partial<StayFilterState>) => {
+      setFilters((previousFilters) => {
+        const nextFilters = {
+          ...previousFilters,
+          ...updates,
+          page: updates.page != null ? Number(updates.page) : 1,
+        } as StayFilterState;
+
+        if (debounceTimerRef.current) {
+          window.clearTimeout(debounceTimerRef.current);
+        }
+
+        commitFilters(nextFilters);
+
+        return nextFilters;
+      });
+    },
+    [commitFilters]
+  );
+
   const applyFilters = useCallback(
     (nextFilters: StayFilterState) => {
       if (debounceTimerRef.current) {
@@ -364,6 +385,7 @@ export const useStayFilters = () => {
     activeFilterCount,
     activeFilterSummary,
     updateField,
+    updateFields,
     clearFilters,
     applyFilters,
   };

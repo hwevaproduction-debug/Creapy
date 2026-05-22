@@ -5,3 +5,4 @@ cshellscript.bat
 server.zip
 *.zip
 npm-debug.log*
+offsite/

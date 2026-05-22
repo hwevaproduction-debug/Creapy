@@ -114,6 +114,7 @@ const Stays = () => {
     activeFilterCount,
     activeFilterSummary,
     updateField,
+    updateFields,
     clearFilters,
     applyFilters,
   } = useStayFilters();
@@ -180,6 +181,14 @@ const Stays = () => {
     setMobileDraftFilters((previousFilters) => ({
       ...previousFilters,
       [field]: value,
+      page: 1,
+    }));
+  };
+
+  const updateMobileDraftFields = (updates: Partial<StayFilterState>) => {
+    setMobileDraftFilters((previousFilters) => ({
+      ...previousFilters,
+      ...updates,
       page: 1,
     }));
   };
@@ -413,6 +422,7 @@ const Stays = () => {
                   <FilterPanel
                     filters={filters}
                     onChange={updateField}
+                    onChangeMany={updateFields}
                     onClear={clearFilters}
                     activeFilterCount={activeFilterCount}
                   />
@@ -539,6 +549,7 @@ const Stays = () => {
               <FilterPanel
                 filters={mobileDraftFilters}
                 onChange={updateMobileDraft}
+                onChangeMany={updateMobileDraftFields}
                 onClear={() => setMobileDraftFilters(cloneFilters(DEFAULT_STAY_FILTERS))}
                 activeFilterCount={activeFilterCount}
               />

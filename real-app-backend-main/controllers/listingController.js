@@ -98,7 +98,7 @@ const applyListingLifecycle = async () => {
 
 exports.getPublicStats = async (req, res) => {
   try {
-    const [activeListings, landlords, provinceRows] = await Promise.all([
+    const [activeListings, landlords, provinceRows, ratingAggregate] = await Promise.all([
       prisma.listing.count({ where: { status: "active" } }),
       prisma.user.count({ where: { role: "landlord" } }),
       prisma.listing.findMany({
@@ -106,18 +106,22 @@ exports.getPublicStats = async (req, res) => {
         distinct: ["province"],
         select: { province: true },
       }),
+      prisma.review.aggregate({
+        where: {
+          isPublished: true,
+          deletedAt: null,
+          accommodation: {
+            isPublished: true,
+            deletedAt: null,
+          },
+        },
+        _avg: { overallRating: true },
+      }),
     ]);
 
-    let avgRating = 0;
-    try {
-      const ratingAggregate = await prisma.listing.aggregate({
-        where: { status: "active" },
-        _avg: { averageRating: true },
-      });
-      avgRating = Number(ratingAggregate?._avg?.averageRating || 0);
-    } catch {
-      avgRating = 0;
-    }
+    const reviewAverageRating = ratingAggregate?._avg?.overallRating;
+    const avgRating =
+      reviewAverageRating == null ? null : Math.round(Number(reviewAverageRating) * 10) / 10;
 
     return res.status(200).json({
       status: true,

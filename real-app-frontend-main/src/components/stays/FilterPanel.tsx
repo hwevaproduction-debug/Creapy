@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Box,
   Checkbox,
@@ -19,6 +19,7 @@ import { StayFilterField, StayFilterState } from "../../hooks/useStayFilters";
 interface FilterPanelProps {
   filters: StayFilterState;
   onChange: (field: StayFilterField, value: StayFilterState[StayFilterField]) => void;
+  onChangeMany: (updates: Partial<StayFilterState>) => void;
   onClear: () => void;
   activeFilterCount?: number;
 }
@@ -84,16 +85,21 @@ const toggleButtonSx = {
 const FilterPanel = ({
   filters,
   onChange,
+  onChangeMany,
   onClear,
   activeFilterCount = 0,
 }: FilterPanelProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const minPrice = Number(filters.minPrice) || 0;
   const maxPrice = Number(filters.maxPrice) || 2000;
-  const priceRange: [number, number] = [
-    Math.min(minPrice, maxPrice),
-    Math.max(minPrice, maxPrice),
-  ];
+  const normalizedMinPrice = Math.min(minPrice, maxPrice);
+  const normalizedMaxPrice = Math.max(minPrice, maxPrice);
+  const priceRange: [number, number] = [normalizedMinPrice, normalizedMaxPrice];
+  const [draftPriceRange, setDraftPriceRange] = useState<[number, number]>(priceRange);
+
+  useEffect(() => {
+    setDraftPriceRange([normalizedMinPrice, normalizedMaxPrice]);
+  }, [normalizedMinPrice, normalizedMaxPrice]);
 
   const toggleAmenity = (amenityValue: string) => {
     const nextAmenities = filters.amenities.includes(amenityValue)
@@ -175,10 +181,23 @@ const FilterPanel = ({
         <Box>
           <SubHeading sx={sectionTitleSx}>Price range</SubHeading>
           <Slider
-            value={priceRange}
+            value={draftPriceRange}
             onChange={(_, newValue) => {
-              onChange("minPrice", String((newValue as number[])[0]));
-              onChange("maxPrice", String((newValue as number[])[1]));
+              const nextRange = newValue as number[];
+              setDraftPriceRange([nextRange[0], nextRange[1]]);
+            }}
+            onChangeCommitted={(_, newValue) => {
+              const nextRange = newValue as number[];
+              const nextPriceRange: [number, number] = [
+                Math.min(nextRange[0], nextRange[1]),
+                Math.max(nextRange[0], nextRange[1]),
+              ];
+
+              setDraftPriceRange(nextPriceRange);
+              onChangeMany({
+                minPrice: String(nextPriceRange[0]),
+                maxPrice: String(nextPriceRange[1]),
+              });
             }}
             min={0}
             max={2000}
@@ -187,7 +206,7 @@ const FilterPanel = ({
             sx={{ color: "#B8975A" }}
           />
           <SubHeading sx={{ color: "text.secondary", fontSize: "13px" }}>
-            ${priceRange[0]} - ${priceRange[1]}
+            ${draftPriceRange[0]} - ${draftPriceRange[1]}
           </SubHeading>
         </Box>
 

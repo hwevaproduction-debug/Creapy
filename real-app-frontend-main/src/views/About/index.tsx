@@ -25,6 +25,7 @@ const computeStats = (data: any) => {
   const landlords = Number(data.landlords || 0);
   const provinces = Number(data.provinces || 0);
   const avgRating = Number(data.avgRating || 0);
+  const hasAvgRating = Number.isFinite(avgRating) && avgRating > 0;
 
   return [
     activeListings >= 100
@@ -34,7 +35,7 @@ const computeStats = (data: any) => {
       ? { value: `${landlords}+`, label: "Verified Landlords" }
       : { value: "Growing Network", label: "Trusted Landlords" },
     { value: String(provinces || 10), label: "Provinces Covered" },
-    avgRating >= 4.0
+    hasAvgRating && avgRating >= 4.0
       ? { value: `${avgRating.toFixed(1)}★`, label: "Average Rating" }
       : { value: "Highly Rated", label: "Verified Stays" },
   ];
