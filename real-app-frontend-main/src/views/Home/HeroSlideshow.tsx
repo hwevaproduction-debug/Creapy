@@ -15,6 +15,7 @@ const kenBurnsTo = [
 const HeroSlideshow = ({ images }: HeroSlideshowProps) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [prevIndex, setPrevIndex] = useState<number | null>(null);
+  const imageSignature = images.join("|");
 
   useEffect(() => {
     if (images.length <= 1) {
@@ -34,7 +35,7 @@ const HeroSlideshow = ({ images }: HeroSlideshowProps) => {
   useEffect(() => {
     setActiveIndex(0);
     setPrevIndex(null);
-  }, [images]);
+  }, [imageSignature]);
 
   return (
     <Box sx={{ position: "absolute", inset: 0, overflow: "hidden", zIndex: 0 }}>

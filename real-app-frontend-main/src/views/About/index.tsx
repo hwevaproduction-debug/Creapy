@@ -49,7 +49,7 @@ const stepCards = [
   {
     Icon: Home,
     title: "Connect Directly",
-    body: "Contact landlords directly - no agent fees",
+    body: "Contact landlords directly — no agent fees",
   },
   {
     Icon: Shield,
@@ -62,7 +62,7 @@ const valueCards = [
   {
     Icon: Eye,
     title: "Transparency",
-    body: "Every listing shows real data - rooms, amenities, price",
+    body: "Every listing shows real data — rooms, amenities, price",
   },
   {
     Icon: UserX,

@@ -64,3 +64,6 @@ services:
       - key: FRONTEND_URL
         # Set to your Amplify frontend URL, e.g. https://<branch>.<appid>.amplifyapp.com
         sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        # Optional comma-separated origins for API and S3 upload CORS.
+        sync: false

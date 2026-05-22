@@ -4,6 +4,30 @@ const prisma = require("../utils/prisma");
 
 const getUserId = (user) => user?.id || user?._id?.toString();
 
+const getNotificationDelegate = () =>
+  prisma.notification?.count && prisma.notification?.findMany
+    ? prisma.notification
+    : null;
+
+const isMissingNotificationStoreError = (error) => {
+  const message = String(error?.message || "").toLowerCase();
+
+  return (
+    error?.code === "P2021" ||
+    error?.code === "P2022" ||
+    message.includes("prisma.notification") ||
+    (message.includes("notification") && message.includes("does not exist"))
+  );
+};
+
+const handleMissingNotificationStore = (error) => {
+  if (!isMissingNotificationStoreError(error)) {
+    throw error;
+  }
+
+  console.warn("[notifications] Notification store is unavailable:", error?.message || error);
+};
+
 const getPagination = (query) => {
   const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
   const limit = Math.min(50, Math.max(1, Number.parseInt(query.limit, 10) || 20));
@@ -19,15 +43,34 @@ exports.getMyNotifications = catchAsync(async (req, res) => {
   const userId = getUserId(req.user);
   const { limit, skip } = getPagination(req.query);
   const where = { userId };
-  const [total, notifications] = await Promise.all([
-    prisma.notification.count({ where }),
-    prisma.notification.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: limit,
-    }),
-  ]);
+  const notification = getNotificationDelegate();
+
+  if (!notification) {
+    return res.status(200).json({
+      status: "success",
+      total: 0,
+      data: [],
+    });
+  }
+
+  let total;
+  let notifications;
+
+  try {
+    [total, notifications] = await Promise.all([
+      notification.count({ where }),
+      notification.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+    ]);
+  } catch (error) {
+    handleMissingNotificationStore(error);
+    total = 0;
+    notifications = [];
+  }
 
   res.status(200).json({
     status: "success",
@@ -37,12 +80,21 @@ exports.getMyNotifications = catchAsync(async (req, res) => {
 });
 
 exports.getUnreadCount = catchAsync(async (req, res) => {
-  const count = await prisma.notification.count({
-    where: {
-      userId: getUserId(req.user),
-      isRead: false,
-    },
-  });
+  const notification = getNotificationDelegate();
+  let count = 0;
+
+  if (notification) {
+    try {
+      count = await notification.count({
+        where: {
+          userId: getUserId(req.user),
+          isRead: false,
+        },
+      });
+    } catch (error) {
+      handleMissingNotificationStore(error);
+    }
+  }
 
   res.status(200).json({
     status: "success",
@@ -51,19 +103,32 @@ exports.getUnreadCount = catchAsync(async (req, res) => {
 });
 
 exports.markAsRead = catchAsync(async (req, res, next) => {
-  const result = await prisma.notification.updateMany({
-    where: {
-      id: req.params.id,
-      userId: getUserId(req.user),
-    },
-    data: { isRead: true },
-  });
+  const notification = getNotificationDelegate();
+
+  if (!notification?.updateMany) {
+    return next(new AppError("Notification not found", 404));
+  }
+
+  let result;
+
+  try {
+    result = await notification.updateMany({
+      where: {
+        id: req.params.id,
+        userId: getUserId(req.user),
+      },
+      data: { isRead: true },
+    });
+  } catch (error) {
+    handleMissingNotificationStore(error);
+    return next(new AppError("Notification not found", 404));
+  }
 
   if (result.count === 0) {
     return next(new AppError("Notification not found", 404));
   }
 
-  const notification = await prisma.notification.findFirst({
+  const updatedNotification = await notification.findFirst({
     where: {
       id: req.params.id,
       userId: getUserId(req.user),
@@ -72,18 +137,27 @@ exports.markAsRead = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: "success",
-    data: notification,
+    data: updatedNotification,
   });
 });
 
 exports.markAllAsRead = catchAsync(async (req, res) => {
-  const result = await prisma.notification.updateMany({
-    where: {
-      userId: getUserId(req.user),
-      isRead: false,
-    },
-    data: { isRead: true },
-  });
+  const notification = getNotificationDelegate();
+  let result = { count: 0 };
+
+  if (notification?.updateMany) {
+    try {
+      result = await notification.updateMany({
+        where: {
+          userId: getUserId(req.user),
+          isRead: false,
+        },
+        data: { isRead: true },
+      });
+    } catch (error) {
+      handleMissingNotificationStore(error);
+    }
+  }
 
   res.status(200).json({
     status: "success",
