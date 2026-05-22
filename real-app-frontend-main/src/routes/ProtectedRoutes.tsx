@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import useTypedSelector from "../hooks/useTypedSelector";
 import { selectedUserRole } from "../redux/auth/authSlice";
 
@@ -9,6 +9,7 @@ interface ProtectedRoutesProps {
 }
 
 const ProtectedRoutes = ({ allowedRoles, children }: ProtectedRoutesProps) => {
+  const location = useLocation();
   const authUser = useTypedSelector((state) => state.auth?.user);
   const role = useTypedSelector(selectedUserRole);
   const destination =
@@ -23,7 +24,13 @@ const ProtectedRoutes = ({ allowedRoles, children }: ProtectedRoutesProps) => {
           : "/";
 
   if (!authUser) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: location.pathname + location.search }}
+        replace
+      />
+    );
   }
 
   if (!allowedRoles || allowedRoles.length === 0) {

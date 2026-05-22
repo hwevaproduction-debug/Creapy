@@ -111,6 +111,35 @@ test("getListings uses Prisma-compatible location filters", async () => {
   assert.equal(result.statusCode, 200);
 });
 
+test("getListings applies city and neighborhood discovery filters", async () => {
+  let capturedArgs = null;
+  prisma.listing.updateMany = async () => ({ count: 0 });
+  prisma.listing.findMany = async (args) => {
+    capturedArgs = args;
+    return [];
+  };
+
+  const result = await invokeController(listingController.getListings, {
+    query: { city: "Harare", neighborhood: "Borrowdale" },
+  });
+
+  assert.deepEqual(capturedArgs.where.AND, [
+    {
+      OR: [
+        { province: { contains: "Harare", mode: "insensitive" } },
+        { city: { contains: "Harare", mode: "insensitive" } },
+      ],
+    },
+    {
+      OR: [
+        { city: { contains: "Borrowdale", mode: "insensitive" } },
+        { addressLine: { contains: "Borrowdale", mode: "insensitive" } },
+      ],
+    },
+  ]);
+  assert.equal(result.statusCode, 200);
+});
+
 test("getHomeGroupedByLocation groups current flat province locations", async () => {
   let capturedArgs = null;
   prisma.listing.updateMany = async () => ({ count: 0 });

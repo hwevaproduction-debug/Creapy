@@ -17,6 +17,8 @@ const stayRouter = require("./routes/stayRoutes");
 const notificationRouter = require("./routes/notificationRoutes");
 const disputeRouter = require("./routes/disputeRoutes");
 const reportRouter = require("./routes/reportRoutes");
+const engagementRouter = require("./routes/engagementRoutes");
+const leadRouter = require("./routes/leadRoutes");
 const { globalLimiter } = require("./middleware/rateLimiter");
 
 const listingRoutes = require("./routes/listingRoutes");
@@ -125,6 +127,8 @@ app.use("/api/listings", listingRoutes);
 app.use("/api/v1/listing-drafts", listingDraftRoutes);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/bookings", bookingRouter);
+app.use("/api/v1/engagements", engagementRouter);
+app.use("/api/v1/leads", leadRouter);
 app.use("/api/v1/stays", stayRouter);
 
 // PRODUCTION SETUP

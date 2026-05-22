@@ -157,6 +157,12 @@ enum ModerationStatus {
   SUSPENDED
 }
 
+enum EngagementStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
 model User {
   id                       String              @id @default(cuid())
   username                 String              @unique
@@ -172,6 +178,8 @@ model User {
   phoneOtpExpires          DateTime?
   emailVerificationToken   String?
   emailVerificationExpires DateTime?
+  passwordResetToken       String?
+  passwordResetExpires     DateTime?
   premiumExpiry            DateTime?
   providerProfile          Json?
   listings                 Listing[]
@@ -193,6 +201,12 @@ model User {
   resolvedDisputes         Dispute[]           @relation("DisputeResolver")
   createdAt                DateTime            @default(now())
   updatedAt                DateTime            @updatedAt
+  verificationStatus       String              @default("UNVERIFIED")
+  verificationIdUrl        String?
+  verificationSelfieUrl    String?
+  verificationSubmittedAt  DateTime?
+  tenantEngagements        Engagement[]        @relation("TenantEngagements")
+  landlordEngagements      Engagement[]        @relation("LandlordEngagements")
 }
 
 model Listing {
@@ -225,6 +239,7 @@ model Listing {
   payments             Payment[]
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
+  engagements          Engagement[]
 
   @@index([userId, status])
 }
@@ -790,4 +805,23 @@ model Dispute {
 
   @@index([status, createdAt])
   @@index([bookingId])
+}
+
+model Engagement {
+  id           String           @id @default(cuid())
+  listingId    String
+  listing      Listing          @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  tenantId     String
+  tenant       User             @relation("TenantEngagements", fields: [tenantId], references: [id])
+  landlordId   String
+  landlord     User             @relation("LandlordEngagements", fields: [landlordId], references: [id])
+  message      String
+  status       EngagementStatus @default(PENDING)
+  landlordNote String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([tenantId, status])
+  @@index([landlordId, status])
+  @@index([listingId])
 }

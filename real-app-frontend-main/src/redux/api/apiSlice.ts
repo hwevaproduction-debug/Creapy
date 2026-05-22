@@ -41,6 +41,7 @@ export const apiSlice = createApi({
     "Dispute",
     "Report",
     "AuditLog",
+    "Engagement",
   ],
   endpoints: (builder) => ({}),
 });

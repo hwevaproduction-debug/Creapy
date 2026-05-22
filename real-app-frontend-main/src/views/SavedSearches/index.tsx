@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Checkbox,
@@ -10,6 +11,7 @@ import {
   FormControlLabel,
   Grid,
 } from "@mui/material";
+import { Bookmark } from "lucide-react";
 
 import { Heading, SubHeading } from "../../components/Heading";
 import useTypedSelector from "../../hooks/useTypedSelector";
@@ -26,6 +28,7 @@ import AppInput from "../../components/ui/AppInput";
 
 const SavedSearches = () => {
   const role = useTypedSelector(selectedUserRole);
+  const navigate = useNavigate();
 
   const { data: searchesData, refetch } = useGetMySavedSearchesQuery(undefined, {
     skip: role !== "tenant",
@@ -196,7 +199,30 @@ const SavedSearches = () => {
         <AppCard sx={{ marginTop: "20px", p: 2 }}>
           <SubHeading sx={{ marginBottom: "10px" }}>Your Saved Searches</SubHeading>
           {searches.length === 0 ? (
-            <Box>No saved searches yet.</Box>
+            <Box
+              sx={{
+                minHeight: 240,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+                px: 2,
+              }}
+            >
+              <Box>
+                <Bookmark size={42} color="#B8975A" />
+                <Heading sx={{ fontSize: "22px", mt: 1.5 }}>
+                  No saved searches yet
+                </Heading>
+                <SubHeading sx={{ color: "text.secondary", mt: 0.5, mb: 2 }}>
+                  Use the search page to save searches and get notified about new
+                  listings.
+                </SubHeading>
+                <AppButton onClick={() => navigate("/search")}>
+                  Start Searching
+                </AppButton>
+              </Box>
+            </Box>
           ) : (
             searches.map((s: any) => (
               <Box

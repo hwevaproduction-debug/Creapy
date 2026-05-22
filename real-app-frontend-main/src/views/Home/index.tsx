@@ -36,6 +36,7 @@ import AppButton from "../../components/ui/AppButton";
 import AppInput from "../../components/ui/AppInput";
 import useTypedSelector from "../../hooks/useTypedSelector";
 import { ZIMBABWE_PROVINCES } from "../../config/zimbabweProvinces";
+import { ZIMBABWE_NEIGHBORHOODS } from "../../config/zimbabweNeighborhoods";
 import {
   selectedUserRole,
   selectedUserToken,
@@ -138,6 +139,17 @@ const Home = () => {
 
   const highlightedListings = (highlightedData?.data || []).slice(0, 6);
   const groupedSlides = groupedByLocationData?.data || [];
+  const neighborhoodEntries = ZIMBABWE_NEIGHBORHOODS.flatMap((entry) =>
+    entry.neighborhoods.map((neighborhood) => ({
+      city: entry.city,
+      neighborhood,
+    }))
+  ).slice(0, 12);
+  const neighborhoodGradients = [
+    "linear-gradient(135deg,#B8975A,#7D6234)",
+    "linear-gradient(135deg,#1F4D3A,#1F2937)",
+    "linear-gradient(135deg,#1F2937,#374151)",
+  ];
   const listingHeroImages = highlightedListings
     .map((item: any) => getListingImage(item))
     .filter((image: string | null): image is string => Boolean(image));
@@ -571,51 +583,86 @@ const Home = () => {
 
       <AppContainer sx={{ pb: { xs: 6, md: 8 } }}>
         <Box sx={{ marginBottom: 3 }}>
-          <Heading>Browse By Location</Heading>
+          <Heading>Explore By Neighbourhood</Heading>
           <SubHeading sx={{ marginTop: 0.75 }}>
-            Explore properties across Zimbabwe&apos;s provinces
+            Discover high-demand areas across Zimbabwe&apos;s major cities
           </SubHeading>
         </Box>
         <Grid container spacing={2}>
-          {ZIMBABWE_PROVINCES.map((province) => {
-            const isPopular = ["Harare", "Bulawayo"].includes(province.value);
-            return (
-              <Grid item xs={6} sm={4} md={3} lg={2} key={province.value}>
+          {neighborhoodEntries.map((entry, index) => (
+            <Grid
+              item
+              xs={6}
+              sm={4}
+              md={3}
+              lg={2}
+              key={`${entry.city}-${entry.neighborhood}`}
+            >
+              <Box
+                onClick={() =>
+                  navigate(
+                    `/search?city=${entry.city}&neighborhood=${entry.neighborhood}`
+                  )
+                }
+                sx={{
+                  height: 100,
+                  borderRadius: "14px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  background:
+                    neighborhoodGradients[index % neighborhoodGradients.length],
+                  transition: "all 0.2s",
+                  px: 1.5,
+                  "&:hover": {
+                    transform: "translateY(-3px)",
+                    boxShadow: "0 12px 32px rgba(31,41,55,0.2)",
+                  },
+                }}
+              >
                 <Box
-                  onClick={() => navigate(`/search?province=${province.value}`)}
                   sx={{
-                    height: 100,
-                    borderRadius: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    background: isPopular
-                      ? "linear-gradient(135deg, #B8975A, #7D6234)"
-                      : "linear-gradient(135deg, #1F4D3A, #1F2937)",
-                    transition: "all 0.2s",
-                    px: 1.5,
-                    "&:hover": {
-                      transform: "translateY(-3px)",
-                      boxShadow: "0 12px 32px rgba(31,41,55,0.2)",
-                    },
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: "14px",
+                    textAlign: "center",
                   }}
                 >
-                  <Box
-                    sx={{
-                      color: "#fff",
-                      fontWeight: 700,
-                      fontSize: "14px",
-                      textAlign: "center",
-                    }}
-                  >
-                    {province.label}
-                  </Box>
+                  {entry.neighborhood}
                 </Box>
-              </Grid>
-            );
-          })}
+                <Box
+                  sx={{
+                    color: "#fff",
+                    opacity: 0.7,
+                    fontSize: "11px",
+                    mt: 0.5,
+                  }}
+                >
+                  {entry.city}
+                </Box>
+              </Box>
+            </Grid>
+          ))}
         </Grid>
+        <Box
+          component="button"
+          type="button"
+          onClick={() => navigate("/search")}
+          sx={{
+            mt: 2,
+            border: 0,
+            background: "transparent",
+            color: "#1F4D3A",
+            fontWeight: 700,
+            cursor: "pointer",
+            padding: 0,
+            font: "inherit",
+          }}
+        >
+          Browse by province -&gt;
+        </Box>
       </AppContainer>
 
       <AppContainer sx={{ pb: { xs: 6, md: 8 } }}>

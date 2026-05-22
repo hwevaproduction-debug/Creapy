@@ -1,60 +1,75 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, Grid } from "@mui/material";
-import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
+import { Box, Chip, Grid } from "@mui/material";
+import { CheckCircle2, Home } from "lucide-react";
 import { Form, Formik, FormikProps } from "formik";
+import * as Yup from "yup";
 import { onKeyDown } from "../../utils";
-import { useRegisterProviderMutation } from "../../redux/api/providerApiSlice";
+import { useSubmitPropertyInterestMutation } from "../../redux/api/userApiSlice";
 import DotLoader from "../../components/Spinner/dotLoader";
 import PrimaryInput from "../../components/PrimaryInput/PrimaryInput";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
-import { providerSignUpSchema } from "./components/validationSchema";
 import { Heading, SubHeading } from "../../components/Heading";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
 import AppSelect from "../../components/ui/AppSelect";
-import { BUSINESS_TYPES } from "../Stays";
-import { ZIMBABWE_PROVINCES } from "../../config/zimbabweProvinces";
+import HeroSlideshow from "../../views/Home/HeroSlideshow";
 
-interface IProviderSignUpForm {
-  userName: string;
+interface IPropertyInterestForm {
+  fullName: string;
   email: string;
-  password: string;
-  confirmPassword: string;
-  businessName: string;
-  businessType: string;
-  registrationNumber: string;
-  contactPhone: string;
-  address: string;
-  province: string;
-  city: string;
+  phone: string;
+  propertyType: string;
+  location: string;
   description: string;
-  checkInTime: string;
-  checkOutTime: string;
+  referral: string;
 }
 
-const initialValues: IProviderSignUpForm = {
-  userName: "",
+const FALLBACK_HERO_IMAGES = [
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1920&q=80",
+];
+
+const initialValues: IPropertyInterestForm = {
+  fullName: "",
   email: "",
-  password: "",
-  confirmPassword: "",
-  businessName: "",
-  businessType: "",
-  registrationNumber: "",
-  contactPhone: "",
-  address: "",
-  province: "",
-  city: "",
+  phone: "",
+  propertyType: "",
+  location: "",
   description: "",
-  checkInTime: "",
-  checkOutTime: "",
+  referral: "",
 };
+
+const propertyInterestSchema = Yup.object().shape({
+  fullName: Yup.string().required("Full name is required"),
+  email: Yup.string()
+    .email("Invalid email address")
+    .required("Email is required"),
+  phone: Yup.string().nullable(),
+  propertyType: Yup.string().required("Property type is required"),
+  location: Yup.string().required("Location is required"),
+  description: Yup.string()
+    .min(20, "Description must be at least 20 characters")
+    .required("Description is required"),
+  referral: Yup.string().nullable(),
+});
+
+const propertyTypeOptions = [
+  { label: "House", value: "House" },
+  { label: "Flat", value: "Flat" },
+  { label: "Room", value: "Room" },
+  { label: "Student Accommodation", value: "Student Accommodation" },
+  { label: "Other", value: "Other" },
+];
+
+const trustSignals = ["Curated Listings", "Verified Tenants", "Dedicated Support"];
 
 const ProviderSignUp = () => {
   const navigate = useNavigate();
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [toast, setToast] = useState({
     message: "",
@@ -62,48 +77,23 @@ const ProviderSignUp = () => {
     type: "",
   });
 
-  const [registerProvider, { isLoading }] = useRegisterProviderMutation();
+  const [submitPropertyInterest, { isLoading }] =
+    useSubmitPropertyInterestMutation();
 
   const handleCloseToast = () => {
     setToast((prev) => ({ ...prev, appearence: false }));
   };
 
-  const handleSubmit = async (data: IProviderSignUpForm) => {
-    const payload = {
-      username: data.userName,
-      email: data.email,
-      password: data.password,
-      businessName: data.businessName,
-      businessType: data.businessType,
-      registrationNumber: data.registrationNumber || undefined,
-      contactPhone: data.contactPhone,
-      address: data.address,
-      province: data.province,
-      city: data.city,
-      description: data.description || undefined,
-      checkInTime: data.checkInTime || undefined,
-      checkOutTime: data.checkOutTime || undefined,
-    };
-
+  const handleSubmit = async (data: IPropertyInterestForm) => {
     try {
-      const user: any = await registerProvider(payload);
-
-      if (user?.data?.status === "pending_verification" || user?.data) {
-        setSubmitted(true);
-        return;
-      }
-
-      if (user?.error) {
-        setToast({
-          message: user?.error?.data?.message || "Something went wrong",
-          appearence: true,
-          type: "error",
-        });
-      }
-    } catch (error) {
-      console.error("Provider Sign Up Error:", error);
+      await submitPropertyInterest(data).unwrap();
+      setSubmitted(true);
+    } catch (error: any) {
       setToast({
-        message: "Something went wrong",
+        message:
+          error?.data?.message ||
+          error?.message ||
+          "Unable to submit interest right now.",
         appearence: true,
         type: "error",
       });
@@ -111,481 +101,255 @@ const ProviderSignUp = () => {
   };
 
   return (
-    <Box sx={{ margin: "70px 0" }}>
-      <AppContainer>
-        <Grid container spacing={2} justifyContent="center">
-          <Grid item xs={12} md={7}>
-            <AppCard sx={{ p: { xs: 2.5, md: 3.5 } }}>
-              {submitted ? (
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    flexDirection: "column",
-                    textAlign: "center",
-                    py: 2,
-                    gap: 1.5,
-                  }}
-                >
-                  <Heading sx={{ fontSize: "32px", marginBottom: "6px" }}>
-                    Application Submitted
-                  </Heading>
-                  <SubHeading sx={{ color: "text.secondary", maxWidth: 440 }}>
-                    Your provider account is pending verification. You will be able
-                    to add rooms after admin approval.
-                  </SubHeading>
+    <Box
+      sx={{
+        position: "relative",
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        py: 4,
+        background: "#0F141E",
+      }}
+    >
+      <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(15,20,30,0.55)",
+          zIndex: 1,
+        }}
+      />
+      <Box sx={{ position: "relative", zIndex: 2, width: "100%" }}>
+        <AppContainer>
+          <Grid container justifyContent="center">
+            <Grid item xs={12}>
+              <AppCard
+                sx={{
+                  maxWidth: 520,
+                  mx: "auto",
+                  p: { xs: 3, md: 4 },
+                  borderRadius: "24px",
+                  boxShadow: "0 32px 80px rgba(0,0,0,0.35)",
+                }}
+              >
+                <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
                   <Box
+                    component="img"
+                    src="/app-logo.png"
+                    alt="Town Ruins"
                     sx={{
-                      display: "flex",
-                      gap: 1.5,
-                      flexWrap: "wrap",
-                      justifyContent: "center",
-                      mt: 1,
+                      height: { xs: 32, md: 40 },
+                      width: "auto",
+                      objectFit: "contain",
+                      display: "block",
                     }}
-                  >
-                    <AppButton onClick={() => navigate("/login")}>
-                      Go to Login
-                    </AppButton>
-                    <AppButton
-                      variant="outlined"
-                      onClick={() => navigate("/stays")}
-                    >
-                      Browse Temporary Stays
-                    </AppButton>
-                  </Box>
+                  />
                 </Box>
-              ) : (
-                <>
+                {submitted ? (
                   <Box
                     sx={{
                       display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
                       flexDirection: "column",
+                      alignItems: "center",
                       textAlign: "center",
+                      py: 2,
+                      gap: 1.5,
                     }}
                   >
-                    <Heading sx={{ fontSize: "32px", marginBottom: "6px" }}>
-                      List your stay
+                    <CheckCircle2 size={58} color="#1F4D3A" />
+                    <Heading sx={{ fontSize: "30px" }}>
+                      Thank you for your interest!
                     </Heading>
-                    <SubHeading sx={{ color: "text.secondary", maxWidth: 520 }}>
-                      Create a provider account to register your accommodation
-                      business and start the verification process.
+                    <SubHeading sx={{ color: "text.secondary", maxWidth: 420 }}>
+                      Our team will be in touch within 48 hours to guide you
+                      through the listing process.
                     </SubHeading>
-                  </Box>
-                  <Box sx={{ width: "100%", marginTop: "10px" }}>
-                    <Formik
-                      initialValues={initialValues}
-                      onSubmit={handleSubmit}
-                      validationSchema={providerSignUpSchema}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        gap: 1.5,
+                        flexWrap: "wrap",
+                        justifyContent: "center",
+                        mt: 1,
+                      }}
                     >
-                      {(props: FormikProps<IProviderSignUpForm>) => {
-                        const {
-                          values,
-                          touched,
-                          errors,
-                          handleBlur,
-                          handleChange,
-                        } = props;
+                      <AppButton onClick={() => navigate("/search")}>
+                        Browse Listings
+                      </AppButton>
+                      <AppButton variant="outlined" onClick={() => navigate("/")}>
+                        Back to Home
+                      </AppButton>
+                    </Box>
+                  </Box>
+                ) : (
+                  <>
+                    <Box sx={{ textAlign: "center" }}>
+                      <Home size={34} color="#B8975A" />
+                      <Heading sx={{ fontSize: "30px", mt: 1 }}>
+                        List Your Property on Town Ruins
+                      </Heading>
+                      <SubHeading sx={{ color: "text.secondary", mt: 0.75 }}>
+                        Join Zimbabwe's most curated property platform. We
+                        personally review every listing.
+                      </SubHeading>
+                    </Box>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        gap: 1,
+                        flexWrap: "wrap",
+                        justifyContent: "center",
+                        mt: 2,
+                      }}
+                    >
+                      {trustSignals.map((signal) => (
+                        <Chip
+                          key={signal}
+                          label={signal}
+                          size="small"
+                          sx={{
+                            background: "#F0F7F4",
+                            color: "#1F4D3A",
+                            fontWeight: 700,
+                          }}
+                        />
+                      ))}
+                    </Box>
+                    <Box sx={{ width: "100%", mt: 2 }}>
+                      <Formik
+                        initialValues={initialValues}
+                        onSubmit={handleSubmit}
+                        validationSchema={propertyInterestSchema}
+                      >
+                        {(props: FormikProps<IPropertyInterestForm>) => {
+                          const {
+                            values,
+                            touched,
+                            errors,
+                            handleBlur,
+                            handleChange,
+                          } = props;
 
-                        return (
-                          <Form onKeyDown={onKeyDown}>
-                            <Box sx={{ marginTop: "20px" }}>
-                              <SubHeading sx={{ marginBottom: "12px" }}>
-                                Account
-                              </SubHeading>
+                          return (
+                            <Form onKeyDown={onKeyDown}>
                               <Box sx={{ display: "grid", gap: 1.5 }}>
-                                <Box>
-                                  <SubHeading sx={{ marginBottom: "5px" }}>
-                                    User Name
-                                  </SubHeading>
-                                  <PrimaryInput
-                                    type="text"
-                                    label=""
-                                    name="userName"
-                                    placeholder="User Name"
-                                    value={values.userName}
-                                    helperText={
-                                      errors.userName && touched.userName
-                                        ? errors.userName
-                                        : ""
-                                    }
-                                    error={Boolean(errors.userName && touched.userName)}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                  />
-                                </Box>
-                                <Box>
-                                  <SubHeading sx={{ marginBottom: "5px" }}>
-                                    Email
-                                  </SubHeading>
-                                  <PrimaryInput
-                                    type="text"
-                                    label=""
-                                    name="email"
-                                    placeholder="Email"
-                                    value={values.email}
-                                    helperText={
-                                      errors.email && touched.email ? errors.email : ""
-                                    }
-                                    error={Boolean(errors.email && touched.email)}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                  />
-                                </Box>
-                                <Box>
-                                  <SubHeading sx={{ marginBottom: "5px" }}>
-                                    Password
-                                  </SubHeading>
-                                  <PrimaryInput
-                                    type={showPassword ? "text" : "password"}
-                                    label=""
-                                    name="password"
-                                    placeholder="Password"
-                                    value={values.password}
-                                    helperText={
-                                      errors.password && touched.password
-                                        ? errors.password
-                                        : ""
-                                    }
-                                    error={Boolean(errors.password && touched.password)}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                    onClick={() =>
-                                      setShowPassword((prev) => !prev)
-                                    }
-                                    endAdornment={
-                                      showPassword ? (
-                                        <AiOutlineEye color="disabled" />
-                                      ) : (
-                                        <AiOutlineEyeInvisible color="disabled" />
-                                      )
-                                    }
-                                  />
-                                </Box>
-                                <Box>
-                                  <SubHeading sx={{ marginBottom: "5px" }}>
-                                    Confirm Password
-                                  </SubHeading>
-                                  <PrimaryInput
-                                    type={
-                                      showConfirmPassword ? "text" : "password"
-                                    }
-                                    label=""
-                                    name="confirmPassword"
-                                    placeholder="Confirm Password"
-                                    value={values.confirmPassword}
-                                    helperText={
-                                      errors.confirmPassword &&
-                                      touched.confirmPassword
-                                        ? errors.confirmPassword
-                                        : ""
-                                    }
-                                    error={Boolean(
-                                      errors.confirmPassword &&
-                                        touched.confirmPassword
-                                    )}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                    onClick={() =>
-                                      setShowConfirmPassword((prev) => !prev)
-                                    }
-                                    endAdornment={
-                                      showConfirmPassword ? (
-                                        <AiOutlineEye color="disabled" />
-                                      ) : (
-                                        <AiOutlineEyeInvisible color="disabled" />
-                                      )
-                                    }
-                                  />
-                                </Box>
-                              </Box>
-                            </Box>
-
-                            <Box sx={{ marginTop: "20px" }}>
-                              <SubHeading sx={{ marginBottom: "12px" }}>
-                                Business
-                              </SubHeading>
-                              <Box sx={{ display: "grid", gap: 1.5 }}>
-                                <Box>
-                                  <SubHeading sx={{ marginBottom: "5px" }}>
-                                    Business Name
-                                  </SubHeading>
-                                  <PrimaryInput
-                                    type="text"
-                                    label=""
-                                    name="businessName"
-                                    placeholder="Business Name"
-                                    value={values.businessName}
-                                    helperText={
-                                      errors.businessName && touched.businessName
-                                        ? errors.businessName
-                                        : ""
-                                    }
-                                    error={Boolean(
-                                      errors.businessName && touched.businessName
-                                    )}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                  />
-                                </Box>
-                                <Box>
-                                  <SubHeading sx={{ marginBottom: "5px" }}>
-                                    Business Type
-                                  </SubHeading>
-                                  <AppSelect
-                                    name="businessType"
-                                    value={values.businessType}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                    displayEmpty
-                                    options={BUSINESS_TYPES.filter(
-                                      (option) => option.value !== ""
-                                    )}
-                                  />
-                                  {errors.businessType && touched.businessType && (
-                                    <Box
-                                      sx={{
-                                        fontSize: "12px",
-                                        color: "#d32f2f",
-                                        mt: "3px",
-                                        ml: "2px",
-                                      }}
-                                    >
-                                      {errors.businessType}
-                                    </Box>
+                                <PrimaryInput
+                                  label="Full name"
+                                  name="fullName"
+                                  placeholder="Full name"
+                                  value={values.fullName}
+                                  helperText={
+                                    errors.fullName && touched.fullName
+                                      ? errors.fullName
+                                      : ""
+                                  }
+                                  error={Boolean(
+                                    errors.fullName && touched.fullName
                                   )}
-                                </Box>
-                                <Box>
-                                  <SubHeading sx={{ marginBottom: "5px" }}>
-                                    Registration Number
-                                  </SubHeading>
-                                  <PrimaryInput
-                                    type="text"
-                                    label=""
-                                    name="registrationNumber"
-                                    placeholder="Registration Number (optional)"
-                                    value={values.registrationNumber}
-                                    helperText={
-                                      errors.registrationNumber &&
-                                      touched.registrationNumber
-                                        ? errors.registrationNumber
-                                        : ""
-                                    }
-                                    error={Boolean(
-                                      errors.registrationNumber &&
-                                        touched.registrationNumber
-                                    )}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                  />
-                                </Box>
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                />
+                                <PrimaryInput
+                                  label="Email"
+                                  name="email"
+                                  placeholder="Email"
+                                  value={values.email}
+                                  helperText={
+                                    errors.email && touched.email ? errors.email : ""
+                                  }
+                                  error={Boolean(errors.email && touched.email)}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                />
+                                <PrimaryInput
+                                  label="Phone"
+                                  name="phone"
+                                  placeholder="+263 77 123 4567"
+                                  value={values.phone}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                />
+                                <AppSelect
+                                  label="Property type"
+                                  name="propertyType"
+                                  value={values.propertyType}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                  options={propertyTypeOptions}
+                                />
+                                {errors.propertyType && touched.propertyType ? (
+                                  <Box sx={{ color: "#d32f2f", fontSize: "12px" }}>
+                                    {errors.propertyType}
+                                  </Box>
+                                ) : null}
+                                <PrimaryInput
+                                  label="Location"
+                                  name="location"
+                                  placeholder="Neighborhood or area"
+                                  value={values.location}
+                                  helperText={
+                                    errors.location && touched.location
+                                      ? errors.location
+                                      : ""
+                                  }
+                                  error={Boolean(errors.location && touched.location)}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                />
+                                <PrimaryInput
+                                  label="Description"
+                                  name="description"
+                                  placeholder="Tell us about the property"
+                                  value={values.description}
+                                  helperText={
+                                    errors.description && touched.description
+                                      ? errors.description
+                                      : ""
+                                  }
+                                  error={Boolean(
+                                    errors.description && touched.description
+                                  )}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                  multiline
+                                  minRows={4}
+                                  maxRows={6}
+                                />
+                                <PrimaryInput
+                                  label="How did you hear about us?"
+                                  name="referral"
+                                  placeholder="Optional"
+                                  value={values.referral}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                />
                               </Box>
-                            </Box>
-
-                            <Box sx={{ marginTop: "20px" }}>
-                              <SubHeading sx={{ marginBottom: "12px" }}>
-                                Contact
-                              </SubHeading>
-                              <Box sx={{ display: "grid", gap: 1.5 }}>
-                                <Box>
-                                  <SubHeading sx={{ marginBottom: "5px" }}>
-                                    Contact Phone
-                                  </SubHeading>
-                                  <PrimaryInput
-                                    type="text"
-                                    label=""
-                                    name="contactPhone"
-                                    placeholder="+263 77 123 4567"
-                                    value={values.contactPhone}
-                                    helperText={
-                                      errors.contactPhone && touched.contactPhone
-                                        ? errors.contactPhone
-                                        : ""
-                                    }
-                                    error={Boolean(
-                                      errors.contactPhone && touched.contactPhone
-                                    )}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                  />
-                                </Box>
-                                <Box>
-                                  <SubHeading sx={{ marginBottom: "5px" }}>
-                                    Address
-                                  </SubHeading>
-                                  <PrimaryInput
-                                    type="text"
-                                    label=""
-                                    name="address"
-                                    placeholder="Street address"
-                                    value={values.address}
-                                    helperText={
-                                      errors.address && touched.address
-                                        ? errors.address
-                                        : ""
-                                    }
-                                    error={Boolean(errors.address && touched.address)}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                  />
-                                </Box>
-                                <Grid container spacing={2}>
-                                  <Grid item xs={12} sm={6}>
-                                    <SubHeading sx={{ marginBottom: "5px" }}>
-                                      Province
-                                    </SubHeading>
-                                    <AppSelect
-                                      name="province"
-                                      value={values.province}
-                                      onChange={handleChange}
-                                      onBlur={handleBlur}
-                                      displayEmpty
-                                      options={ZIMBABWE_PROVINCES}
-                                    />
-                                    {errors.province && touched.province && (
-                                      <Box
-                                        sx={{
-                                          fontSize: "12px",
-                                          color: "#d32f2f",
-                                          mt: "3px",
-                                          ml: "2px",
-                                        }}
-                                      >
-                                        {errors.province}
-                                      </Box>
-                                    )}
-                                  </Grid>
-                                  <Grid item xs={12} sm={6}>
-                                    <SubHeading sx={{ marginBottom: "5px" }}>
-                                      City
-                                    </SubHeading>
-                                    <PrimaryInput
-                                      type="text"
-                                      label=""
-                                      name="city"
-                                      placeholder="City"
-                                      value={values.city}
-                                      helperText={
-                                        errors.city && touched.city ? errors.city : ""
-                                      }
-                                      error={Boolean(errors.city && touched.city)}
-                                      onChange={handleChange}
-                                      onBlur={handleBlur}
-                                    />
-                                  </Grid>
-                                </Grid>
-                              </Box>
-                            </Box>
-
-                            <Box sx={{ marginTop: "20px" }}>
-                              <SubHeading sx={{ marginBottom: "12px" }}>
-                                Optional details
-                              </SubHeading>
-                              <Box sx={{ display: "grid", gap: 1.5 }}>
-                                <Box>
-                                  <SubHeading sx={{ marginBottom: "5px" }}>
-                                    Description
-                                  </SubHeading>
-                                  <PrimaryInput
-                                    label=""
-                                    name="description"
-                                    placeholder="Tell us about your business"
-                                    value={values.description}
-                                    helperText={
-                                      errors.description && touched.description
-                                        ? errors.description
-                                        : ""
-                                    }
-                                    error={Boolean(
-                                      errors.description && touched.description
-                                    )}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                    multiline
-                                    minRows={4}
-                                    maxRows={6}
-                                  />
-                                </Box>
-                                <Grid container spacing={2}>
-                                  <Grid item xs={12} sm={6}>
-                                    <SubHeading sx={{ marginBottom: "5px" }}>
-                                      Check-in Time
-                                    </SubHeading>
-                                    <PrimaryInput
-                                      type="time"
-                                      label=""
-                                      name="checkInTime"
-                                      value={values.checkInTime}
-                                      helperText={
-                                        errors.checkInTime && touched.checkInTime
-                                          ? errors.checkInTime
-                                          : ""
-                                      }
-                                      error={Boolean(
-                                        errors.checkInTime && touched.checkInTime
-                                      )}
-                                      onChange={handleChange}
-                                      onBlur={handleBlur}
-                                    />
-                                  </Grid>
-                                  <Grid item xs={12} sm={6}>
-                                    <SubHeading sx={{ marginBottom: "5px" }}>
-                                      Check-out Time
-                                    </SubHeading>
-                                    <PrimaryInput
-                                      type="time"
-                                      label=""
-                                      name="checkOutTime"
-                                      value={values.checkOutTime}
-                                      helperText={
-                                        errors.checkOutTime && touched.checkOutTime
-                                          ? errors.checkOutTime
-                                          : ""
-                                      }
-                                      error={Boolean(
-                                        errors.checkOutTime && touched.checkOutTime
-                                      )}
-                                      onChange={handleChange}
-                                      onBlur={handleBlur}
-                                    />
-                                  </Grid>
-                                </Grid>
-                              </Box>
-                            </Box>
-
-                            <Box
-                              sx={{
-                                display: "flex",
-                                justifyContent: "end",
-                                marginTop: "16px",
-                              }}
-                            >
                               <AppButton
                                 type="submit"
                                 fullWidth
                                 disabled={isLoading}
-                                sx={{ margin: "0 0 16px 0" }}
+                                sx={{ mt: 2 }}
                               >
                                 {isLoading ? (
                                   <DotLoader color="#fff" size={12} />
                                 ) : (
-                                  "Submit Application"
+                                  "Submit Interest"
                                 )}
                               </AppButton>
-                            </Box>
-                          </Form>
-                        );
-                      }}
-                    </Formik>
-                  </Box>
-                </>
-              )}
-            </AppCard>
+                            </Form>
+                          );
+                        }}
+                      </Formik>
+                    </Box>
+                  </>
+                )}
+              </AppCard>
+            </Grid>
           </Grid>
-        </Grid>
-      </AppContainer>
+        </AppContainer>
+      </Box>
       <ToastAlert
         appearence={toast.appearence}
         type={toast.type}

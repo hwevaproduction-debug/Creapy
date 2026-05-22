@@ -11,6 +11,9 @@ router.post("/google", authController.google); // ← Move this HERE, before pro
 router.get("/verify-email", authController.verifyEmail);
 router.post("/verify-phone", authController.verifyPhone);
 router.post("/resend-phone-otp", authController.resendPhoneOtp);
+router.post("/forgot-password", authController.forgotPassword);
+router.post("/reset-password", authController.resetPassword);
+router.post("/resend-verification", authController.resendVerification);
 router.get("/me", authController.protect, authController.getMe);
 router.get("/:id", authController.optionalAuth, authController.getUserByListingId);
 
@@ -18,6 +21,11 @@ router.get("/:id", authController.optionalAuth, authController.getUserByListingI
 router.use(authController.protect);
 
 // USER CONTROLLER
+router.post(
+  "/submit-verification",
+  authController.requireRole("landlord"),
+  authController.submitVerification
+);
 router.put("/update/:id", authController.update);
 router.delete("/delete/:id", authController.delete);
 

@@ -62,6 +62,30 @@ export const authApiSlice = apiSlice.injectEndpoints({
         };
       },
     }),
+    forgotPassword: builder.mutation({
+      query: (data) => ({
+        url: "users/forgot-password",
+        method: "POST",
+        body: data,
+        headers: { "Content-Type": "application/json" },
+      }),
+    }),
+    resetPassword: builder.mutation({
+      query: (data) => ({
+        url: "users/reset-password",
+        method: "POST",
+        body: data,
+        headers: { "Content-Type": "application/json" },
+      }),
+    }),
+    resendVerification: builder.mutation({
+      query: (data) => ({
+        url: "users/resend-verification",
+        method: "POST",
+        body: data,
+        headers: { "Content-Type": "application/json" },
+      }),
+    }),
     googleLogin: builder.mutation({
       query: (data) => {
         return {
@@ -84,5 +108,8 @@ export const {
   useVerifyEmailQuery,
   useVerifyPhoneMutation,
   useResendPhoneOtpMutation,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
+  useResendVerificationMutation,
   useGoogleLoginMutation,
 } = authApiSlice;

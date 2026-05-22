@@ -24,6 +24,10 @@ import {
   useGetListingQuery,
 } from "../../redux/api/listingApiSlice";
 import { useGetMyPaymentsQuery } from "../../redux/api/paymentApiSlice";
+import {
+  useGetIncomingEngagementsQuery,
+  useRespondToEngagementMutation,
+} from "../../redux/api/engagementApiSlice";
 // Utils Imports
 import { convertToFormattedDate } from "../../utils";
 // Component Imports
@@ -33,6 +37,7 @@ import AppButton from "../../components/ui/AppButton";
 import { Heading, SubHeading } from "../../components/Heading";
 import OverlayLoader from "../../components/Spinner/OverlayLoader";
 import DotLoader from "../../components/Spinner/dotLoader";
+import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import { studentAccommodationBadgeSx } from "../../styles/listingBadges";
 
 const getListingStatusBadge = (status: string) => {
@@ -154,6 +159,31 @@ const getPaymentStatusBadge = (status: string) => {
   );
 };
 
+const getEngagementStatusBadge = (status: string) => {
+  const styles =
+    status === "APPROVED"
+      ? { background: "#D1EAE0", color: "#1F4D3A", label: "Approved" }
+      : status === "DECLINED"
+      ? { background: "#FEE2E2", color: "#991B1B", label: "Declined" }
+      : { background: "#FEF3C7", color: "#92400E", label: "Pending" };
+
+  return (
+    <Box
+      sx={{
+        background: styles.background,
+        color: styles.color,
+        borderRadius: "999px",
+        padding: "5px 10px",
+        fontSize: "12px",
+        fontWeight: 700,
+        display: "inline-block",
+      }}
+    >
+      {styles.label}
+    </Box>
+  );
+};
+
 const formatDraftTimestamp = (value?: string) => {
   if (!value) return "";
 
@@ -171,6 +201,11 @@ const formatDraftTimestamp = (value?: string) => {
 const LandlordDashboard = () => {
   const userId = useTypedSelector(selectedUserId);
   const navigate = useNavigate();
+  const [toast, setToast] = useState({
+    message: "",
+    appearence: false,
+    type: "",
+  });
 
   const { data: listingsData, isLoading: listingsLoading } = useGetListingQuery(userId);
   const [deletingListingId, setDeletingListingId] = useState<string | null>(null);
@@ -187,6 +222,17 @@ const LandlordDashboard = () => {
 
   const { data: paymentsData, isLoading: paymentsLoading } =
     useGetMyPaymentsQuery(undefined);
+  const {
+    data: incomingEngagementsData,
+    isLoading: incomingEngagementsLoading,
+    refetch: refetchIncomingEngagements,
+  } = useGetIncomingEngagementsQuery(undefined);
+  const [respondToEngagement, { isLoading: isRespondingToEngagement }] =
+    useRespondToEngagementMutation();
+
+  const handleCloseToast = () => {
+    setToast((prev) => ({ ...prev, appearence: false }));
+  };
 
   const handleDeleteListing = async (listingId?: string) => {
     if (!listingId) return;
@@ -199,15 +245,130 @@ const LandlordDashboard = () => {
     }
   };
 
+  const handleRespondToEngagement = async (
+    engagementId: string,
+    action: "approve" | "decline"
+  ) => {
+    try {
+      await respondToEngagement({ id: engagementId, action }).unwrap();
+      await refetchIncomingEngagements();
+      setToast({
+        message:
+          action === "approve" ? "Engagement approved" : "Engagement declined",
+        appearence: true,
+        type: "success",
+      });
+    } catch (error: any) {
+      setToast({
+        message:
+          error?.data?.message || error?.message || "Unable to update request",
+        appearence: true,
+        type: "error",
+      });
+    }
+  };
+
   return (
-    <Box sx={{ mt: { xs: 5, md: 6 } }}>
-      <AppContainer>
-        <Box sx={{ mb: 3 }}>
-          <Heading>My Dashboard</Heading>
-          <SubHeading sx={{ color: "text.secondary" }}>
-            Manage your listings and track payments.
-          </SubHeading>
+    <Box sx={{ background: "background.default", minHeight: "100vh" }}>
+      <Box sx={{ background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)", pt: { xs: 8, md: 10 }, pb: { xs: 8, md: 10 }, px: 3, mb: -6 }}>
+        <Box sx={{ maxWidth: 900, mx: "auto" }}>
+          <Box sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, fontWeight: 800, color: "#fff" }}>My Dashboard</Box>
+          <Box sx={{ color: "rgba(255,255,255,0.7)", fontSize: "1rem", mt: 1 }}>Manage your listings and track engagement</Box>
         </Box>
+      </Box>
+      <AppContainer sx={{ pb: { xs: 4, md: 6 } }}>
+
+        <AppCard sx={{ mb: 3, p: { xs: 2, md: 2.5 } }}>
+          <Heading sx={{ fontSize: "20px", mb: 2 }}>
+            Incoming Engagement Requests
+          </Heading>
+          {incomingEngagementsLoading ? (
+            <SubHeading sx={{ color: "text.secondary" }}>Loading...</SubHeading>
+          ) : incomingEngagementsData?.data?.length === 0 ? (
+            <SubHeading sx={{ color: "text.secondary" }}>
+              No engagement requests yet.
+            </SubHeading>
+          ) : (
+            incomingEngagementsData?.data?.map((engagement: any) => (
+              <Box
+                key={engagement.id}
+                sx={{
+                  border: "1.5px solid",
+                  borderColor: "divider",
+                  borderRadius: "12px",
+                  p: "16px",
+                  mb: 1.5,
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 1.5,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <Box>
+                    <Box sx={{ fontWeight: 700 }}>
+                      {engagement.tenant?.username || "Tenant"}
+                    </Box>
+                    <Box sx={{ fontSize: "13px", color: "text.secondary" }}>
+                      {engagement.listing?.name || "Listing"}
+                    </Box>
+                  </Box>
+                  {getEngagementStatusBadge(engagement.status)}
+                </Box>
+                <Box
+                  sx={{
+                    background: "#F8FAFC",
+                    borderRadius: "8px",
+                    p: "10px 12px",
+                    fontSize: "13px",
+                    color: "text.secondary",
+                    fontStyle: "italic",
+                    maxHeight: 60,
+                    overflow: "hidden",
+                    my: 1.5,
+                  }}
+                >
+                  {engagement.message}
+                </Box>
+                <Box sx={{ fontSize: "12px", color: "text.secondary" }}>
+                  Sent {new Date(engagement.createdAt).toLocaleString()}
+                </Box>
+                {engagement.status === "PENDING" ? (
+                  <Box sx={{ display: "flex", gap: 1, mt: 1.5, flexWrap: "wrap" }}>
+                    <AppButton
+                      size="small"
+                      disabled={isRespondingToEngagement}
+                      onClick={() =>
+                        handleRespondToEngagement(engagement.id, "approve")
+                      }
+                      sx={{
+                        background: "#1F4D3A",
+                        color: "#fff",
+                        "&:hover": { background: "#173B2C" },
+                      }}
+                    >
+                      Approve
+                    </AppButton>
+                    <AppButton
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      disabled={isRespondingToEngagement}
+                      onClick={() =>
+                        handleRespondToEngagement(engagement.id, "decline")
+                      }
+                    >
+                      Decline
+                    </AppButton>
+                  </Box>
+                ) : null}
+              </Box>
+            ))
+          )}
+        </AppCard>
 
         <Box
           sx={{
@@ -504,6 +665,12 @@ const LandlordDashboard = () => {
           </AppCard>
         )}
       </AppContainer>
+      <ToastAlert
+        appearence={toast.appearence}
+        type={toast.type}
+        message={toast.message}
+        handleClose={handleCloseToast}
+      />
     </Box>
   );
 };

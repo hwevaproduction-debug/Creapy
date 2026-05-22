@@ -1,7 +1,7 @@
 // React Imports
 import { useState } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 // Material UI Imports
 import { Box, Grid } from "@mui/material";
 // React Icons
@@ -24,6 +24,15 @@ import GoogleOAuth from "../../components/OAuth";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
+import HeroSlideshow from "../../views/Home/HeroSlideshow";
+
+const FALLBACK_HERO_IMAGES = [
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1920&q=80",
+];
 
 interface ISLoginForm {
   email: string;
@@ -33,6 +42,7 @@ interface ISLoginForm {
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // states
   const [showPassword, setShowPassword] = useState(false);
@@ -70,15 +80,11 @@ const Login = () => {
       if (user?.data?.status) {
         dispatch(setUser(user?.data));
         localStorage.setItem("user", JSON.stringify(user?.data));
-        const role = user?.data?.data?.user?.role;
-        if (role === "landlord") {
-          navigate("/dashboard/landlord");
-        } else if (role === "tenant") {
-          navigate("/dashboard/tenant");
-        } else if (role === "admin") {
-          navigate("/dashboard/admin");
+        const from = (location.state as any)?.from;
+        if (from && from !== "/login" && from !== "/signup") {
+          navigate(from, { replace: true });
         } else {
-          navigate("/");
+          navigate("/", { replace: true });
         }
       }
       if (user?.error) {
@@ -101,15 +107,37 @@ const Login = () => {
   };
 
   return (
-    <Box sx={{ minHeight: "calc(100vh - 72px)", display: "flex", alignItems: "center", py: 4 }}>
+    <Box
+      sx={{
+        position: "relative",
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        py: 4,
+        background: "#0F141E",
+      }}
+    >
+      <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(15,20,30,0.55)",
+          zIndex: 1,
+        }}
+      />
+      <Box sx={{ position: "relative", zIndex: 2, width: "100%" }}>
       <AppContainer>
         <Grid container spacing={2} justifyContent="center">
           <Grid item xs={12} md={6} lg={5}>
             <AppCard
               sx={{
+                maxWidth: 460,
+                mx: "auto",
                 p: { xs: 3, md: "48px 44px" },
                 borderRadius: "24px",
-                boxShadow: "0 16px 60px rgba(31,41,55,0.12)",
+                boxShadow: "0 32px 80px rgba(0,0,0,0.35)",
               }}
             >
               <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
@@ -299,6 +327,7 @@ const Login = () => {
           </Grid>
         </Grid>
       </AppContainer>
+      </Box>
     <ToastAlert
       appearence={toast.appearence}
       type={toast.type}

@@ -6,6 +6,7 @@ import NotFound from "./views/NotFound";
 import Login from "./views/Login";
 import SignUp from "./views/SignUp";
 import ForgotPassword from "./views/ForgotPassword";
+import ResetPassword from "./views/ResetPassword";
 import Profile from "./views/Profile";
 import About from "./views/About";
 import Header from "./components/Header";
@@ -15,6 +16,7 @@ import CreateListing from "./views/Listing";
 import ViewListing from "./views/Listing/components/viewListing";
 import SearchPage from "./views/Search";
 import SavedSearches from "./views/SavedSearches";
+import Notifications from "./views/Notifications";
 import LandlordDashboard from "./views/Dashboard/Landlord";
 import ProviderDashboardShell from "./views/Dashboard/provider/ProviderDashboardShell";
 import TenantDashboard from "./views/Dashboard/Tenant";
@@ -89,6 +91,14 @@ function App() {
               }
             />
             <Route
+              path="/reset-password"
+              element={
+                <PublicRoutes>
+                  <ResetPassword />
+                </PublicRoutes>
+              }
+            />
+            <Route
               path="/provider-signup"
               element={
                 <PublicRoutes>
@@ -118,6 +128,14 @@ function App() {
               element={
                 <ProtectedRoutes>
                   <Profile />
+                </ProtectedRoutes>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedRoutes>
+                  <Notifications />
                 </ProtectedRoutes>
               }
             />

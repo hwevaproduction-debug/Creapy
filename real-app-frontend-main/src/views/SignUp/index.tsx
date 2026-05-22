@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 // MUI Imports
-import { Box, Chip, FormControlLabel, Grid, Radio, RadioGroup } from "@mui/material";
+import { Box, FormControlLabel, Grid, Radio, RadioGroup } from "@mui/material";
 // React Icons
 import { AiOutlineEyeInvisible, AiOutlineEye } from "react-icons/ai";
 // Formik Imports
@@ -10,7 +10,10 @@ import { Form, Formik, FormikProps } from "formik";
 // Utils Imports
 import { onKeyDown } from "../../utils";
 // Redux Imports
-import { useSignupMutation } from "../../redux/api/authApiSlice";
+import {
+  useResendVerificationMutation,
+  useSignupMutation,
+} from "../../redux/api/authApiSlice";
 // Components Imports
 import DotLoader from "../../components/Spinner/dotLoader";
 import PrimaryInput from "../../components/PrimaryInput/PrimaryInput";
@@ -22,15 +25,24 @@ import GoogleOAuth from "../../components/OAuth";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
+import HeroSlideshow from "../../views/Home/HeroSlideshow";
+
+const FALLBACK_HERO_IMAGES = [
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1920&q=80",
+];
 
 interface ISSignUpForm {
   userName: string;
   email: string;
   password: string;
   role: "tenant" | "landlord";
-  phoneNumber: string;
-  nationalId: string;
 }
+
+const signUpFormSchema = signUpSchema.omit(["phoneNumber", "nationalId"] as any);
 
 const SignUp = () => {
   const navigate = useNavigate();
@@ -44,8 +56,6 @@ const SignUp = () => {
     email: "",
     password: "",
     role: "tenant",
-    phoneNumber: "",
-    nationalId: "",
   });
 
   const [toast, setToast] = useState({
@@ -64,6 +74,8 @@ const SignUp = () => {
 
   // Sign Up Api Bind
   const [signupUser, { isLoading }] = useSignupMutation();
+  const [resendVerification, { isLoading: isResendingVerification }] =
+    useResendVerificationMutation();
 
   const SignUpHandler = async (data: ISSignUpForm) => {
     if (!["tenant", "landlord"].includes(data.role)) {
@@ -81,19 +93,12 @@ const SignUp = () => {
       email: data.email,
       password: data.password,
       role: data.role,
-      phoneNumber: data.role === "landlord" ? data.phoneNumber : undefined,
-      nationalId: data.role === "landlord" ? data.nationalId : undefined,
     };
     try {
       const user: any = await signupUser(payload);
 
       if (user?.data?.status === "pending_verification") {
         setPendingVerificationEmail(data.email);
-        return;
-      }
-
-      if (user?.data?.status === "pending_phone_verification") {
-        navigate("/verify-phone", { state: { email: data.email } });
         return;
       }
 
@@ -124,16 +129,60 @@ const SignUp = () => {
     }
   };
 
+  const handleResendVerification = async () => {
+    try {
+      await resendVerification({ email: pendingVerificationEmail }).unwrap();
+      setToast({
+        ...toast,
+        message: "Verification email resent.",
+        appearence: true,
+        type: "success",
+      });
+    } catch (error: any) {
+      setToast({
+        ...toast,
+        message:
+          error?.data?.message ||
+          error?.message ||
+          "Unable to resend verification email.",
+        appearence: true,
+        type: "error",
+      });
+    }
+  };
+
   return (
-    <Box sx={{ minHeight: "calc(100vh - 72px)", display: "flex", alignItems: "center", py: 4 }}>
+    <Box
+      sx={{
+        position: "relative",
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        py: 4,
+        background: "#0F141E",
+      }}
+    >
+      <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(15,20,30,0.55)",
+          zIndex: 1,
+        }}
+      />
+      <Box sx={{ position: "relative", zIndex: 2, width: "100%" }}>
       <AppContainer>
         <Grid container spacing={2} justifyContent="center">
           <Grid item xs={12} md={6} lg={5}>
             <AppCard
               sx={{
+                maxWidth: 460,
+                mx: "auto",
                 p: { xs: 3, md: "48px 44px" },
                 borderRadius: "24px",
-                boxShadow: "0 16px 60px rgba(31,41,55,0.12)",
+                boxShadow: "0 32px 80px rgba(0,0,0,0.35)",
               }}
             >
               <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
@@ -168,7 +217,15 @@ const SignUp = () => {
                     We sent a verification link to {pendingVerificationEmail}. Verify
                     your email before logging in.
                   </SubHeading>
-                  <AppButton sx={{ mt: 1 }} onClick={() => navigate("/login")}>
+                  <AppButton
+                    sx={{ mt: 1 }}
+                    disabled={isResendingVerification}
+                    loading={isResendingVerification}
+                    onClick={handleResendVerification}
+                  >
+                    Resend email
+                  </AppButton>
+                  <AppButton variant="text" onClick={() => navigate("/login")}>
                     Go to Login
                   </AppButton>
                 </Box>
@@ -205,7 +262,7 @@ const SignUp = () => {
                 onSubmit={(values: ISSignUpForm) => {
                   SignUpHandler(values);
                 }}
-                validationSchema={signUpSchema}
+                validationSchema={signUpFormSchema}
               >
                 {(props: FormikProps<ISSignUpForm>) => {
                   const { values, touched, errors, handleBlur, handleChange } =
@@ -310,75 +367,6 @@ const SignUp = () => {
                           </Box>
                         )}
                       </Box>
-                      {values.role === "landlord" && (
-                        <Box
-                          sx={{
-                            marginTop: "12px",
-                            padding: "16px",
-                            border: "1px solid var(--border-default)",
-                            borderRadius: "14px",
-                            background: "var(--surface-page)",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              gap: 1,
-                              flexWrap: "wrap",
-                              marginBottom: "10px",
-                            }}
-                          >
-                            <SubHeading>Landlord details</SubHeading>
-                            <Chip label="Landlord only" size="small" sx={{ background: "#fef3c7", color: "#92400e" }} />
-                          </Box>
-                          <Box sx={{ marginTop: "12px" }}>
-                            <SubHeading sx={{ marginBottom: "5px" }}>
-                              Phone Number
-                            </SubHeading>
-                            <PrimaryInput
-                              type="text"
-                              label=""
-                              name="phoneNumber"
-                              placeholder="+263 77 123 4567"
-                              value={values.phoneNumber}
-                              helperText={
-                                errors.phoneNumber && touched.phoneNumber
-                                  ? errors.phoneNumber
-                                  : ""
-                              }
-                              error={
-                                errors.phoneNumber && touched.phoneNumber ? true : false
-                              }
-                              onChange={handleChange}
-                              onBlur={handleBlur}
-                            />
-                          </Box>
-                          <Box sx={{ marginTop: "12px" }}>
-                            <SubHeading sx={{ marginBottom: "5px" }}>
-                              National ID Number
-                            </SubHeading>
-                            <PrimaryInput
-                              type="text"
-                              label=""
-                              name="nationalId"
-                              placeholder="e.g. 63-123456A78"
-                              value={values.nationalId}
-                              helperText={
-                                errors.nationalId && touched.nationalId
-                                  ? errors.nationalId
-                                  : ""
-                              }
-                              error={
-                                errors.nationalId && touched.nationalId ? true : false
-                              }
-                              onChange={handleChange}
-                              onBlur={handleBlur}
-                            />
-                          </Box>
-                        </Box>
-                      )}
                       <Box
                         sx={{
                           display: "flex",
@@ -453,6 +441,7 @@ const SignUp = () => {
           </Grid>
         </Grid>
       </AppContainer>
+      </Box>
       <ToastAlert
         appearence={toast.appearence}
         type={toast.type}

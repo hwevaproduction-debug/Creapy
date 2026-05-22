@@ -670,6 +670,39 @@ test("getMe strips OTP and verification secrets from the authenticated payload",
   assert.equal("nationalId" in result.body.data.user, false);
 });
 
+test("submitVerification rejects non-landlords before updates or admin email", async () => {
+  let updateCalled = false;
+  let emailCalled = false;
+
+  emailUtils.sendEmail = async () => {
+    emailCalled = true;
+  };
+  const authController = loadAuthController();
+
+  prisma.user.update = async () => {
+    updateCalled = true;
+    throw new Error("should not update non-landlords");
+  };
+
+  const result = await invokeController(authController.submitVerification, {
+    user: {
+      id: "tenant-1",
+      role: "tenant",
+      username: "tenant",
+      email: "tenant@example.com",
+    },
+    body: {
+      idImageUrl: "https://example.com/id.png",
+      selfieUrl: "https://example.com/selfie.png",
+    },
+  });
+
+  assert(result.error);
+  assert.equal(result.error.statusCode, 403);
+  assert.equal(updateCalled, false);
+  assert.equal(emailCalled, false);
+});
+
 test("google marks existing unverified users as verified before issuing a token", async () => {
   const authController = loadAuthController();
   let updateArgs = null;

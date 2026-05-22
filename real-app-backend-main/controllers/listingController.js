@@ -482,6 +482,8 @@ exports.getListings = catchAsync(async (req, res, next) => {
 
   const province = (req.query.province || "").toString().trim();
   const location = (req.query.location || "").toString().trim();
+  const city = (req.query.city || "").toString().trim();
+  const neighborhood = (req.query.neighborhood || "").toString().trim();
   if (province) {
     AND.push({
       province: { contains: province, mode: "insensitive" },
@@ -489,6 +491,22 @@ exports.getListings = catchAsync(async (req, res, next) => {
   } else if (location) {
     AND.push({
       province: { contains: location, mode: "insensitive" },
+    });
+  }
+  if (city) {
+    AND.push({
+      OR: [
+        { province: { contains: city, mode: "insensitive" } },
+        { city: { contains: city, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (neighborhood) {
+    AND.push({
+      OR: [
+        { city: { contains: neighborhood, mode: "insensitive" } },
+        { addressLine: { contains: neighborhood, mode: "insensitive" } },
+      ],
     });
   }
 

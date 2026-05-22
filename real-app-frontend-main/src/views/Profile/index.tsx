@@ -15,9 +15,13 @@ import { onKeyDown } from "../../utils";
 import { getGreeting, getFirstName } from "../../utils/greeting";
 // Hooks Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
-import { Camera, Eye, EyeOff, Trash2 } from "lucide-react";
+import { Camera, Eye, EyeOff, Trash2, Upload } from "lucide-react";
 // Redux Imports
-import { useDeleteMutation, useUpdateMutation } from "../../redux/api/userApiSlice";
+import {
+  useDeleteMutation,
+  useSubmitVerificationMutation,
+  useUpdateMutation,
+} from "../../redux/api/userApiSlice";
 import {
   useGetR2SignedUrlMutation,
   type R2SignedUrlData,
@@ -26,6 +30,7 @@ import {
   selectedUserAvatar,
   selectedUserName,
   selectedUserEmail,
+  selectedUserRole,
   setUser,
   selectedUserId,
   selectedUserToken,
@@ -83,7 +88,10 @@ const Profile = () => {
   const userAvatar = useTypedSelector(selectedUserAvatar);
   const userId = useTypedSelector(selectedUserId);
   const token = useTypedSelector(selectedUserToken);
+  const userRole = useTypedSelector(selectedUserRole);
+  const authUser = useTypedSelector((state) => state.auth?.user);
   const [getR2SignedUrl] = useGetR2SignedUrlMutation();
+  const [submitVerification] = useSubmitVerificationMutation();
   const firstName = getFirstName(userName);
 
   // states
@@ -104,6 +112,19 @@ const Profile = () => {
     type: "",
   });
   const [confirmDialog, setConfirmDialog] = useState(false);
+  const [verificationOpen, setVerificationOpen] = useState(false);
+  const [idFile, setIdFile] = useState<File | null>(null);
+  const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState(
+    authUser?.data?.user?.verificationStatus || "UNVERIFIED"
+  );
+
+  useEffect(() => {
+    setVerificationStatus(
+      authUser?.data?.user?.verificationStatus || "UNVERIFIED"
+    );
+  }, [authUser?.data?.user?.verificationStatus]);
 
   useEffect(() => {
     if (file) {
@@ -167,6 +188,85 @@ const Profile = () => {
     } catch (e) {
       console.error(e);
       setFileUploadError(true);
+    }
+  };
+
+  const uploadVerificationFile = async (file: File) => {
+    const result = await getR2SignedUrl({
+      contentType: file.type,
+      folder: "verification",
+    }).unwrap();
+
+    const putRes = await fetch(result.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+
+    if (!putRes.ok) throw new Error("R2 upload failed");
+
+    return result.publicUrl;
+  };
+
+  const persistVerificationStatus = (status: string) => {
+    if (!authUser?.data?.user) return;
+
+    const nextAuthUser = {
+      ...authUser,
+      data: {
+        ...authUser.data,
+        user: {
+          ...authUser.data.user,
+          verificationStatus: status,
+        },
+      },
+    };
+
+    dispatch(setUser(nextAuthUser));
+    localStorage.setItem("user", JSON.stringify(nextAuthUser));
+  };
+
+  const handleSubmitVerification = async () => {
+    if (!idFile || !selfieFile) {
+      setToast({
+        ...toast,
+        message: "Please upload both an ID image and a selfie.",
+        appearence: true,
+        type: "error",
+      });
+      return;
+    }
+
+    setVerificationLoading(true);
+    try {
+      const [idImageUrl, selfieUrl] = await Promise.all([
+        uploadVerificationFile(idFile),
+        uploadVerificationFile(selfieFile),
+      ]);
+      await submitVerification({ idImageUrl, selfieUrl }).unwrap();
+      setVerificationStatus("PENDING_REVIEW");
+      persistVerificationStatus("PENDING_REVIEW");
+      setVerificationOpen(false);
+      setIdFile(null);
+      setSelfieFile(null);
+      setToast({
+        ...toast,
+        message: "Verification submitted",
+        appearence: true,
+        type: "success",
+      });
+    } catch (error: any) {
+      setToast({
+        ...toast,
+        message:
+          error?.data?.message ||
+          error?.message ||
+          "Unable to submit verification.",
+        appearence: true,
+        type: "error",
+      });
+    } finally {
+      setVerificationLoading(false);
     }
   };
 
@@ -396,6 +496,101 @@ const Profile = () => {
                 </Box>
               </Box>
 
+              {userRole === "landlord" ? (
+                <Box sx={{ width: "100%", mt: 2 }}>
+                  {verificationStatus === "PENDING_REVIEW" ? (
+                    <AppCard
+                      elevation="flat"
+                      sx={{ borderLeft: "4px solid #3B82F6", p: 2 }}
+                    >
+                      <Box
+                        sx={{
+                          display: "inline-block",
+                          background: "#FEF3C7",
+                          color: "#92400E",
+                          borderRadius: "999px",
+                          padding: "4px 10px",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          mb: 1,
+                        }}
+                      >
+                        Under Review
+                      </Box>
+                      <SubHeading sx={{ color: "text.secondary" }}>
+                        Your verification is under review. We'll notify you within
+                        24-48 hours.
+                      </SubHeading>
+                    </AppCard>
+                  ) : verificationStatus === "VERIFIED" ? (
+                    <AppCard
+                      elevation="flat"
+                      sx={{ borderLeft: "4px solid #1F4D3A", p: 2 }}
+                    >
+                      <Box
+                        sx={{
+                          display: "inline-block",
+                          background: "#D1EAE0",
+                          color: "#1F4D3A",
+                          borderRadius: "999px",
+                          padding: "4px 10px",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          mb: 1,
+                        }}
+                      >
+                        Verified
+                      </Box>
+                      <SubHeading sx={{ color: "text.secondary" }}>
+                        Your identity has been verified.
+                      </SubHeading>
+                    </AppCard>
+                  ) : verificationStatus === "REJECTED" ? (
+                    <AppCard
+                      elevation="flat"
+                      sx={{ borderLeft: "4px solid #991B1B", p: 2 }}
+                    >
+                      <Box
+                        sx={{
+                          display: "inline-block",
+                          background: "#FEE2E2",
+                          color: "#991B1B",
+                          borderRadius: "999px",
+                          padding: "4px 10px",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          mb: 1,
+                        }}
+                      >
+                        Not Approved
+                      </Box>
+                      <SubHeading sx={{ color: "text.secondary", mb: 1.5 }}>
+                        Your verification was not approved. Please resubmit.
+                      </SubHeading>
+                      <AppButton onClick={() => setVerificationOpen(true)}>
+                        Resubmit
+                      </AppButton>
+                    </AppCard>
+                  ) : (
+                    <AppCard
+                      elevation="flat"
+                      sx={{ borderLeft: "4px solid #B8975A", p: 2 }}
+                    >
+                      <Box sx={{ fontWeight: 800, color: "#1F2937", mb: 0.75 }}>
+                        Identity Verification Required
+                      </Box>
+                      <SubHeading sx={{ color: "text.secondary", mb: 1.5 }}>
+                        Upload your government ID and a selfie to verify your
+                        identity and list properties.
+                      </SubHeading>
+                      <AppButton onClick={() => setVerificationOpen(true)}>
+                        Start Verification
+                      </AppButton>
+                    </AppCard>
+                  )}
+                </Box>
+              ) : null}
+
               <Box sx={{ width: "100%" }}>
                 <Formik
                   initialValues={formValues}
@@ -547,6 +742,87 @@ const Profile = () => {
             }}
           >
             Delete Account
+          </AppButton>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={verificationOpen}
+        onClose={() => setVerificationOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Identity Verification</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Upload a clear government ID image and a selfie for review.
+          </DialogContentText>
+          <Grid container spacing={2}>
+            {[
+              {
+                label: "Government ID",
+                file: idFile,
+                onChange: setIdFile,
+              },
+              {
+                label: "Selfie",
+                file: selfieFile,
+                onChange: setSelfieFile,
+              },
+            ].map((item) => (
+              <Grid item xs={12} sm={6} key={item.label}>
+                <Box
+                  component="label"
+                  sx={{
+                    minHeight: 150,
+                    border: "1.5px dashed",
+                    borderColor: "divider",
+                    borderRadius: "14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 1,
+                    cursor: "pointer",
+                    textAlign: "center",
+                    p: 2,
+                    "&:hover": {
+                      borderColor: "#B8975A",
+                      background: "#FDF8F0",
+                    },
+                  }}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(event) => {
+                      const selectedFile = event.target.files?.[0] || null;
+                      item.onChange(selectedFile);
+                    }}
+                  />
+                  <Upload size={24} color="#B8975A" />
+                  <Box sx={{ fontWeight: 700 }}>{item.label}</Box>
+                  <Box sx={{ color: "text.secondary", fontSize: "12px" }}>
+                    {item.file ? item.file.name : "Choose image"}
+                  </Box>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <AppButton
+            variant="outlined"
+            onClick={() => setVerificationOpen(false)}
+          >
+            Cancel
+          </AppButton>
+          <AppButton
+            disabled={verificationLoading}
+            loading={verificationLoading}
+            onClick={handleSubmitVerification}
+          >
+            Submit Verification
           </AppButton>
         </DialogActions>
       </Dialog>

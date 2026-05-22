@@ -1,20 +1,20 @@
 // React Imports
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 // MUI Imports
 import { Box, Grid, Divider } from "@mui/material";
-// Swiper Imports
-import { Swiper, SwiperSlide } from "swiper/react";
-import SwiperCore from "swiper";
-import { Navigation } from "swiper/modules";
-import "swiper/css/bundle";
 // Component Imports
 import OverlayLoader from "../../../components/Spinner/OverlayLoader";
 import { Heading, SubHeading } from "../../../components/Heading";
 import AppContainer from "../../../components/ui/AppContainer";
 import AppCard from "../../../components/ui/AppCard";
+import AppButton from "../../../components/ui/AppButton";
+import ContactModal from "../../../components/ContactModal";
+import ImageLightbox from "../../../components/ImageLightbox";
 import { studentAccommodationBadgeSx } from "../../../styles/listingBadges";
 // Utils Imports
 import { thousandSeparatorNumber } from "../../../utils";
+import { Lock, MapPin, Phone } from "lucide-react";
 // React Icons
 import { FaLocationDot } from "react-icons/fa6";
 import { FaBath } from "react-icons/fa";
@@ -23,7 +23,11 @@ import { FaChair } from "react-icons/fa6";
 import { FaBed } from "react-icons/fa";
 // Redux Imports
 import useTypedSelector from "../../../hooks/useTypedSelector";
-import { selectedUserToken } from "../../../redux/auth/authSlice";
+import {
+  selectedUserRole,
+  selectedUserToken,
+} from "../../../redux/auth/authSlice";
+import { useGetMyEngagementsQuery } from "../../../redux/api/engagementApiSlice";
 import { useGetSingleListingQuery } from "../../../redux/api/listingApiSlice";
 
 const iconStyle = {
@@ -37,19 +41,53 @@ const iconStyle = {
 const ViewListing = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  SwiperCore.use([Navigation]);
+  const location = useLocation();
   const userToken = useTypedSelector(selectedUserToken);
+  const userRole = useTypedSelector(selectedUserRole);
   const isLoggedIn = Boolean(userToken);
+  const isTenant = userRole === "tenant";
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const { data, isLoading } = useGetSingleListingQuery(id as string, {
     skip: !id,
   });
-  const images = data?.data?.imageUrls;
+  const { data: engagementsData } = useGetMyEngagementsQuery(undefined, {
+    skip: !isTenant,
+  });
+  const listing = data?.data;
+  const images = Array.isArray(listing?.imageUrls) ? listing.imageUrls : [];
+  const existingEngagement = engagementsData?.data?.find(
+    (engagement: any) =>
+      engagement?.listing?.id === id || engagement?.listingId === id
+  );
   const price = thousandSeparatorNumber(
-    data?.data?.monthlyRent || data?.data?.regularPrice
+    listing?.monthlyRent || listing?.regularPrice
   );
 
-  const locationData = data?.data?.location;
+  useEffect(() => {
+    if (!listing || !id) return;
+
+    const existing = localStorage.getItem("tr_recently_viewed");
+    let recentlyViewed: Array<{ id: string; name: string }> = [];
+    if (existing) {
+      try {
+        const parsed = JSON.parse(existing);
+        recentlyViewed = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        recentlyViewed = [];
+      }
+    }
+
+    const next = [
+      { id, name: listing.name },
+      ...recentlyViewed.filter((item) => item.id !== id),
+    ].slice(0, 10);
+    localStorage.setItem("tr_recently_viewed", JSON.stringify(next));
+  }, [id, listing]);
+
+  const locationData = listing?.location;
   const publicLocation = [locationData?.city, locationData?.province, locationData?.country]
     .filter(Boolean)
     .join(", ");
@@ -61,34 +99,101 @@ const ViewListing = () => {
     <>
       {isLoading && <OverlayLoader />}
       <Box>
-        <Box sx={{ borderRadius: "16px 16px 0 0", overflow: "hidden" }}>
-          <Swiper navigation={true}>
-            {images?.map((image: any) => (
-              <SwiperSlide key={image}>
-                <Box sx={{ height: { xs: 260, sm: 360, md: 520 }, position: "relative" }}>
-                  <img
-                    src={image}
-                    alt="listing"
-                    width="100%"
-                    height="100%"
-                    style={{ objectFit: "cover" }}
-                  />
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      height: "35%",
-                      background: "linear-gradient(to top, rgba(31,41,55,0.45), transparent)",
-                      pointerEvents: "none",
-                    }}
-                  />
-                </Box>
-              </SwiperSlide>
-            ))}
-          </Swiper>
+        <Box
+          sx={{
+            position: "relative",
+            height: { xs: 260, sm: 360, md: 520 },
+            overflow: "hidden",
+            borderRadius: "16px 16px 0 0",
+            cursor: "pointer",
+          }}
+          onClick={() => {
+            setLightboxIndex(0);
+            setLightboxOpen(true);
+          }}
+        >
+          <img
+            src={images?.[0] || "/app-logo.png"}
+            alt="listing"
+            width="100%"
+            height="100%"
+            style={{ objectFit: "cover" }}
+          />
+          <Box
+            sx={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: "35%",
+              background:
+                "linear-gradient(to top, rgba(31,41,55,0.55), transparent)",
+              pointerEvents: "none",
+            }}
+          />
+          <Box
+            component="button"
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setLightboxIndex(0);
+              setLightboxOpen(true);
+            }}
+            sx={{
+              position: "absolute",
+              bottom: 16,
+              right: 16,
+              background: "#fff",
+              border: 0,
+              borderRadius: "999px",
+              padding: "6px 14px",
+              fontSize: "13px",
+              fontWeight: 700,
+              cursor: "pointer",
+              color: "#1F2937",
+            }}
+          >
+            View all photos
+          </Box>
         </Box>
+        {images.length > 1 ? (
+          <Box
+            sx={{
+              display: "flex",
+              gap: 1,
+              overflowX: "auto",
+              p: 1,
+              background: "background.paper",
+            }}
+          >
+            {images.map((image: string, index: number) => (
+              <Box
+                key={`${image}-${index}`}
+                sx={{
+                  width: 80,
+                  height: 60,
+                  flexShrink: 0,
+                  borderRadius: "8px",
+                  overflow: "hidden",
+                  cursor: "pointer",
+                  border: "2px solid transparent",
+                }}
+                onClick={() => {
+                  setLightboxIndex(index);
+                  setLightboxOpen(true);
+                }}
+              >
+                <img
+                  src={image}
+                  alt="listing thumbnail"
+                  width="100%"
+                  height="100%"
+                  style={{ objectFit: "cover" }}
+                />
+              </Box>
+            ))}
+          </Box>
+        ) : null}
         <AppContainer>
           <Box sx={{ my: { xs: 3, md: 4 } }}>
             <Grid container spacing={3}>
@@ -266,53 +371,193 @@ const ViewListing = () => {
                     Contact Landlord
                   </Heading>
                   <Divider />
-                  <Box
-                    sx={{
-                      marginTop: 2,
-                      padding: "20px",
-                      borderRadius: "10px",
-                      border: "1px dashed",
-                      borderColor: "divider",
-                      background: "background.default",
-                      color: "text.secondary",
-                      textAlign: "center",
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    <Box sx={{ fontSize: "28px", marginBottom: 1 }}>🔒</Box>
-                    <Box>
-                      Landlord contact details are shared privately once your booking is
-                      accepted.
+                  {!isLoggedIn ? (
+                    <Box
+                      sx={{
+                        marginTop: 2,
+                        padding: "20px",
+                        borderRadius: "12px",
+                        border: "1px dashed",
+                        borderColor: "divider",
+                        background: "background.default",
+                        color: "text.secondary",
+                        textAlign: "center",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      <Lock size={30} color="#1F4D3A" />
+                      <Box sx={{ mt: 1 }}>
+                        Landlord contact details are shared privately after
+                        approval.
+                      </Box>
+                      <AppButton
+                        fullWidth
+                        sx={{ mt: 2 }}
+                        onClick={() =>
+                          navigate("/login", {
+                            state: { from: location.pathname },
+                          })
+                        }
+                      >
+                        Log in to Reach Out
+                      </AppButton>
                     </Box>
-                    <Box sx={{ marginTop: 1, fontSize: "13px", color: "#94a3b8" }}>
-                      Send a booking request to get started.
+                  ) : !isTenant ? (
+                    <Box
+                      sx={{
+                        marginTop: 2,
+                        padding: "20px",
+                        borderRadius: "12px",
+                        border: "1px dashed",
+                        borderColor: "divider",
+                        background: "background.default",
+                        color: "text.secondary",
+                        textAlign: "center",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      Landlord contact requests are available to tenant
+                      accounts only.
                     </Box>
-                    {!isLoggedIn ? (
+                  ) : !existingEngagement ? (
+                    <Box sx={{ mt: 2 }}>
+                      <SubHeading sx={{ color: "text.secondary", mb: 2 }}>
+                        Send a private message to request contact and address
+                        details.
+                      </SubHeading>
+                      <AppButton
+                        fullWidth
+                        onClick={() => setContactModalOpen(true)}
+                      >
+                        Reach Out
+                      </AppButton>
+                    </Box>
+                  ) : existingEngagement.status === "PENDING" ? (
+                    <Box sx={{ mt: 2 }}>
                       <Box
-                        component="button"
-                        type="button"
-                        onClick={() => navigate("/login")}
                         sx={{
-                          marginTop: 2,
-                          border: 0,
-                          background: "transparent",
-                          color: "#1F4D3A",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          padding: 0,
-                          font: "inherit",
+                          display: "inline-block",
+                          background: "#FEF3C7",
+                          color: "#92400E",
+                          borderRadius: "999px",
+                          padding: "6px 12px",
+                          fontSize: "12px",
+                          fontWeight: 800,
+                          mb: 1.5,
                         }}
                       >
-                        Log in to send a booking request
+                        Request Pending
                       </Box>
-                    ) : null}
-                  </Box>
+                      <SubHeading sx={{ color: "text.secondary" }}>
+                        Sent{" "}
+                        {new Date(
+                          existingEngagement.createdAt
+                        ).toLocaleDateString()}
+                      </SubHeading>
+                      <Box sx={{ color: "text.secondary", mt: 1 }}>
+                        Awaiting landlord response
+                      </Box>
+                    </Box>
+                  ) : existingEngagement.status === "APPROVED" ? (
+                    <Box sx={{ mt: 2 }}>
+                      <Box
+                        sx={{
+                          display: "inline-block",
+                          background: "#D1EAE0",
+                          color: "#1F4D3A",
+                          borderRadius: "999px",
+                          padding: "6px 12px",
+                          fontSize: "12px",
+                          fontWeight: 800,
+                          mb: 1.5,
+                        }}
+                      >
+                        Approved
+                      </Box>
+                      <Box sx={{ display: "grid", gap: 1, mt: 1 }}>
+                        <Box
+                          sx={{
+                            background: "#F0F7F4",
+                            borderRadius: "10px",
+                            p: "12px",
+                            color: "#1F4D3A",
+                            fontSize: "13px",
+                            display: "flex",
+                            gap: 1,
+                          }}
+                        >
+                          <MapPin size={16} />
+                          {existingEngagement.listing?.address ||
+                            listing?.address ||
+                            "Address unavailable"}
+                        </Box>
+                        <Box
+                          sx={{
+                            background: "background.default",
+                            borderRadius: "10px",
+                            p: "12px",
+                            color: "text.secondary",
+                            fontSize: "13px",
+                            display: "flex",
+                            gap: 1,
+                          }}
+                        >
+                          <Phone size={16} />
+                          {existingEngagement.listing?.phoneNumber ||
+                            listing?.phoneNumber ||
+                            "Phone unavailable"}
+                        </Box>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Box sx={{ mt: 2 }}>
+                      <Box
+                        sx={{
+                          display: "inline-block",
+                          background: "#FEE2E2",
+                          color: "#991B1B",
+                          borderRadius: "999px",
+                          padding: "6px 12px",
+                          fontSize: "12px",
+                          fontWeight: 800,
+                          mb: 1.5,
+                        }}
+                      >
+                        Not Approved
+                      </Box>
+                      <AppButton
+                        fullWidth
+                        variant="outlined"
+                        onClick={() => setContactModalOpen(true)}
+                      >
+                        You may try again
+                      </AppButton>
+                    </Box>
+                  )}
                 </AppCard>
               </Grid>
             </Grid>
           </Box>
         </AppContainer>
       </Box>
+      {listing && isTenant ? (
+        <ContactModal
+          open={contactModalOpen}
+          onClose={() => setContactModalOpen(false)}
+          listing={{
+            id: listing.id || listing._id,
+            name: listing.name,
+            monthlyRent: listing.monthlyRent,
+            imageUrls: images,
+          }}
+        />
+      ) : null}
+      <ImageLightbox
+        images={images || []}
+        initialIndex={lightboxIndex}
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+      />
     </>
   );
 };

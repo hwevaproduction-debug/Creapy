@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 // MUI Imports
-import { Avatar, Box, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 // Hook Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
@@ -12,6 +12,7 @@ import {
   useGetMeQuery,
   useGetMySavedSearchesQuery,
 } from "../../redux/api/userApiSlice";
+import { useGetMyEngagementsQuery } from "../../redux/api/engagementApiSlice";
 import { useInitiateTenantPremiumMutation } from "../../redux/api/paymentApiSlice";
 import {
   selectedUserName,
@@ -20,7 +21,7 @@ import {
 } from "../../redux/auth/authSlice";
 // Config Imports
 import { isPremiumTenant } from "../../config/monetization";
-import { getGreeting, getFirstName } from "../../utils/greeting";
+import { getGreeting } from "../../utils/greeting";
 // Component Imports
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
@@ -30,12 +31,40 @@ import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import { Heading, SubHeading } from "../../components/Heading";
 import DotLoader from "../../components/Spinner/dotLoader";
 
+const getEngagementStatusBadge = (status: string) => {
+  const styles =
+    status === "APPROVED"
+      ? { background: "#D1EAE0", color: "#1F4D3A", label: "Approved" }
+      : status === "DECLINED"
+      ? { background: "#FEE2E2", color: "#991B1B", label: "Declined" }
+      : { background: "#FEF3C7", color: "#92400E", label: "Pending" };
+
+  return (
+    <Box
+      sx={{
+        background: styles.background,
+        color: styles.color,
+        borderRadius: "999px",
+        padding: "5px 10px",
+        fontSize: "12px",
+        fontWeight: 700,
+        display: "inline-block",
+      }}
+    >
+      {styles.label}
+    </Box>
+  );
+};
+
 const TenantDashboard = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const premiumExpiry = useTypedSelector(selectedUserPremiumExpiry);
   const userName = useTypedSelector(selectedUserName);
   const authUser = useTypedSelector((state) => state.auth?.user);
+  const [recentlyViewed, setRecentlyViewed] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
 
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showPolling, setShowPolling] = useState(false);
@@ -55,6 +84,8 @@ const TenantDashboard = () => {
     refetch: refetchSavedSearches,
   } =
     useGetMySavedSearchesQuery(undefined);
+  const { data: engagementsData, isLoading: engagementsLoading } =
+    useGetMyEngagementsQuery(undefined);
 
   const [deleteSavedSearch, { isLoading: isDeletingSavedSearch }] =
     useDeleteSavedSearchMutation();
@@ -67,14 +98,13 @@ const TenantDashboard = () => {
     ? premiumAmountNumber.toFixed(2)
     : "10.00";
   const premiumActive = isPremiumTenant({ premiumExpiry });
-  const firstName = getFirstName(userName);
-  const userInitials =
-    userName
-      ?.split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part: string) => part[0]?.toUpperCase())
-      .join("") || "U";
+  const engagements = engagementsData?.data || [];
+  const approvedEngagements = engagements.filter(
+    (engagement: any) => engagement.status === "APPROVED"
+  );
+  const pendingEngagements = engagements.filter(
+    (engagement: any) => engagement.status === "PENDING"
+  );
   const daysRemaining = premiumExpiry
     ? Math.ceil((new Date(premiumExpiry).getTime() - Date.now()) / 86_400_000)
     : null;
@@ -87,6 +117,18 @@ const TenantDashboard = () => {
         year: "numeric",
       })
     : "-";
+
+  useEffect(() => {
+    const stored = localStorage.getItem("tr_recently_viewed");
+    if (!stored) return;
+
+    try {
+      const parsed = JSON.parse(stored);
+      setRecentlyViewed(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setRecentlyViewed([]);
+    }
+  }, []);
 
   useEffect(() => {
     if (!showPolling) return;
@@ -188,21 +230,38 @@ const TenantDashboard = () => {
   };
 
   return (
-    <Box sx={{ mt: { xs: 5, md: 6 } }}>
-      <AppContainer>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
-          <Avatar
-            alt={`${firstName} avatar`}
-            sx={{ width: 48, height: 48, bgcolor: "#B8975A", fontSize: "1.1rem" }}
-          >
-            {userInitials}
-          </Avatar>
-          <Box>
-            <Heading>{getGreeting(userName)}</Heading>
-            <SubHeading sx={{ color: "text.secondary" }}>
-              Here's what's happening with your account
-            </SubHeading>
-          </Box>
+    <Box sx={{ background: "background.default", minHeight: "100vh" }}>
+      <Box sx={{ background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)", pt: { xs: 8, md: 10 }, pb: { xs: 8, md: 10 }, px: 3, mb: -6 }}>
+        <Box sx={{ maxWidth: 900, mx: "auto" }}>
+          <Box sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, fontWeight: 800, color: "#fff" }}>{getGreeting(userName)}</Box>
+          <Box sx={{ color: "rgba(255,255,255,0.7)", fontSize: "1rem", mt: 1 }}>Here's what's happening with your account</Box>
+        </Box>
+      </Box>
+      <AppContainer sx={{ pb: { xs: 4, md: 6 } }}>
+
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "repeat(2,1fr)", md: "repeat(4,1fr)" },
+            gap: 2,
+            mb: 3,
+          }}
+        >
+          {[
+            { label: "Landlords Contacted", value: engagements.length },
+            { label: "Approved", value: approvedEngagements.length },
+            { label: "Pending", value: pendingEngagements.length },
+            { label: "Properties Viewed", value: recentlyViewed.length },
+          ].map((stat) => (
+            <AppCard key={stat.label} sx={{ p: 2, textAlign: "center" }}>
+              <Box sx={{ color: "#1F4D3A", fontSize: "28px", fontWeight: 800 }}>
+                {stat.value}
+              </Box>
+              <Box sx={{ color: "text.secondary", fontSize: "12px" }}>
+                {stat.label}
+              </Box>
+            </AppCard>
+          ))}
         </Box>
 
         <AppCard
@@ -382,6 +441,93 @@ const TenantDashboard = () => {
             </Box>
           )}
         </AppCard>
+
+        <AppCard sx={{ mt: "20px", p: { xs: 2, md: 2.5 } }}>
+          <Heading sx={{ fontSize: "20px", mb: 2 }}>
+            My Engagement Requests
+          </Heading>
+          {engagementsLoading ? (
+            <SubHeading sx={{ color: "text.secondary" }}>Loading...</SubHeading>
+          ) : engagements.length === 0 ? (
+            <SubHeading sx={{ color: "text.secondary" }}>
+              No engagement requests yet. Browse listings and reach out to
+              landlords.
+            </SubHeading>
+          ) : (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              {engagements.map((engagement: any) => (
+                <AppCard
+                  key={engagement.id}
+                  elevation="flat"
+                  interactive
+                  sx={{
+                    p: "12px 16px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 1,
+                  }}
+                  onClick={() => navigate(`/listing/${engagement.listing?.id}`)}
+                >
+                  <Box>
+                    <Box sx={{ fontWeight: 700, cursor: "pointer" }}>
+                      {engagement.listing?.name || "Listing"}
+                    </Box>
+                    <Box sx={{ fontSize: "12px", color: "text.secondary" }}>
+                      Sent {new Date(engagement.createdAt).toLocaleString()}
+                    </Box>
+                  </Box>
+                  {getEngagementStatusBadge(engagement.status)}
+                </AppCard>
+              ))}
+            </Box>
+          )}
+        </AppCard>
+
+        {approvedEngagements.length > 0 ? (
+          <AppCard sx={{ mt: "20px", p: { xs: 2, md: 2.5 } }}>
+            <Heading sx={{ fontSize: "20px", mb: 2 }}>Approved Contacts</Heading>
+            {approvedEngagements.map((engagement: any) => (
+              <AppCard
+                key={engagement.id}
+                elevation="flat"
+                sx={{
+                  borderLeft: "3px solid #1F4D3A",
+                  p: "14px 16px",
+                  mb: 1,
+                }}
+              >
+                <Box sx={{ fontWeight: 700 }}>
+                  {engagement.listing?.name || "Listing"}
+                </Box>
+                <Box sx={{ fontSize: "13px", color: "#1F4D3A", mt: 0.5 }}>
+                  Address: {engagement.listing?.address || "Unavailable"}
+                </Box>
+                <Box sx={{ fontSize: "13px", color: "text.secondary", mt: 0.5 }}>
+                  Phone: {engagement.listing?.phoneNumber || "Unavailable"}
+                </Box>
+              </AppCard>
+            ))}
+          </AppCard>
+        ) : null}
+
+        {recentlyViewed.length > 0 ? (
+          <AppCard sx={{ mt: "20px", p: { xs: 2, md: 2.5 } }}>
+            <Heading sx={{ fontSize: "20px", mb: 2 }}>Recently Viewed</Heading>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {recentlyViewed.slice(0, 5).map((item) => (
+                <AppButton
+                  key={item.id}
+                  variant="outlined"
+                  size="small"
+                  onClick={() => navigate(`/listing/${item.id}`)}
+                >
+                  {item.name}
+                </AppButton>
+              ))}
+            </Box>
+          </AppCard>
+        ) : null}
       </AppContainer>
 
       <ToastAlert

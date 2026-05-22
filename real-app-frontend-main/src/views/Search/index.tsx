@@ -312,6 +312,8 @@ const SearchPage = () => {
   const [sideBarData, setSideBarData] = useState<any>({
     searchTerm: "",
     location: "",
+    city: "",
+    neighborhood: "",
     minRent: "",
     maxRent: "",
     minTotalRooms: "",
@@ -346,6 +348,8 @@ const SearchPage = () => {
       "searchTerm",
       "location",
       "province",
+      "city",
+      "neighborhood",
       "minRent",
       "maxRent",
       "minTotalRooms",
@@ -405,6 +409,8 @@ const SearchPage = () => {
     const sortFromUrl = urlParams.get("sort");
     const locationFromUrl = urlParams.get("location");
     const provinceFromUrl = urlParams.get("province");
+    const cityFromUrl = urlParams.get("city");
+    const neighborhoodFromUrl = urlParams.get("neighborhood");
     const minRentFromUrl = urlParams.get("minRent");
     const maxRentFromUrl = urlParams.get("maxRent");
     const minTotalRoomsFromUrl = urlParams.get("minTotalRooms");
@@ -418,7 +424,9 @@ const SearchPage = () => {
     if (hasAnySupportedFilterParam(urlParams)) {
       setSideBarData({
         searchTerm: searchTermFromUrl || "",
-        location: provinceFromUrl || locationFromUrl || "",
+        location: provinceFromUrl || locationFromUrl || cityFromUrl || "",
+        city: cityFromUrl || "",
+        neighborhood: neighborhoodFromUrl || "",
         minRent: minRentFromUrl || "",
         maxRent: maxRentFromUrl || "",
         minTotalRooms: minTotalRoomsFromUrl || minBedroomsFromUrl || "",
@@ -470,6 +478,8 @@ const SearchPage = () => {
     urlParams.set("studentAccommodation", sideBarData.studentAccommodation);
     urlParams.set("sort", sideBarData.sort);
     urlParams.set("province", sideBarData.location);
+    urlParams.set("city", sideBarData.city);
+    urlParams.set("neighborhood", sideBarData.neighborhood);
     urlParams.set("minRent", sideBarData.minRent);
     urlParams.set("maxRent", sideBarData.maxRent);
     urlParams.set("minTotalRooms", sideBarData.minTotalRooms);

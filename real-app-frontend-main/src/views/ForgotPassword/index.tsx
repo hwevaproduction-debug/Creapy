@@ -3,15 +3,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 // MUI Imports
 import { Box, Grid } from "@mui/material";
-// Firebase Imports
-import { sendPasswordResetEmail } from "firebase/auth";
 // Formik Imports
 import { Form, Formik, FormikProps } from "formik";
 import * as Yup from "yup";
 // Utils Imports
 import { onKeyDown } from "../../utils";
-// Firebase Config
-import { auth } from "../../firebase";
 // Components Imports
 import { Heading, SubHeading } from "../../components/Heading";
 import DotLoader from "../../components/Spinner/dotLoader";
@@ -20,6 +16,16 @@ import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
+import HeroSlideshow from "../../views/Home/HeroSlideshow";
+import { useForgotPasswordMutation } from "../../redux/api/authApiSlice";
+
+const FALLBACK_HERO_IMAGES = [
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1920&q=80",
+];
 
 interface ISForgotPasswordForm {
   email: string;
@@ -35,8 +41,8 @@ const forgotPasswordSchema = Yup.object().shape({
 const ForgotPassword = () => {
   const navigate = useNavigate();
 
-  const [isLoading, setIsLoading] = useState(false);
   const [sentResetEmail, setSentResetEmail] = useState("");
+  const [forgotPassword, { isLoading }] = useForgotPasswordMutation();
   const [formValues] = useState<ISForgotPasswordForm>({
     email: "",
   });
@@ -52,42 +58,54 @@ const ForgotPassword = () => {
   };
 
   const forgotPasswordHandler = async (data: ISForgotPasswordForm) => {
-    setIsLoading(true);
-
     try {
-      await sendPasswordResetEmail(auth, data.email);
+      await forgotPassword({ email: data.email }).unwrap();
       setSentResetEmail(data.email);
-    } catch (error) {
+    } catch (error: any) {
       setToast({
         ...toast,
         message:
-          (error as any)?.message ||
+          error?.data?.message ||
+          error?.message ||
           "Unable to send a password reset email. Please try again.",
         appearence: true,
         type: "error",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
   return (
     <Box
       sx={{
-        minHeight: "calc(100vh - 72px)",
+        position: "relative",
+        minHeight: "100vh",
         display: "flex",
         alignItems: "center",
+        justifyContent: "center",
         py: 4,
+        background: "#0F141E",
       }}
     >
+      <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(15,20,30,0.55)",
+          zIndex: 1,
+        }}
+      />
+      <Box sx={{ position: "relative", zIndex: 2, width: "100%" }}>
       <AppContainer>
         <Grid container spacing={2} justifyContent="center">
           <Grid item xs={12} md={6} lg={5}>
             <AppCard
               sx={{
+                maxWidth: 460,
+                mx: "auto",
                 p: { xs: 2.5, md: 3.5 },
                 borderRadius: "24px",
-                boxShadow: "0 16px 60px rgba(31,41,55,0.12)",
+                boxShadow: "0 32px 80px rgba(0,0,0,0.35)",
               }}
             >
               <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
@@ -240,6 +258,7 @@ const ForgotPassword = () => {
           </Grid>
         </Grid>
       </AppContainer>
+      </Box>
       <ToastAlert
         appearence={toast.appearence}
         type={toast.type}

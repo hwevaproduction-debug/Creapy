@@ -1,36 +1,92 @@
-// React Imports
 import { useNavigate } from "react-router-dom";
-// React Icons
-import { FaExclamationTriangle } from "react-icons/fa";
-// MUI Imports
 import { Box } from "@mui/material";
-// Component Imports
-import { SubHeading } from "../../components/Heading";
-import AppContainer from "../../components/ui/AppContainer";
-import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
 
 const NotFound = () => {
   const navigate = useNavigate();
 
   return (
-    <Box sx={{ height: "75vh", display: "flex", alignItems: "center" }}>
-      <AppContainer>
-        <AppCard sx={{ maxWidth: 420, margin: "0 auto", p: 3, textAlign: "center" }}>
-          <FaExclamationTriangle style={{ color: "#64748b", fontSize: "5em" }} />
-          <h1>404</h1>
-          <SubHeading sx={{ marginBottom: "30px" }}>
-            Sorry, this page does not exist
-          </SubHeading>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #0F141E 0%, #1F2937 100%)",
+        px: 2,
+        textAlign: "center",
+      }}
+    >
+      <Box>
+        <Box
+          sx={{
+            color: "#B8975A",
+            fontSize: { xs: "6rem", md: "9rem" },
+            fontWeight: 800,
+            lineHeight: 1,
+          }}
+        >
+          404
+        </Box>
+        <Box
+          sx={{
+            color: "#fff",
+            fontSize: { xs: "1.5rem", md: "2rem" },
+            fontWeight: 700,
+            mt: 2,
+          }}
+        >
+          Page not found
+        </Box>
+        <Box
+          sx={{
+            color: "rgba(255,255,255,0.6)",
+            fontSize: "1rem",
+            mt: 1,
+            mb: 4,
+          }}
+        >
+          This page doesn't exist or has moved.
+        </Box>
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 2,
+            justifyContent: "center",
+          }}
+        >
+          <AppButton onClick={() => navigate("/")}>Go Home</AppButton>
           <AppButton
-            onClick={() => {
-              navigate("/");
+            variant="outlined"
+            onClick={() => navigate("/search")}
+            sx={{
+              color: "#fff",
+              borderColor: "rgba(255,255,255,0.7)",
+              "&:hover": {
+                borderColor: "#fff",
+                background: "rgba(255,255,255,0.1)",
+              },
             }}
           >
-            Go Back
+            Browse Listings
           </AppButton>
-        </AppCard>
-      </AppContainer>
+          <AppButton
+            variant="outlined"
+            onClick={() => navigate("/search")}
+            sx={{
+              color: "#fff",
+              borderColor: "rgba(255,255,255,0.7)",
+              "&:hover": {
+                borderColor: "#fff",
+                background: "rgba(255,255,255,0.1)",
+              },
+            }}
+          >
+            Search
+          </AppButton>
+        </Box>
+      </Box>
     </Box>
   );
 };

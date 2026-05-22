@@ -110,6 +110,7 @@ const buildAuthUserPayload = (user) => ({
   phoneNumber: user.phoneNumber || null,
   isEmailVerified: Boolean(user.isEmailVerified),
   isPhoneVerified: Boolean(user.isPhoneVerified),
+  verificationStatus: user.verificationStatus || "UNVERIFIED",
   premiumExpiry: user.premiumExpiry || null,
   createdAt: user.createdAt || null,
   updatedAt: user.updatedAt || null,
@@ -135,17 +136,11 @@ const createSendToken = (user, statusCode, res) => {
 };
 
 exports.signup = catchAsync(async (req, res, next) => {
-  const { username, email, password, role, phoneNumber, nationalId } = req.body;
+  const { username, email, password, role } = req.body;
   const allowedRoles = ["tenant", "landlord"];
 
   if (role && !allowedRoles.includes(role)) {
     return next(new AppError("Invalid role. Role must be tenant or landlord", 400));
-  }
-
-  if (role === "landlord" && (!phoneNumber || !nationalId)) {
-    return next(
-      new AppError("Phone number and national ID are required for landlords", 400)
-    );
   }
 
   const verification = createEmailVerificationToken();
@@ -155,8 +150,6 @@ exports.signup = catchAsync(async (req, res, next) => {
       email,
       password: await bcrypt.hash(password, 12),
       ...(role ? { role } : {}),
-      ...(phoneNumber ? { phoneNumber } : {}),
-      ...(nationalId ? { nationalId } : {}),
       isEmailVerified: false,
       emailVerificationToken: verification.hashedToken,
       emailVerificationExpires: new Date(verification.expiresAt),
@@ -164,52 +157,6 @@ exports.signup = catchAsync(async (req, res, next) => {
   });
 
   if (process.env.SKIP_EMAIL_VERIFICATION === "true") {
-    if (newUser.role === "landlord") {
-      if (process.env.SKIP_PHONE_VERIFICATION === "true") {
-        const verifiedUser = await prisma.user.update({
-          where: { id: newUser.id },
-          data: {
-            isEmailVerified: true,
-            isPhoneVerified: true,
-            phoneOtp: null,
-            phoneOtpExpires: null,
-          },
-        });
-
-        createSendToken(verifiedUser, 201, res);
-        return;
-      }
-
-      const phoneVerification = generatePhoneOtp();
-      const verifiedUser = await prisma.user.update({
-        where: { id: newUser.id },
-        data: {
-          isEmailVerified: true,
-          phoneOtp: phoneVerification.hashedOtp,
-          phoneOtpExpires: new Date(phoneVerification.expiresAt),
-        },
-      });
-
-      try {
-        await sendSms({
-          to: newUser.phoneNumber,
-          message: `Your Creapy verification code is ${phoneVerification.rawOtp}. It expires in 10 minutes.`,
-        });
-      } catch (error) {
-        await prisma.user.delete({ where: { id: newUser.id } });
-        return next(buildVerificationDeliveryError("sms", error));
-      }
-
-      res.status(201).json({
-        status: "pending_phone_verification",
-        message: "Account created. Please verify your phone number.",
-        data: {
-          user: buildPendingVerificationUserPayload(verifiedUser),
-        },
-      });
-      return;
-    }
-
     const verifiedUser = await prisma.user.update({
       where: { id: newUser.id },
       data: { isEmailVerified: true },
@@ -218,32 +165,11 @@ exports.signup = catchAsync(async (req, res, next) => {
     return;
   }
 
-  let verificationChannel = "email";
-
   try {
-    if (newUser.role === "landlord") {
-      verificationChannel = "sms";
-      const phoneVerification = generatePhoneOtp();
-
-      await prisma.user.update({
-        where: { id: newUser.id },
-        data: {
-          phoneOtp: phoneVerification.hashedOtp,
-          phoneOtpExpires: new Date(phoneVerification.expiresAt),
-        },
-      });
-
-      await sendSms({
-        to: newUser.phoneNumber,
-        message: `Your Creapy verification code is ${phoneVerification.rawOtp}. It expires in 10 minutes.`,
-      });
-    }
-
-    verificationChannel = "email";
     await sendVerificationEmail(newUser, verification.rawToken);
   } catch (error) {
     await prisma.user.delete({ where: { id: newUser.id } });
-    return next(buildVerificationDeliveryError(verificationChannel, error));
+    return next(buildVerificationDeliveryError("email", error));
   }
 
   newUser.password = undefined;
@@ -280,10 +206,6 @@ exports.login = catchAsync(async (req, res, next) => {
     return next(new AppError("Please verify your email before logging in", 403));
   }
 
-  if (user.role === "landlord" && user.isPhoneVerified !== true) {
-    return next(new AppError("Please verify your phone number before logging in", 403));
-  }
-
   // 4) If everything ok, send token to client
   createSendToken(user, 200, res);
 });
@@ -316,16 +238,6 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
       emailVerificationExpires: null,
     },
   });
-
-  if (verifiedUser.role === "landlord" && verifiedUser.isPhoneVerified !== true) {
-    return res.status(200).json({
-      status: "pending_phone_verification",
-      message: "Email verified. Please verify your phone number.",
-      data: {
-        user: buildPendingVerificationUserPayload(verifiedUser),
-      },
-    });
-  }
 
   createSendToken(verifiedUser, 200, res);
 });
@@ -568,6 +480,136 @@ exports.resendPhoneOtp = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: "success",
     message: "OTP resent.",
+  });
+});
+
+exports.forgotPassword = catchAsync(async (req, res, next) => {
+  const { email } = req.body;
+  if (!email) return next(new AppError("Email is required", 400));
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    return res.status(200).json({
+      status: "success",
+      message: "If that email exists, a reset link has been sent.",
+    });
+  }
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordResetToken: hashedToken,
+      passwordResetExpires: new Date(Date.now() + 60 * 60 * 1000),
+    },
+  });
+
+  const resetUrl = `${getAppBaseUrl()}/reset-password?token=${rawToken}`;
+  await sendEmail({
+    to: user.email,
+    subject: "Reset your Town Ruins password",
+    text: `Reset your password by visiting: ${resetUrl}\nThis link expires in 1 hour.`,
+    html: `<p>Hello ${user.username},</p><p>Click the link below to reset your Town Ruins password:</p><p><a href="${resetUrl}" style="background:#B8975A;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:700;">Reset Password</a></p><p>This link expires in 1 hour. If you did not request this, ignore this email.</p>`,
+  });
+
+  res.status(200).json({
+    status: "success",
+    message: "If that email exists, a reset link has been sent.",
+  });
+});
+
+exports.resetPassword = catchAsync(async (req, res, next) => {
+  const { token, password } = req.body;
+  if (!token || !password) {
+    return next(new AppError("Token and new password are required", 400));
+  }
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+  const user = await prisma.user.findFirst({
+    where: {
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { gt: new Date() },
+    },
+  });
+
+  if (!user) return next(new AppError("Reset link is invalid or has expired", 400));
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password: await bcrypt.hash(password, 12),
+      passwordResetToken: null,
+      passwordResetExpires: null,
+    },
+  });
+
+  res
+    .status(200)
+    .json({ status: "success", message: "Password updated successfully." });
+});
+
+exports.resendVerification = catchAsync(async (req, res, next) => {
+  const { email } = req.body;
+  if (!email) return next(new AppError("Email is required", 400));
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || user.isEmailVerified) {
+    return res.status(200).json({
+      status: "success",
+      message: "If applicable, a new verification email has been sent.",
+    });
+  }
+
+  const verification = createEmailVerificationToken();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      emailVerificationToken: verification.hashedToken,
+      emailVerificationExpires: new Date(verification.expiresAt),
+    },
+  });
+
+  await sendVerificationEmail(user, verification.rawToken);
+  res
+    .status(200)
+    .json({ status: "success", message: "Verification email resent." });
+});
+
+exports.submitVerification = catchAsync(async (req, res, next) => {
+  if (req.user?.role !== "landlord") {
+    return next(new AppError("Access denied", 403));
+  }
+
+  const { idImageUrl, selfieUrl } = req.body;
+  if (!idImageUrl || !selfieUrl) {
+    return next(new AppError("ID image and selfie are required", 400));
+  }
+
+  await prisma.user.update({
+    where: { id: req.user.id },
+    data: {
+      verificationStatus: "PENDING_REVIEW",
+      verificationIdUrl: idImageUrl,
+      verificationSelfieUrl: selfieUrl,
+      verificationSubmittedAt: new Date(),
+    },
+  });
+
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (adminEmail) {
+    await sendEmail({
+      to: adminEmail,
+      subject: "New landlord verification submission",
+      text: `User ${req.user.username} (${req.user.email}) has submitted identity verification documents for review.`,
+      html: `<p>User <strong>${req.user.username}</strong> (${req.user.email}) has submitted identity verification. Please review in the admin dashboard.</p>`,
+    });
+  }
+
+  res.status(200).json({
+    status: "success",
+    message: "Verification submitted. We will review within 24-48 hours.",
   });
 });
 
