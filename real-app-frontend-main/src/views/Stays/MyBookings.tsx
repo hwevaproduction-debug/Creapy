@@ -12,7 +12,7 @@ import {
   Stack,
   TextField,
 } from "@mui/material";
-import { FaMinus, FaPlus } from "react-icons/fa6";
+import { Minus, Plus } from "lucide-react";
 import { Heading, SubHeading } from "../../components/Heading";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import AppContainer from "../../components/ui/AppContainer";
@@ -528,7 +528,7 @@ const MyBookings = () => {
                           }
                           disabled={counter.value <= counter.min}
                         >
-                          <FaMinus size={12} />
+                          <Minus size={12} />
                         </AppButton>
                         <Box sx={{ width: 28, textAlign: "center", fontWeight: 800 }}>
                           {counter.value}
@@ -550,7 +550,7 @@ const MyBookings = () => {
                           }
                           disabled={counter.value >= counter.max}
                         >
-                          <FaPlus size={12} />
+                          <Plus size={12} />
                         </AppButton>
                       </Stack>
                     </Stack>

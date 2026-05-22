@@ -41,6 +41,15 @@ import {
   selectedUserRole,
   selectedUserToken,
 } from "../../redux/auth/authSlice";
+import HeroSlideshow from "../Home/HeroSlideshow";
+
+const STAY_HERO_IMAGES = [
+  "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1551882547-ff40c4a49f5e?auto=format&fit=crop&w=1920&q=80",
+];
 
 export const BUSINESS_TYPES = [
   { label: "All", value: "", icon: null },
@@ -203,27 +212,26 @@ const Stays = () => {
         <Stack spacing={3}>
           <Box
             sx={{
-              p: { xs: 2.5, md: 4 },
-              borderRadius: { xs: "16px", md: "24px" },
-              background:
-                "linear-gradient(135deg, #1F2937 0%, #2D3748 55%, #1F4D3A 100%)",
-              color: "#fff",
               position: "relative",
+              minHeight: { xs: "380px", md: "460px" },
+              display: "flex",
+              alignItems: "center",
+              backgroundColor: "#0F141E",
               overflow: "hidden",
+              color: "#fff",
             }}
           >
-            <Box
+            <HeroSlideshow images={STAY_HERO_IMAGES} />
+            <Stack
+              spacing={3}
               sx={{
-                position: "absolute",
-                inset: 0,
-                backgroundImage:
-                  "radial-gradient(rgba(184,151,90,0.08) 1px, transparent 1px)",
-                backgroundSize: "24px 24px",
-                pointerEvents: "none",
-                zIndex: 0,
+                position: "relative",
+                zIndex: 3,
+                width: "100%",
+                pt: { xs: 4, md: 6 },
+                pb: { xs: 4, md: 6 },
               }}
-            />
-            <Stack spacing={3} sx={{ position: "relative", zIndex: 1 }}>
+            >
               <Box>
                 <Box
                   sx={{

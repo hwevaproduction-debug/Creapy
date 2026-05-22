@@ -11,6 +11,7 @@ import {
   ParkingCircle,
   Shield,
   Sofa,
+  Star,
   Wifi,
   Zap,
 } from "lucide-react";
@@ -20,12 +21,11 @@ import PropertyCard from "../../components/PropertyCard";
 import HeroSlideshow from "./HeroSlideshow";
 // Swiper Imports
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay, Pagination } from "swiper/modules";
+import { Autoplay, Pagination, FreeMode } from "swiper/modules";
 import "swiper/css/free-mode";
 import "swiper/css";
 import "swiper/css/pagination";
 import {
-  useGetHomeGroupedByLocationQuery,
   useGetHomeHighlightedQuery,
   useGetPublicStatsQuery,
 } from "../../redux/api/listingApiSlice";
@@ -41,6 +41,17 @@ import {
   selectedUserRole,
   selectedUserToken,
 } from "../../redux/auth/authSlice";
+
+const NEIGHBOURHOOD_IMAGES = [
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=600&q=80",
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80",
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80",
+  "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=600&q=80",
+  "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=80",
+  "https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=600&q=80",
+  "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=600&q=80",
+  "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=600&q=80",
+];
 
 type SearchTab = "rent" | "stays" | "student";
 
@@ -111,7 +122,7 @@ const computeStats = (data: any) => {
       : { value: "Growing Network", label: "Trusted Landlords" },
     { value: String(provinces || 10), label: "Provinces Covered" },
     hasAvgRating && avgRating >= 4.0
-      ? { value: `${avgRating.toFixed(1)}★`, label: "Average Rating" }
+      ? { value: avgRating.toFixed(1), label: "Average Rating" }
       : { value: "Highly Rated", label: "Verified Stays" },
   ];
 };
@@ -131,20 +142,15 @@ const Home = () => {
 
   const { data: highlightedData, isLoading: highlightedLoading } =
     useGetHomeHighlightedQuery(6);
-  const {
-    data: groupedByLocationData,
-    isLoading: groupedByLocationLoading,
-  } = useGetHomeGroupedByLocationQuery({ locationsLimit: 6, perLocation: 3 });
   const { data: statsData } = useGetPublicStatsQuery(undefined);
 
   const highlightedListings = (highlightedData?.data || []).slice(0, 6);
-  const groupedSlides = groupedByLocationData?.data || [];
   const neighborhoodEntries = ZIMBABWE_NEIGHBORHOODS.flatMap((entry) =>
     entry.neighborhoods.map((neighborhood) => ({
       city: entry.city,
       neighborhood,
     }))
-  ).slice(0, 12);
+  );
   const neighborhoodGradients = [
     "linear-gradient(135deg,#B8975A,#7D6234)",
     "linear-gradient(135deg,#1F4D3A,#1F2937)",
@@ -162,8 +168,7 @@ const Home = () => {
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
-    const anyLoading = highlightedLoading || groupedByLocationLoading;
-    if (!anyLoading) {
+    if (!highlightedLoading) {
       setShowOverlay(false);
       setTimedOut(false);
       return;
@@ -179,7 +184,7 @@ const Home = () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, [highlightedLoading, groupedByLocationLoading]);
+  }, [highlightedLoading]);
 
   const navigateToSearch = (params: Record<string, string>) => {
     const urlParams = new URLSearchParams();
@@ -583,7 +588,7 @@ const Home = () => {
 
       <AppContainer sx={{ pb: { xs: 6, md: 8 } }}>
         <Box sx={{ marginBottom: 3 }}>
-          <Heading>Explore By Neighbourhood</Heading>
+          <Heading>Popular Neighbourhoods</Heading>
           <SubHeading sx={{ marginTop: 0.75 }}>
             Discover high-demand areas across Zimbabwe&apos;s major cities
           </SubHeading>
@@ -661,7 +666,7 @@ const Home = () => {
             font: "inherit",
           }}
         >
-          Browse by province -&gt;
+          View all neighbourhoods &rarr;
         </Box>
       </AppContainer>
 
@@ -711,6 +716,10 @@ const Home = () => {
                 <Box sx={{ textAlign: "center" }}>
                   <Box
                     sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 0.5,
                       fontSize: { xs: "2rem", md: "2.5rem" },
                       fontWeight: 800,
                       color: "#B8975A",
@@ -718,6 +727,9 @@ const Home = () => {
                     }}
                   >
                     {stat.value}
+                    {stat.label === "Average Rating" ? (
+                      <Star size={28} fill="currentColor" strokeWidth={2.5} />
+                    ) : null}
                   </Box>
                   <Box
                     sx={{
@@ -738,68 +750,107 @@ const Home = () => {
 
       <AppContainer
         sx={{
-          py: { xs: 6, md: 8 },
+          pb: { xs: 6, md: 8 },
           "& .swiper-pagination-bullet-active": { background: "#B8975A" },
         }}
       >
-        <Heading sx={{ marginBottom: 3 }}>Explore By Neighbourhood</Heading>
-        {groupedSlides?.length > 0 ? (
-          <Swiper
-            slidesPerView={1}
-            spaceBetween={30}
-            centeredSlides={true}
-            autoplay={{
-              delay: 3000,
-              disableOnInteraction: false,
-            }}
-            pagination={{
-              clickable: true,
-            }}
-            modules={[Autoplay, Pagination]}
-            speed={1500}
-            effect="fade"
-          >
-            {groupedSlides.map((group: any) => (
-              <SwiperSlide key={group?.location}>
-                <Box sx={{ pb: 5 }}>
-                  <Heading
+        <Box sx={{ marginBottom: 3 }}>
+          <Heading>Discover Your Neighbourhood</Heading>
+          <SubHeading sx={{ marginTop: 0.75 }}>
+            Explore premium areas across Zimbabwe&apos;s major cities
+          </SubHeading>
+        </Box>
+        <Swiper
+          slidesPerView="auto"
+          spaceBetween={16}
+          modules={[Autoplay, Pagination, FreeMode]}
+          autoplay={{ delay: 3500, disableOnInteraction: false }}
+          pagination={{ clickable: true }}
+          speed={800}
+          style={{ paddingBottom: "40px" }}
+        >
+          {neighborhoodEntries.map((entry, index) => (
+            <SwiperSlide
+              key={`${entry.city}-${entry.neighborhood}`}
+              style={{ width: "220px" }}
+            >
+              <Box
+                onClick={() =>
+                  navigate(
+                    `/search?city=${entry.city}&neighborhood=${entry.neighborhood}`
+                  )
+                }
+                sx={{
+                  position: "relative",
+                  height: 280,
+                  borderRadius: "16px",
+                  overflow: "hidden",
+                  cursor: "pointer",
+                  backgroundImage: `url(${
+                    NEIGHBOURHOOD_IMAGES[
+                      index % NEIGHBOURHOOD_IMAGES.length
+                    ]
+                  })`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  transition: "transform 0.3s ease, box-shadow 0.3s ease",
+                  "&:hover": {
+                    transform: "scale(1.03)",
+                    boxShadow: "0 16px 40px rgba(31,41,55,0.25)",
+                  },
+                }}
+              >
+                <Box
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    background:
+                      "linear-gradient(to top, rgba(15,20,30,0.88) 0%, rgba(31,77,58,0.22) 60%, rgba(31,77,58,0) 100%)",
+                  }}
+                />
+                <Box
+                  sx={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    p: 2,
+                  }}
+                >
+                  <Box
                     sx={{
-                      color: "text.primary",
-                      fontWeight: 700,
-                      marginBottom: 2,
+                      color: "#fff",
+                      fontWeight: 800,
+                      fontSize: "16px",
+                      lineHeight: 1.2,
                     }}
                   >
-                    {group?.location}
-                  </Heading>
-                  <Grid container spacing={2}>
-                    {group?.listings?.map((item: any) => (
-                      <Grid item xs={12} sm={6} md={4} key={item?._id}>
-                        <PropertyCard
-                          item={item}
-                          onClick={() => navigate(`/listing/${item?._id}`)}
-                        />
-                      </Grid>
-                    ))}
-                  </Grid>
+                    {entry.neighborhood}
+                  </Box>
+                  <Box
+                    sx={{
+                      color: "rgba(255,255,255,0.72)",
+                      fontSize: "12px",
+                      mt: 0.5,
+                    }}
+                  >
+                    {entry.city}
+                  </Box>
+                  <Box
+                    sx={{
+                      color: "#B8975A",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      mt: 1,
+                    }}
+                  >
+                    Explore &rarr;
+                  </Box>
                 </Box>
-              </SwiperSlide>
-            ))}
-          </Swiper>
-        ) : (
-          <Box
-            sx={{
-              p: { xs: 2, md: 2.5 },
-              background: "background.paper",
-              border: "1px solid",
-              borderColor: "divider",
-              borderRadius: "10px",
-              color: "text.secondary",
-              fontSize: "14px",
-            }}
-          >
-            No neighbourhood listings yet. Check back soon.
-          </Box>
-        )}
+              </Box>
+            </SwiperSlide>
+          ))}
+        </Swiper>
       </AppContainer>
 
       <Box

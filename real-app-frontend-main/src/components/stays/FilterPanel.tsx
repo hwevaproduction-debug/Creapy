@@ -10,7 +10,7 @@ import {
   ToggleButtonGroup,
   Tooltip as MuiTooltip,
 } from "@mui/material";
-import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, Star } from "lucide-react";
 import { Heading, SubHeading } from "../Heading";
 import AppButton from "../ui/AppButton";
 import AppCard from "../ui/AppCard";
@@ -279,7 +279,8 @@ const FilterPanel = ({
           >
             {["1", "2", "3", "4", "5"].map((rating) => (
               <ToggleButton key={rating} value={rating} sx={toggleButtonSx}>
-                ★
+                <Star size={11} style={{ marginRight: 3 }} />
+                {rating}+
               </ToggleButton>
             ))}
           </ToggleButtonGroup>

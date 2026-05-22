@@ -15,6 +15,7 @@ const kenBurnsTo = [
 const HeroSlideshow = ({ images }: HeroSlideshowProps) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [prevIndex, setPrevIndex] = useState<number | null>(null);
+  const [greenFade, setGreenFade] = useState(true);
   const imageSignature = images.join("|");
 
   useEffect(() => {
@@ -36,6 +37,16 @@ const HeroSlideshow = ({ images }: HeroSlideshowProps) => {
     setActiveIndex(0);
     setPrevIndex(null);
   }, [imageSignature]);
+
+  useEffect(() => {
+    setGreenFade(false);
+
+    const timeout = window.setTimeout(() => {
+      setGreenFade(true);
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeIndex]);
 
   return (
     <Box sx={{ position: "absolute", inset: 0, overflow: "hidden", zIndex: 0 }}>
@@ -69,13 +80,26 @@ const HeroSlideshow = ({ images }: HeroSlideshowProps) => {
           />
         );
       })}
+      {/* Layer 1 - dark vignette */}
       <Box
         sx={{
           position: "absolute",
           inset: 0,
           zIndex: 1,
           background:
-            "linear-gradient(to top, rgba(15,20,30,0.75) 0%, rgba(15,20,30,0.35) 50%, rgba(15,20,30,0.15) 100%)",
+            "linear-gradient(to top, rgba(15,20,30,0.78) 0%, rgba(15,20,30,0.28) 55%, rgba(15,20,30,0.08) 100%)",
+        }}
+      />
+      {/* Layer 2 - green brand overlay */}
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 2,
+          background:
+            "linear-gradient(135deg, rgba(31,77,58,0.40) 0%, rgba(31,77,58,0.18) 55%, rgba(31,77,58,0) 100%)",
+          opacity: greenFade ? 1 : 0.65,
+          transition: "opacity 2s ease",
         }}
       />
     </Box>

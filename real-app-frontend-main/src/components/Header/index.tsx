@@ -157,7 +157,12 @@ const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const isHomePage = location.pathname === "/";
   const [scrolled, setScrolled] = useState(false);
-  const headerIconColor = isHomePage && !scrolled ? "#fff" : "#1F2937";
+  const headerIconColor =
+    isHomePage && !scrolled
+      ? "#fff"
+      : theme.palette.mode === "dark"
+      ? "#E6EDF3"
+      : "#1F2937";
   const isActive = (path: string) =>
     path === "/"
       ? location.pathname === "/"
@@ -210,16 +215,16 @@ const Header = () => {
           zIndex: 1100,
           background:
             isHomePage && !scrolled
-              ? "transparent"
+              ? "rgba(31,77,58,0.18)"
               : theme.palette.mode === "dark"
-              ? "rgba(13,17,23,0.92)"
-              : "rgba(245, 240, 235, 0.92)",
-          backdropFilter: isHomePage && !scrolled ? "none" : "blur(12px)",
+              ? "rgba(13,17,23,0.94)"
+              : "rgba(245,240,235,0.94)",
+          backdropFilter: isHomePage && !scrolled ? "blur(4px)" : "blur(16px)",
           borderBottom:
             isHomePage && !scrolled
               ? "none"
-              : "1px solid rgba(184, 151, 90, 0.18)",
-          transition: "background 0.3s ease, backdrop-filter 0.3s ease",
+              : "1px solid rgba(184,151,90,0.18)",
+          transition: "background 0.35s ease, backdrop-filter 0.35s ease, border-color 0.35s ease",
         }}
       >
         <AppContainer>
@@ -280,12 +285,12 @@ const Header = () => {
             <Box
               sx={{
                 display: { xs: "none", md: "flex" },
-                flexDirection: "column",
+                flexDirection: "row",
                 alignItems: "center",
-                gap: 1,
+                gap: 2,
               }}
             >
-              <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%", maxWidth: 420 }}>
+              <Box component="form" onSubmit={handleSubmit} sx={{ flexShrink: 0, width: "100%", maxWidth: 280 }}>
                 <SearchBar
                   placeholder="Search locations, listings..."
                   searchText={searchText}
@@ -295,7 +300,7 @@ const Header = () => {
                 />
               </Box>
 
-              <Box sx={{ display: "flex", gap: 3, alignItems: "center" }}>
+              <Box sx={{ display: "flex", gap: 2.5, alignItems: "center", flexWrap: "nowrap" }}>
                 {[
                   { label: "Home", path: "/" },
                   { label: "About", path: "/about" },

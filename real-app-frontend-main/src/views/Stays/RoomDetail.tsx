@@ -11,7 +11,7 @@ import {
   StepLabel,
   Stepper,
 } from "@mui/material";
-import { FaCalendarDay, FaLocationDot, FaMinus, FaPlus, FaUserGroup } from "react-icons/fa6";
+import { CalendarDays, MapPin, Minus, Plus, Users } from "lucide-react";
 import { Heading, SubHeading } from "../../components/Heading";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import AppContainer from "../../components/ui/AppContainer";
@@ -597,7 +597,7 @@ const RoomDetail = () => {
                       <Box>
                         <Heading sx={{ mb: 1 }}>{getRoomName(room)}</Heading>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#475569" }}>
-                          <FaLocationDot />
+                          <MapPin size={16} />
                           <SubHeading>{getRoomLocation(room)}</SubHeading>
                         </Box>
                       </Box>
@@ -617,9 +617,9 @@ const RoomDetail = () => {
                   </Box>
 
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                    <Chip icon={<FaUserGroup />} label={`Up to ${getRoomCapacity(room)} guests`} />
+                    <Chip icon={<Users size={16} />} label={`Up to ${getRoomCapacity(room)} guests`} />
                     <Chip
-                      icon={<FaCalendarDay />}
+                      icon={<CalendarDays size={16} />}
                       label={`$${thousandSeparatorNumber(nightlyRate)}/night`}
                     />
                   </Stack>
@@ -781,7 +781,7 @@ const RoomDetail = () => {
                                       disabled={counter.value <= counter.min}
                                       sx={{ border: "1px solid", borderColor: "divider" }}
                                     >
-                                      <FaMinus size={12} />
+                                      <Minus size={12} />
                                     </IconButton>
                                     <Box sx={{ width: 28, textAlign: "center", fontWeight: 800 }}>
                                       {counter.value}
@@ -799,7 +799,7 @@ const RoomDetail = () => {
                                       disabled={counter.value >= counter.max}
                                       sx={{ border: "1px solid", borderColor: "divider" }}
                                     >
-                                      <FaPlus size={12} />
+                                      <Plus size={12} />
                                     </IconButton>
                                   </Stack>
                                 </Stack>

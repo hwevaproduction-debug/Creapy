@@ -10,6 +10,7 @@ import {
   TableCell,
   TableRow,
 } from "@mui/material";
+import { PartyPopper } from "lucide-react";
 import { Heading, SubHeading } from "../../components/Heading";
 import DotLoader from "../../components/Spinner/dotLoader";
 import AppContainer from "../../components/ui/AppContainer";
@@ -215,7 +216,12 @@ const BookingConfirmation = () => {
             <AppCard sx={{ p: { xs: 2.5, md: 3 } }}>
               <Stack spacing={3}>
                 <Box sx={{ textAlign: "center" }}>
-                  <Box sx={{ fontSize: 44, lineHeight: 1, mb: 1 }}>🎉</Box>
+                  <Box
+                    sx={{ color: "#1F4D3A", lineHeight: 1, mb: 1, display: "flex", justifyContent: "center" }}
+                    aria-hidden
+                  >
+                    <PartyPopper size={44} />
+                  </Box>
                   <Heading sx={{ fontSize: "30px", mb: 1 }}>{statusMeta.title}</Heading>
                   <Stack direction="row" justifyContent="center" sx={{ mb: 1 }}>
                     <Chip color={statusMeta.color} label={statusMeta.label} />

@@ -13,6 +13,7 @@ import {
   TableRow,
   Tooltip,
 } from "@mui/material";
+import { GraduationCap, Pencil, Trash2 } from "lucide-react";
 // Hook Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
@@ -523,8 +524,17 @@ const LandlordDashboard = () => {
                         {item?.name}
                       </Box>
                       {item?.studentAccommodation ? (
-                        <Box sx={{ ...studentAccommodationBadgeSx, mt: 0.5 }}>
-                          🎓 Student Accommodation
+                        <Box
+                          sx={{
+                            ...studentAccommodationBadgeSx,
+                            mt: 0.5,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
+                        >
+                          <GraduationCap size={16} />
+                          Student Accommodation
                         </Box>
                       ) : null}
                     </TableCell>
@@ -569,7 +579,7 @@ const LandlordDashboard = () => {
                                 borderRadius: "8px",
                               }}
                             >
-                              ✏️
+                              <Pencil size={18} />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Delete">
@@ -589,7 +599,7 @@ const LandlordDashboard = () => {
                               {deletingListingId === item?._id ? (
                                 <DotLoader color="#dc2626" size={10} />
                               ) : (
-                                "🗑️"
+                                <Trash2 size={18} />
                               )}
                             </IconButton>
                           </Tooltip>

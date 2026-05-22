@@ -5,23 +5,27 @@ import { useDispatch } from "react-redux";
 // MUI Imports
 import {
   Box,
+  Checkbox,
+  Divider,
   Drawer,
   Fab,
-  Grid,
-  RadioGroup,
   FormControlLabel,
-  Radio,
-  Checkbox,
+  Grid,
+  IconButton,
+  Slider,
+  ToggleButton,
+  ToggleButtonGroup,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
+import { Add, Remove } from "@mui/icons-material";
+import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 // Custom Imports
 import SearchBar from "../../components/SearchBar";
-import { Heading, SubHeading } from "../../components/Heading";
+import { Heading } from "../../components/Heading";
 import PropertyCard from "../../components/PropertyCard";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
-import AppInput from "../../components/ui/AppInput";
 import AppSelect from "../../components/ui/AppSelect";
 import AppButton from "../../components/ui/AppButton";
 import DotLoader from "../../components/Spinner/dotLoader";
@@ -33,8 +37,6 @@ import {
   selectedSearchText,
   setSearchText,
 } from "../../redux/global/globalSlice";
-// React Icons
-import { IoFilter } from "react-icons/io5";
 // Utils Imports
 import { getApiBaseUrl } from "../../utils";
 
@@ -57,6 +59,58 @@ const sortTypes = [
   },
 ];
 
+const defaultSideBarData = {
+  searchTerm: "",
+  location: "",
+  city: "",
+  neighborhood: "",
+  minRent: "",
+  maxRent: "",
+  minTotalRooms: "",
+  solar: false,
+  borehole: false,
+  security: false,
+  internet: false,
+  type: "all",
+  parking: false,
+  furnished: false,
+  offer: false,
+  studentAccommodation: false,
+  sort: "createdAt_desc",
+};
+
+const sectionTitleSx = {
+  fontSize: "11px",
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+  color: "#94A3B8",
+  mb: 1.25,
+} as const;
+
+const toggleGroupSx = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 0.5,
+  "& .MuiToggleButtonGroup-grouped": {
+    m: 0,
+    border: "1px solid #E2E8F0",
+  },
+} as const;
+
+const toggleButtonSx = {
+  borderRadius: "999px !important",
+  fontSize: "12px",
+  py: 0.5,
+  px: 1.5,
+  textTransform: "none",
+  "&.Mui-selected": {
+    background: "#B8975A",
+    color: "#fff",
+    "&:hover": { background: "#9E7E45" },
+  },
+} as const;
+
 type FilterFormProps = {
   sideBarData: any;
   setSideBarData: (data: any) => void;
@@ -64,6 +118,7 @@ type FilterFormProps = {
   isMobile: boolean;
   searchText: string;
   handleSearch: (e: any) => void;
+  onCollapse: () => void;
 };
 
 const FilterForm = ({
@@ -73,12 +128,91 @@ const FilterForm = ({
   isMobile,
   searchText,
   handleSearch,
-}: FilterFormProps) => (
-  <Box>
-    <Heading sx={{ margin: "0 0 10px 0" }}>Filters</Heading>
-    <AppCard sx={{ p: { xs: 2, md: 2.5 } }}>
+  onCollapse,
+}: FilterFormProps) => {
+  const parsedMinRent = Number(sideBarData.minRent || 0);
+  const parsedMaxRent = Number(sideBarData.maxRent || 5000);
+  const safeMinRent = Number.isFinite(parsedMinRent) ? parsedMinRent : 0;
+  const safeMaxRent = Number.isFinite(parsedMaxRent) ? parsedMaxRent : 5000;
+  const normalizedMinRent = Math.max(
+    0,
+    Math.min(safeMinRent, safeMaxRent, 5000)
+  );
+  const normalizedMaxRent = Math.min(
+    5000,
+    Math.max(safeMinRent, safeMaxRent, 0)
+  );
+  const [rentRange, setRentRange] = useState<[number, number]>([
+    normalizedMinRent,
+    normalizedMaxRent,
+  ]);
+  const listingTypeValue = sideBarData.studentAccommodation
+    ? "student"
+    : sideBarData.type || "all";
+  const amenityOptions = [
+    { key: "solar", label: "Solar" },
+    { key: "borehole", label: "Borehole" },
+    { key: "security", label: "Security" },
+    { key: "internet", label: "Internet" },
+  ];
+  const featureOptions = [
+    { key: "offer", label: "Offer" },
+    { key: "parking", label: "Parking" },
+    { key: "furnished", label: "Furnished" },
+  ];
+
+  useEffect(() => {
+    setRentRange([normalizedMinRent, normalizedMaxRent]);
+  }, [normalizedMinRent, normalizedMaxRent]);
+
+  return (
+    <AppCard
+      sx={{
+        p: 2.5,
+        borderRadius: "16px",
+        position: "sticky",
+        top: "88px",
+        maxHeight: "calc(100vh - 108px)",
+        overflowY: "auto",
+      }}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1.5,
+          mb: 2,
+        }}
+      >
+        <Heading sx={{ fontSize: "18px", fontWeight: 700 }}>Filters</Heading>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+          <AppButton
+            type="button"
+            variant="text"
+            size="small"
+            onClick={() => setSideBarData({ ...defaultSideBarData })}
+            sx={{ minHeight: 32, px: 1, py: 0.5, color: "#64748B" }}
+          >
+            Clear all
+          </AppButton>
+          <IconButton
+            size="small"
+            onClick={onCollapse}
+            sx={{
+              width: 34,
+              height: 34,
+              border: "1px solid #E2E8F0",
+              color: "#64748B",
+            }}
+          >
+            <ChevronLeft size={18} />
+          </IconButton>
+        </Box>
+      </Box>
+
       <form onSubmit={handleSubmit}>
-        <SubHeading sx={{ marginBottom: "8px" }}>Search</SubHeading>
+        <Box sx={sectionTitleSx}>Search</Box>
         <SearchBar
           placeholder="Search..."
           searchText={searchText}
@@ -88,8 +222,10 @@ const FilterForm = ({
           color="#fff"
         />
 
-        <Box sx={{ marginTop: "10px" }}>
-          <SubHeading sx={{ marginBottom: "5px" }}>Province</SubHeading>
+        <Divider sx={{ my: 2 }} />
+
+        <Box>
+          <Box sx={sectionTitleSx}>Province</Box>
           <AppSelect
             options={[
               { label: "All Provinces", value: "" },
@@ -108,196 +244,168 @@ const FilterForm = ({
           />
         </Box>
 
-        <Box sx={{ marginTop: "10px" }}>
-          <SubHeading sx={{ marginBottom: "5px" }}>Rent Range</SubHeading>
-          <Grid container spacing={1} sx={{ marginTop: "0px" }}>
-            <Grid item xs={6}>
-              <AppInput
-                value={sideBarData.minRent}
-                size="small"
-                onChange={(e) =>
-                  setSideBarData({ ...sideBarData, minRent: e.target.value })
-                }
-                placeholder="Min"
-                type="number"
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <AppInput
-                value={sideBarData.maxRent}
-                size="small"
-                onChange={(e) =>
-                  setSideBarData({ ...sideBarData, maxRent: e.target.value })
-                }
-                placeholder="Max"
-                type="number"
-              />
-            </Grid>
-          </Grid>
-        </Box>
+        <Divider sx={{ my: 2 }} />
 
-        <Box sx={{ marginTop: "10px" }}>
-          <SubHeading sx={{ marginBottom: "5px" }}>Min Rooms</SubHeading>
-          <AppInput
-            value={sideBarData.minTotalRooms}
-            size="small"
-            onChange={(e) =>
-              setSideBarData({ ...sideBarData, minTotalRooms: e.target.value })
-            }
-            placeholder="e.g., 2"
-            type="number"
-          />
-        </Box>
-
-        <Box sx={{ marginTop: "10px" }}>
-          <SubHeading sx={{ marginBottom: "5px" }}>Amenities</SubHeading>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={sideBarData.solar}
-                onChange={(e) =>
-                  setSideBarData({ ...sideBarData, solar: e.target.checked })
-                }
-              />
-            }
-            label="Solar"
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={sideBarData.borehole}
-                onChange={(e) =>
-                  setSideBarData({
-                    ...sideBarData,
-                    borehole: e.target.checked,
-                  })
-                }
-              />
-            }
-            label="Borehole"
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={sideBarData.security}
-                onChange={(e) =>
-                  setSideBarData({
-                    ...sideBarData,
-                    security: e.target.checked,
-                  })
-                }
-              />
-            }
-            label="Security"
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={sideBarData.internet}
-                onChange={(e) =>
-                  setSideBarData({ ...sideBarData, internet: e.target.checked })
-                }
-              />
-            }
-            label="Internet"
-          />
-        </Box>
-        <Box sx={{ marginTop: "10px" }}>
-          <RadioGroup
-            name="type"
-            value={sideBarData.type}
-            onChange={(event) => {
+        <Box>
+          <Box sx={sectionTitleSx}>Rent Range</Box>
+          <Slider
+            min={0}
+            max={5000}
+            step={100}
+            valueLabelDisplay="auto"
+            sx={{ color: "#B8975A" }}
+            value={rentRange}
+            onChange={(_, value) => {
+              if (Array.isArray(value)) {
+                setRentRange(value as [number, number]);
+              }
+            }}
+            onChangeCommitted={(_, value) => {
+              const val = Array.isArray(value) ? value : [0, value];
               setSideBarData({
                 ...sideBarData,
-                type: event.target.value,
+                minRent: String(val[0]),
+                maxRent: String(val[1]),
               });
             }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 1,
-              }}
+          />
+          <Box sx={{ fontSize: "13px", fontWeight: 700, color: "#334155" }}>
+            ${rentRange[0]} &ndash; ${rentRange[1]}
+          </Box>
+        </Box>
+
+        <Divider sx={{ my: 2 }} />
+
+        <Box>
+          <Box sx={sectionTitleSx}>Min Rooms</Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <IconButton
+              size="small"
+              onClick={() =>
+                setSideBarData({
+                  ...sideBarData,
+                  minTotalRooms: String(
+                    Math.max(0, Number(sideBarData.minTotalRooms || 0) - 1)
+                  ),
+                })
+              }
             >
-              <FormControlLabel value="all" control={<Radio />} label="All Listings" />
-              <FormControlLabel value="rent" control={<Radio />} label="Rent" />
+              <Remove fontSize="small" />
+            </IconButton>
+            <Box sx={{ minWidth: 24, textAlign: "center", fontWeight: 700 }}>
+              {sideBarData.minTotalRooms || 0}
             </Box>
-          </RadioGroup>
+            <IconButton
+              size="small"
+              onClick={() =>
+                setSideBarData({
+                  ...sideBarData,
+                  minTotalRooms: String(
+                    Number(sideBarData.minTotalRooms || 0) + 1
+                  ),
+                })
+              }
+            >
+              <Add fontSize="small" />
+            </IconButton>
+          </Box>
         </Box>
-        <Box sx={{ margin: "0 0 5px 0" }}>
-          <FormControlLabel
-            control={<Checkbox />}
-            label="Offer"
-            name="offer"
-            checked={sideBarData.offer}
-            onChange={() => {
-              setSideBarData({
-                ...sideBarData,
-                offer: !sideBarData.offer,
-              });
-            }}
-          />
-          <FormControlLabel
-            control={<Checkbox />}
-            label="Parking"
-            name="parking"
-            checked={sideBarData.parking}
-            onChange={() => {
-              setSideBarData({
-                ...sideBarData,
-                parking: !sideBarData.parking,
-              });
-            }}
-          />
-          <FormControlLabel
-            control={<Checkbox />}
-            label="Furnished"
-            name="furnished"
-            checked={sideBarData.furnished}
-            onChange={() => {
-              setSideBarData({
-                ...sideBarData,
-                furnished: !sideBarData.furnished,
-              });
-            }}
-          />
-          <FormControlLabel
-            control={<Checkbox />}
-            label="Student Accommodation"
-            name="studentAccommodation"
-            checked={sideBarData.studentAccommodation}
-            onChange={() => {
-              setSideBarData({
-                ...sideBarData,
-                studentAccommodation: !sideBarData.studentAccommodation,
-              });
-            }}
-          />
+
+        <Divider sx={{ my: 2 }} />
+
+        <Box>
+          <Box sx={sectionTitleSx}>Amenities</Box>
+          <Box sx={{ display: "grid", gap: 0.5 }}>
+            {amenityOptions.map((option) => (
+              <FormControlLabel
+                key={option.key}
+                sx={{ alignItems: "center", m: 0 }}
+                control={
+                  <Checkbox
+                    checked={Boolean(sideBarData[option.key])}
+                    onChange={(e) =>
+                      setSideBarData({
+                        ...sideBarData,
+                        [option.key]: e.target.checked,
+                      })
+                    }
+                  />
+                }
+                label={option.label}
+              />
+            ))}
+          </Box>
         </Box>
-        <SubHeading sx={{ margin: "5px 0" }}>Sort</SubHeading>
-        <AppSelect
-          name="sort"
-          value={sideBarData.sort}
-          onChange={(event: any) => {
-            setSideBarData({
-              ...sideBarData,
-              sort: event.target.value,
-            });
-          }}
-          options={sortTypes.map((copyType) => ({
-            value: copyType.value,
-            label: copyType.name,
-          }))}
-        />
+
+        <Divider sx={{ my: 2 }} />
+
+        <Box>
+          <Box sx={sectionTitleSx}>Listing Type</Box>
+          <ToggleButtonGroup
+            exclusive
+            value={listingTypeValue}
+            onChange={(_, value) => {
+              if (!value) {
+                return;
+              }
+
+              setSideBarData({
+                ...sideBarData,
+                type: value,
+                studentAccommodation: value === "student",
+              });
+            }}
+            sx={toggleGroupSx}
+          >
+            {[
+              { label: "All", value: "all" },
+              { label: "Rent", value: "rent" },
+              { label: "Student", value: "student" },
+            ].map((option) => (
+              <ToggleButton
+                key={option.value}
+                value={option.value}
+                sx={toggleButtonSx}
+              >
+                {option.label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </Box>
+
+        <Divider sx={{ my: 2 }} />
+
+        <Box>
+          <Box sx={sectionTitleSx}>More Filters</Box>
+          <Box sx={{ display: "grid", gap: 0.5 }}>
+            {featureOptions.map((option) => (
+              <FormControlLabel
+                key={option.key}
+                sx={{ alignItems: "center", m: 0 }}
+                control={
+                  <Checkbox
+                    checked={Boolean(sideBarData[option.key])}
+                    onChange={(e) =>
+                      setSideBarData({
+                        ...sideBarData,
+                        [option.key]: e.target.checked,
+                      })
+                    }
+                  />
+                }
+                label={option.label}
+              />
+            ))}
+          </Box>
+        </Box>
+
         <AppButton sx={{ width: "100%", marginTop: "16px" }} type="submit">
           {isMobile ? "Apply Filters" : "Search"}
         </AppButton>
       </form>
     </AppCard>
-  </Box>
-);
+  );
+};
 
 const SearchPage = () => {
   const navigate = useNavigate();
@@ -309,31 +417,14 @@ const SearchPage = () => {
   const token = JSON.parse(localStorage.getItem("user") || "null")?.token;
   const apiBase = getApiBaseUrl();
 
-  const [sideBarData, setSideBarData] = useState<any>({
-    searchTerm: "",
-    location: "",
-    city: "",
-    neighborhood: "",
-    minRent: "",
-    maxRent: "",
-    minTotalRooms: "",
-    solar: false,
-    borehole: false,
-    security: false,
-    internet: false,
-    type: "all",
-    parking: false,
-    furnished: false,
-    offer: false,
-    studentAccommodation: false,
-    sort: "createdAt_desc",
-  });
+  const [sideBarData, setSideBarData] = useState<any>(defaultSideBarData);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [listings, setListings] = useState<any>([]);
   const [showMore, setShowMore] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(true);
+  const [filterCollapsed, setFilterCollapsed] = useState(false);
   const locationSearch = location.search;
 
   const normalizeType = (value: string | null) => {
@@ -378,6 +469,36 @@ const SearchPage = () => {
     }
 
     urlParams.delete("minBedrooms");
+  };
+
+  const buildSearchQuery = (filters: any) => {
+    const urlParams = new URLSearchParams();
+    urlParams.set("searchTerm", filters.searchTerm || "");
+    urlParams.set("type", normalizeType(filters.type));
+    urlParams.set("parking", String(Boolean(filters.parking)));
+    urlParams.set("furnished", String(Boolean(filters.furnished)));
+    urlParams.set("offer", String(Boolean(filters.offer)));
+    urlParams.set(
+      "studentAccommodation",
+      String(Boolean(filters.studentAccommodation))
+    );
+    urlParams.set("sort", filters.sort || "createdAt_desc");
+    urlParams.set("province", filters.location || "");
+    urlParams.set("city", filters.city || "");
+    urlParams.set("neighborhood", filters.neighborhood || "");
+    urlParams.set("minRent", filters.minRent || "");
+    urlParams.set("maxRent", filters.maxRent || "");
+    urlParams.set("minTotalRooms", filters.minTotalRooms || "");
+    urlParams.set("solar", String(Boolean(filters.solar)));
+    urlParams.set("borehole", String(Boolean(filters.borehole)));
+    urlParams.set("security", String(Boolean(filters.security)));
+    urlParams.set("internet", String(Boolean(filters.internet)));
+
+    return urlParams.toString();
+  };
+
+  const applySearchQuery = (filters: any) => {
+    navigate(`/search?${buildSearchQuery(filters)}`);
   };
 
   const handleSearch = (event: any) => {
@@ -469,26 +590,7 @@ const SearchPage = () => {
 
   const handleSubmit = (e: any) => {
     e.preventDefault();
-    const urlParams = new URLSearchParams();
-    urlParams.set("searchTerm", sideBarData.searchTerm);
-    urlParams.set("type", normalizeType(sideBarData.type));
-    urlParams.set("parking", sideBarData.parking);
-    urlParams.set("furnished", sideBarData.furnished);
-    urlParams.set("offer", sideBarData.offer);
-    urlParams.set("studentAccommodation", sideBarData.studentAccommodation);
-    urlParams.set("sort", sideBarData.sort);
-    urlParams.set("province", sideBarData.location);
-    urlParams.set("city", sideBarData.city);
-    urlParams.set("neighborhood", sideBarData.neighborhood);
-    urlParams.set("minRent", sideBarData.minRent);
-    urlParams.set("maxRent", sideBarData.maxRent);
-    urlParams.set("minTotalRooms", sideBarData.minTotalRooms);
-    urlParams.set("solar", sideBarData.solar);
-    urlParams.set("borehole", sideBarData.borehole);
-    urlParams.set("security", sideBarData.security);
-    urlParams.set("internet", sideBarData.internet);
-    const searchQuery = urlParams.toString();
-    navigate(`/search?${searchQuery}`);
+    applySearchQuery(sideBarData);
     if (isMobile) {
       setMobileFiltersOpen(false);
     }
@@ -530,19 +632,75 @@ const SearchPage = () => {
       <Grid container spacing={3}>
         {!isMobile && (
           <Grid item xs={12} md={4} lg={3}>
-            <FilterForm
-              sideBarData={sideBarData}
-              setSideBarData={setSideBarData}
-              handleSubmit={handleSubmit}
-              isMobile={isMobile}
-              searchText={searchText}
-              handleSearch={handleSearch}
-            />
+            {filterCollapsed ? (
+              <Box
+                onClick={() => setFilterCollapsed(false)}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  cursor: "pointer",
+                  background: "#B8975A",
+                  color: "#fff",
+                  borderRadius: "999px",
+                  px: 2,
+                  py: 1,
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  width: "fit-content",
+                }}
+              >
+                <SlidersHorizontal size={16} />
+                Filters
+                <ChevronRight size={14} />
+              </Box>
+            ) : (
+              <FilterForm
+                sideBarData={sideBarData}
+                setSideBarData={setSideBarData}
+                handleSubmit={handleSubmit}
+                isMobile={isMobile}
+                searchText={searchText}
+                handleSearch={handleSearch}
+                onCollapse={() => setFilterCollapsed(true)}
+              />
+            )}
           </Grid>
         )}
         <Grid item xs={12} md={8} lg={9}>
           <Box>
-            <Heading sx={{ margin: "0 0 5px 0" }}>Listing Results</Heading>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: { xs: "stretch", sm: "center" },
+                justifyContent: "space-between",
+                flexDirection: { xs: "column", sm: "row" },
+                gap: 2,
+                mb: 2,
+              }}
+            >
+              <Heading sx={{ margin: 0 }}>Listing Results</Heading>
+              <Box sx={{ minWidth: { xs: "100%", sm: 240 } }}>
+                <AppSelect
+                  name="sort"
+                  value={sideBarData.sort}
+                  size="small"
+                  onChange={(event: any) => {
+                    const nextSideBarData = {
+                      ...sideBarData,
+                      sort: event.target.value,
+                    };
+
+                    setSideBarData(nextSideBarData);
+                    applySearchQuery(nextSideBarData);
+                  }}
+                  options={sortTypes.map((copyType) => ({
+                    value: copyType.value,
+                    label: copyType.name,
+                  }))}
+                />
+              </Box>
+            </Box>
             <Grid container spacing={2}>
               {!loading && listings?.length === 0 ? (
                 <Grid item xs={12}>
@@ -601,6 +759,7 @@ const SearchPage = () => {
               isMobile={isMobile}
               searchText={searchText}
               handleSearch={handleSearch}
+              onCollapse={() => setMobileFiltersOpen(false)}
             />
           </Drawer>
           {!mobileFiltersOpen && (
@@ -618,7 +777,7 @@ const SearchPage = () => {
                 },
               }}
             >
-              <IoFilter style={{ marginRight: 8 }} />
+              <SlidersHorizontal size={16} style={{ marginRight: 8 }} />
               Filters
             </Fab>
           )}
