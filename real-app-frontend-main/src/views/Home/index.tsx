@@ -4,9 +4,20 @@ import { Box, Grid, Menu, MenuItem, Skeleton, useTheme } from "@mui/material";
 import { useEffect, useState } from "react";
 import type { FormEvent, MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Droplets,
+  GraduationCap,
+  Home as HomeIcon,
+  ParkingCircle,
+  Shield,
+  Sofa,
+  Wifi,
+  Zap,
+} from "lucide-react";
 // Custom Imports
 import { Heading, SubHeading } from "../../components/Heading";
 import PropertyCard from "../../components/PropertyCard";
+import HeroSlideshow from "./HeroSlideshow";
 // Swiper Imports
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Pagination } from "swiper/modules";
@@ -16,6 +27,7 @@ import "swiper/css/pagination";
 import {
   useGetHomeGroupedByLocationQuery,
   useGetHomeHighlightedQuery,
+  useGetPublicStatsQuery,
 } from "../../redux/api/listingApiSlice";
 import OverlayLoader from "../../components/Spinner/OverlayLoader";
 import AppContainer from "../../components/ui/AppContainer";
@@ -46,22 +58,61 @@ const filterButtonSx = {
 };
 
 const categoryChips = [
-  { label: "🏠 All Rentals", path: "/search" },
-  { label: "🎓 Student Accommodation", path: "/search?studentAccommodation=true" },
-  { label: "⚡ Solar Powered", path: "/search?solar=true" },
-  { label: "🅿 With Parking", path: "/search?parking=true" },
-  { label: "🛋 Furnished", path: "/search?furnished=true" },
-  { label: "💧 Borehole Water", path: "/search?borehole=true" },
-  { label: "🔒 Gated/Security", path: "/search?security=true" },
-  { label: "🌐 Internet Ready", path: "/search?internet=true" },
+  { label: "All Rentals", path: "/search", icon: <HomeIcon size={14} /> },
+  {
+    label: "Student Accommodation",
+    path: "/search?studentAccommodation=true",
+    icon: <GraduationCap size={14} />,
+  },
+  { label: "Solar Powered", path: "/search?solar=true", icon: <Zap size={14} /> },
+  { label: "With Parking", path: "/search?parking=true", icon: <ParkingCircle size={14} /> },
+  { label: "Furnished", path: "/search?furnished=true", icon: <Sofa size={14} /> },
+  { label: "Borehole Water", path: "/search?borehole=true", icon: <Droplets size={14} /> },
+  { label: "Gated/Security", path: "/search?security=true", icon: <Shield size={14} /> },
+  { label: "Internet Ready", path: "/search?internet=true", icon: <Wifi size={14} /> },
 ];
 
-const trustStats = [
-  { value: "2,000+", label: "Active Listings" },
-  { value: "10", label: "Provinces Covered" },
-  { value: "500+", label: "Verified Landlords" },
-  { value: "4.8★", label: "Average Rating" },
+const FALLBACK_HERO_IMAGES = [
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1920&q=80",
 ];
+
+const fallbackStats = [
+  { value: "Curated", label: "Premium Listings" },
+  { value: "Trusted", label: "Verified Landlords" },
+  { value: "10", label: "Provinces Covered" },
+  { value: "Top Rated", label: "Verified Stays" },
+];
+
+const getListingImage = (item: any) =>
+  item?.image || item?.images?.[0] || item?.imageUrls?.[0] || null;
+
+const computeStats = (data: any) => {
+  if (!data) {
+    return fallbackStats;
+  }
+
+  const activeListings = Number(data.activeListings || 0);
+  const landlords = Number(data.landlords || 0);
+  const provinces = Number(data.provinces || 0);
+  const avgRating = Number(data.avgRating || 0);
+
+  return [
+    activeListings >= 100
+      ? { value: `${activeListings}+`, label: "Active Listings" }
+      : { value: "Growing", label: "Curated Listings" },
+    landlords >= 50
+      ? { value: `${landlords}+`, label: "Verified Landlords" }
+      : { value: "Growing Network", label: "Trusted Landlords" },
+    { value: String(provinces || 10), label: "Provinces Covered" },
+    avgRating >= 4.0
+      ? { value: `${avgRating.toFixed(1)}★`, label: "Average Rating" }
+      : { value: "Highly Rated", label: "Verified Stays" },
+  ];
+};
 
 const Home = () => {
   const navigate = useNavigate();
@@ -82,9 +133,15 @@ const Home = () => {
     data: groupedByLocationData,
     isLoading: groupedByLocationLoading,
   } = useGetHomeGroupedByLocationQuery({ locationsLimit: 6, perLocation: 3 });
+  const { data: statsData } = useGetPublicStatsQuery(undefined);
 
   const highlightedListings = (highlightedData?.data || []).slice(0, 6);
   const groupedSlides = groupedByLocationData?.data || [];
+  const listingHeroImages = highlightedListings
+    .map((item: any) => getListingImage(item))
+    .filter((image: string | null): image is string => Boolean(image));
+  const heroImages =
+    listingHeroImages.length >= 3 ? listingHeroImages : FALLBACK_HERO_IMAGES;
 
   // Never block the whole landing page forever.
   // If the API is down or DB isn't connected, show the page and allow retry.
@@ -195,23 +252,25 @@ const Home = () => {
         sx={{
           width: "100%",
           minHeight: { xs: "70vh", md: "88vh" },
-          background:
-            "linear-gradient(135deg, #1F2937 0%, #1F4D3A 60%, #0D1117 100%)",
+          position: "relative",
+          backgroundColor: "#0F141E",
           display: "flex",
           alignItems: "center",
           pt: { xs: 12, md: 14 },
           pb: { xs: 6, md: 8 },
         }}
       >
-        <AppContainer>
-          <Box
-            sx={{
-              maxWidth: 680,
-              mx: "auto",
-              textAlign: "center",
-              color: "#fff",
-            }}
-          >
+        <HeroSlideshow images={heroImages} />
+        <Box sx={{ position: "relative", zIndex: 1, width: "100%" }}>
+          <AppContainer>
+            <Box
+              sx={{
+                maxWidth: 680,
+                mx: "auto",
+                textAlign: "center",
+                color: "#fff",
+              }}
+            >
             <Box
               sx={{
                 fontSize: "11px",
@@ -459,8 +518,9 @@ const Home = () => {
             <Box sx={{ fontSize: "13px", color: "rgba(255,255,255,0.65)" }}>
               2,000+ Listings · 10 Provinces · Verified Landlords
             </Box>
-          </Box>
-        </AppContainer>
+            </Box>
+          </AppContainer>
+        </Box>
       </Box>
 
       <AppContainer sx={{ py: { xs: 6, md: 8 } }}>
@@ -579,11 +639,15 @@ const Home = () => {
                 fontSize: "14px",
                 fontWeight: 600,
                 cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 0.75,
                 "&:hover": {
                   background: "#EDD9B0",
                 },
               }}
             >
+              {category.icon}
               {category.label}
             </Box>
           ))}
@@ -598,7 +662,7 @@ const Home = () => {
       >
         <AppContainer>
           <Grid container spacing={4}>
-            {trustStats.map((stat) => (
+            {computeStats(statsData?.data).map((stat) => (
               <Grid item xs={6} md={3} key={stat.label}>
                 <Box sx={{ textAlign: "center" }}>
                   <Box

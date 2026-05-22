@@ -44,6 +44,10 @@ export const listingApiSlice = apiSlice.injectEndpoints({
       },
       providesTags: ["Listing"],
     }),
+    getPublicStats: builder.query({
+      query: () => ({ url: "listings/stats", method: "GET" }),
+      providesTags: ["Listing"],
+    }),
     deleteListing: builder.mutation({
       query: (listingId) => {
         return {
@@ -151,6 +155,7 @@ export const {
   useDeleteListingMutation,
   useUpdateListingMutation,
   useGetSingleListingQuery,
+  useGetPublicStatsQuery,
   useSearchListingsQuery,
   useGetHomeHighlightedQuery,
   useGetHomeGroupedByLocationQuery,

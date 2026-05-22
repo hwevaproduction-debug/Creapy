@@ -18,9 +18,7 @@ import {
 import { selectedUserId } from "../../../redux/auth/authSlice";
 // Hook Imports
 import useTypedSelector from "../../../hooks/useTypedSelector";
-// React Icons
-import { CiEdit } from "react-icons/ci";
-import { MdDeleteOutline } from "react-icons/md";
+import { Pencil, Trash2 } from "lucide-react";
 // Utils Imports
 import { convertToFormattedDate } from "../../../utils";
 // Component Imports
@@ -315,7 +313,7 @@ const AllListings = () => {
                                   startIcon={
                                     selectedListing === item?._id &&
                                     isDeleting ? null : (
-                                      <MdDeleteOutline />
+                                      <Trash2 size={16} />
                                     )
                                   }
                                   disabled={isDeleting}
@@ -346,7 +344,7 @@ const AllListings = () => {
 
                                 <AppButton
                                   variant="outlined"
-                                  startIcon={<CiEdit />}
+                                  startIcon={<Pencil size={16} />}
                                   onClick={() => {
                                     navigate(`/listings/${item?._id}`);
                                   }}

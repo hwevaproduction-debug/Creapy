@@ -5,18 +5,17 @@ import { useDispatch } from "react-redux";
 // Formik Imports
 import { Form, Formik, FormikProps } from "formik";
 // Component Imports
-import { Heading, SubHeading } from "../../components/Heading";
+import { SubHeading } from "../../components/Heading";
 import { signUpSchema } from "../SignUp/components/validationSchema";
 import PrimaryInput from "../../components/PrimaryInput/PrimaryInput";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import DotLoader from "../../components/Spinner/dotLoader";
 // Utils Imports
 import { onKeyDown } from "../../utils";
+import { getGreeting, getFirstName } from "../../utils/greeting";
 // Hooks Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
-// React Icons
-import { AiOutlineEyeInvisible, AiOutlineEye } from "react-icons/ai";
-import { MdOutlineDeleteSweep } from "react-icons/md";
+import { Camera, Eye, EyeOff, Trash2 } from "lucide-react";
 // Redux Imports
 import { useDeleteMutation, useUpdateMutation } from "../../redux/api/userApiSlice";
 import {
@@ -41,6 +40,7 @@ import {
   DialogTitle,
   Grid,
   Tooltip,
+  Avatar,
 } from "@mui/material";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
@@ -51,6 +51,21 @@ interface ISProfileForm {
   email: string;
   password: string;
 }
+
+const getInitials = (name?: string) => {
+  if (!name) {
+    return "U";
+  }
+
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "U"
+  );
+};
 
 // Firebase Storage
 // allow read;
@@ -69,6 +84,7 @@ const Profile = () => {
   const userId = useTypedSelector(selectedUserId);
   const token = useTypedSelector(selectedUserToken);
   const [getR2SignedUrl] = useGetR2SignedUrlMutation();
+  const firstName = getFirstName(userName);
 
   // states
   const [file, setFile] = useState<File | null>(null);
@@ -245,14 +261,31 @@ const Profile = () => {
   };
 
   return (
-    <Box sx={{ minHeight: "calc(100vh - 72px)", py: { xs: 4, md: 6 } }}>
-      <AppContainer>
-        <Box sx={{ mb: 3 }}>
-          <Heading>My Profile</Heading>
-          <SubHeading sx={{ color: "text.secondary" }}>
-            Update your account details and avatar.
-          </SubHeading>
+    <Box sx={{ minHeight: "calc(100vh - 72px)", background: "background.default" }}>
+      <Box
+        sx={{
+          background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)",
+          pt: { xs: 8, md: 10 },
+          pb: { xs: 8, md: 10 },
+          px: 3,
+          textAlign: "center",
+          mb: -6,
+        }}
+      >
+        <Box
+          sx={{
+            fontSize: { xs: "1.5rem", md: "2rem" },
+            fontWeight: 800,
+            color: "#fff",
+          }}
+        >
+          {getGreeting(userName)}
         </Box>
+        <Box sx={{ color: "rgba(255,255,255,0.7)", fontSize: "1rem", mt: 1 }}>
+          Manage your account details and preferences
+        </Box>
+      </Box>
+      <AppContainer sx={{ pb: { xs: 4, md: 6 } }}>
         <Grid container spacing={2} justifyContent="center">
           <Grid item xs={12} md={7} lg={6}>
             <AppCard sx={{ p: { xs: 2.5, md: 3.5 }, borderRadius: "24px" }}>
@@ -264,7 +297,6 @@ const Profile = () => {
                   flexDirection: "column",
                 }}
               >
-                <Heading sx={{ fontSize: "30px" }}>Profile</Heading>
                 <Tooltip title="Upload Image" placement="right">
                   <Box sx={{ marginTop: "30px", cursor: "pointer" }}>
                     <input
@@ -290,16 +322,29 @@ const Profile = () => {
                         "&:hover .upload-overlay": { opacity: 1 },
                       }}
                     >
-                      <img
-                        src={formData.avatar || userAvatar}
-                        alt="user"
-                        style={{
-                          borderRadius: "50%",
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                      />
+                      {formData.avatar || userAvatar ? (
+                        <Avatar
+                          src={formData.avatar || userAvatar}
+                          alt={`${firstName} avatar`}
+                          sx={{
+                            width: 95,
+                            height: 95,
+                            border: "3px solid #B8975A",
+                          }}
+                        />
+                      ) : (
+                        <Avatar
+                          alt={`${firstName} avatar`}
+                          sx={{
+                            width: 95,
+                            height: 95,
+                            bgcolor: "#B8975A",
+                            fontSize: "2rem",
+                          }}
+                        >
+                          {getInitials(userName)}
+                        </Avatar>
+                      )}
                       <Box
                         className="upload-overlay"
                         sx={{
@@ -314,10 +359,18 @@ const Profile = () => {
                           transition: "opacity 0.2s",
                         }}
                       >
-                        <Box sx={{ color: "#fff", fontSize: "22px" }}>
-                          &#128247;
-                        </Box>
+                        <Camera size={22} color="#fff" />
                       </Box>
+                    </Box>
+                    <Box
+                      sx={{
+                        fontSize: "12px",
+                        color: "text.secondary",
+                        mt: 1,
+                        textAlign: "center",
+                      }}
+                    >
+                      Click to change photo
                     </Box>
                   </Box>
                 </Tooltip>
@@ -420,9 +473,9 @@ const Profile = () => {
                             onClick={hideShowPassword}
                             endAdornment={
                               showPassword ? (
-                                <AiOutlineEye color="disabled" />
+                                <Eye size={18} />
                               ) : (
-                                <AiOutlineEyeInvisible color="disabled" />
+                                <EyeOff size={18} />
                               )
                             }
                           />
@@ -452,7 +505,7 @@ const Profile = () => {
                             variant="outlined"
                             color="error"
                             disabled={deleteLoading}
-                            startIcon={<MdOutlineDeleteSweep />}
+                            startIcon={<Trash2 size={16} />}
                             onClick={() => setConfirmDialog(true)}
                           >
                             Delete Account

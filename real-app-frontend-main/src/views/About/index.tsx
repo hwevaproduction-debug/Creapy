@@ -1,35 +1,90 @@
 // MUI Imports
-import { Box } from "@mui/material";
+import { Box, Grid } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import { Eye, Home, Key, Search, Shield, Smartphone, UserX } from "lucide-react";
 // Custom Imports
 import { SubHeading } from "../../components/Heading";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
+import AppButton from "../../components/ui/AppButton";
+import { useGetPublicStatsQuery } from "../../redux/api/listingApiSlice";
 
-const teamMembers = [
+const fallbackStats = [
+  { value: "Curated", label: "Premium Listings" },
+  { value: "Trusted", label: "Verified Landlords" },
+  { value: "10", label: "Provinces Covered" },
+  { value: "Top Rated", label: "Verified Stays" },
+];
+
+const computeStats = (data: any) => {
+  if (!data) {
+    return fallbackStats;
+  }
+
+  const activeListings = Number(data.activeListings || 0);
+  const landlords = Number(data.landlords || 0);
+  const provinces = Number(data.provinces || 0);
+  const avgRating = Number(data.avgRating || 0);
+
+  return [
+    activeListings >= 100
+      ? { value: `${activeListings}+`, label: "Active Listings" }
+      : { value: "Growing", label: "Curated Listings" },
+    landlords >= 50
+      ? { value: `${landlords}+`, label: "Verified Landlords" }
+      : { value: "Growing Network", label: "Trusted Landlords" },
+    { value: String(provinces || 10), label: "Provinces Covered" },
+    avgRating >= 4.0
+      ? { value: `${avgRating.toFixed(1)}★`, label: "Average Rating" }
+      : { value: "Highly Rated", label: "Verified Stays" },
+  ];
+};
+
+const stepCards = [
   {
-    name: "Salman Muazam",
-    role: "CEO",
-    image:
-      "https://firebasestorage.googleapis.com/v0/b/real-estate-54ca1.appspot.com/o/1701424117897salman%20passport.jpg?alt=media&token=a903aba6-b78e-4442-b0c0-f07c0dfa145f",
-    alt: "Salman Muazam",
+    Icon: Search,
+    title: "Browse Freely",
+    body: "Explore verified listings without creating an account",
   },
   {
-    name: "Hassan Raza",
-    role: "President",
-    image:
-      "https://firebasestorage.googleapis.com/v0/b/real-estate-54ca1.appspot.com/o/1701198186809Hassan.jpg?alt=media&token=881f2f1b-b0d4-4933-9b4a-79259d313f42",
-    alt: "Hassan Raza",
+    Icon: Home,
+    title: "Connect Directly",
+    body: "Contact landlords directly - no agent fees",
   },
   {
-    name: "Ch Faizan",
-    role: "Marketing Manager",
-    image:
-      "https://firebasestorage.googleapis.com/v0/b/real-estate-54ca1.appspot.com/o/1701198124445Faizan.jpg?alt=media&token=560ccfc3-f5f4-430c-b55d-d6a0357c7be2",
-    alt: "Ch Faizan",
+    Icon: Shield,
+    title: "Move In Confidently",
+    body: "Verified listings, structured data, trusted platform",
+  },
+];
+
+const valueCards = [
+  {
+    Icon: Eye,
+    title: "Transparency",
+    body: "Every listing shows real data - rooms, amenities, price",
+  },
+  {
+    Icon: UserX,
+    title: "No Middlemen",
+    body: "Direct landlord-to-tenant connections",
+  },
+  {
+    Icon: Smartphone,
+    title: "Mobile First",
+    body: "Built for Zimbabwe's mobile-first reality",
+  },
+  {
+    Icon: Key,
+    title: "Landlord Control",
+    body: "Landlords own their listings, set their terms",
   },
 ];
 
 const About = () => {
+  const navigate = useNavigate();
+  const { data: statsData } = useGetPublicStatsQuery(undefined);
+
   return (
     <>
       <Box
@@ -51,7 +106,7 @@ const About = () => {
             mb: 2,
           }}
         >
-          About Us
+          OUR STORY
         </Box>
         <Box
           component="h1"
@@ -63,7 +118,7 @@ const About = () => {
             mb: 2,
           }}
         >
-          Zimbabwe's Premier Property Platform
+          Reimagining Property Discovery in Zimbabwe
         </Box>
         <Box
           sx={{
@@ -74,97 +129,155 @@ const About = () => {
             lineHeight: 1.6,
           }}
         >
-          Agent-free rental housing marketplace connecting tenants and
-          landlords directly.
+          Agent-free. Transparent. Built for real people.
         </Box>
       </Box>
+
       <AppContainer sx={{ py: { xs: 6, md: 8 } }}>
-        <AppCard sx={{ marginTop: "20px", p: { xs: 2, md: 3 } }}>
-          <Box sx={{ color: "text.secondary", fontSize: "16px", lineHeight: 1.7 }}>
-            This platform is an agent-free rental housing marketplace built to
-            connect tenants and landlords directly &mdash; no middlemen, no
-            inflated fees, no wasted time.
-            <br />
-            <br />
-            In many rental markets, agents slow things down, reduce
-            transparency, and increase costs for tenants while limiting
-            landlords&rsquo; control over their own listings. This platform exists
-            to remove that friction entirely by offering a simple, digital way
-            to discover and list rental properties based on real, structured
-            data.
-            <br />
-            <br />
-            Tenants can browse public listings without creating an account,
-            filter homes by location, price, rooms, and amenities, and view
-            clear property details including room breakdowns and available
-            features such as solar power, boreholes, security, parking, and
-            internet availability.
-            <br />
-            <br />
-            Landlords list and manage their properties directly, keeping full
-            ownership of their listings while reaching tenants faster and more
-            efficiently.
-            <br />
-            <br />
-            The platform follows a landlord-paid publishing model. Basic access
-            &mdash; browsing listings, viewing property details, and contacting
-            landlords &mdash; is always free for everyone. Tenants never pay,
-            while landlords subscribe only when they want to publish listings.
-            <br />
-            <br />
-            Built as a mobile-first web application, the goal is speed, clarity,
-            and trust &mdash; making it easier to find a home or rent one out
-            without unnecessary intermediaries.
-          </Box>
-        </AppCard>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            flexWrap: "wrap",
-            gap: 3,
-            mt: 4,
-          }}
-        >
-          {teamMembers.map((member) => (
-            <AppCard
-              key={member.name}
-              sx={{ textAlign: "center", p: 3, width: { xs: "100%", sm: 220 } }}
+        <Grid container spacing={6} alignItems="center">
+          <Grid item xs={12} md={6}>
+            <Box
+              sx={{
+                borderRadius: "20px",
+                overflow: "hidden",
+                height: { xs: 240, md: 360 },
+              }}
             >
               <Box
-                sx={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  mx: "auto",
-                  mb: 1.5,
-                }}
-              >
-                <img
-                  src={member.image}
-                  alt={member.alt}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </Box>
-              <SubHeading sx={{ mb: 0.5 }}>{member.name}</SubHeading>
-              <Box
-                sx={{
-                  display: "inline-block",
-                  background: "#F7EDDA",
-                  color: "#7D6234",
-                  borderRadius: "999px",
-                  padding: "3px 10px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                }}
-              >
-                {member.role}
-              </Box>
-            </AppCard>
-          ))}
+                component="img"
+                src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80"
+                alt="Luxury property"
+                sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Box sx={{ color: "#B8975A", fontSize: "2rem", fontWeight: 800, mb: 2 }}>
+              Our Mission
+            </Box>
+            <SubHeading sx={{ color: "text.secondary", lineHeight: 1.8, mb: 2 }}>
+              We built Town Ruins because finding a home in Zimbabwe shouldn't require
+              an agent, inflated fees, or wasted weekends. Direct connections. Real
+              listings. Zero middlemen.
+            </SubHeading>
+            <SubHeading sx={{ color: "text.secondary", lineHeight: 1.8 }}>
+              Tenants browse freely. Landlords list directly. No intermediaries. No
+              hidden costs. Just transparent, structured property data for everyone.
+            </SubHeading>
+          </Grid>
+        </Grid>
+
+        <Box sx={{ mt: { xs: 6, md: 8 } }}>
+          <Grid container spacing={3}>
+            {stepCards.map(({ Icon, title, body }) => (
+              <Grid item xs={12} md={4} key={title}>
+                <AppCard sx={{ p: 3, textAlign: "center", height: "100%" }}>
+                  <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                    <Icon size={28} color="#B8975A" />
+                  </Box>
+                  <Box sx={{ fontWeight: 800, fontSize: "18px", mb: 1 }}>{title}</Box>
+                  <SubHeading sx={{ color: "text.secondary" }}>{body}</SubHeading>
+                </AppCard>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        <Box sx={{ mt: { xs: 6, md: 8 } }}>
+          <Grid container spacing={3}>
+            {valueCards.map(({ Icon, title, body }) => (
+              <Grid item xs={12} sm={6} key={title}>
+                <AppCard sx={{ p: 2.5, height: "100%" }}>
+                  <Box sx={{ mb: 1.5 }}>
+                    <Icon size={24} color="#B8975A" />
+                  </Box>
+                  <Box sx={{ fontWeight: 800, fontSize: "17px", mb: 0.75 }}>
+                    {title}
+                  </Box>
+                  <SubHeading sx={{ color: "text.secondary" }}>{body}</SubHeading>
+                </AppCard>
+              </Grid>
+            ))}
+          </Grid>
         </Box>
       </AppContainer>
+
+      <Box sx={{ background: "#1F2937", py: 5 }}>
+        <AppContainer>
+          <Grid container spacing={4}>
+            {computeStats(statsData?.data).map((stat) => (
+              <Grid item xs={6} md={3} key={stat.label}>
+                <Box sx={{ textAlign: "center" }}>
+                  <Box
+                    sx={{
+                      fontSize: { xs: "2rem", md: "2.5rem" },
+                      fontWeight: 800,
+                      color: "#B8975A",
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {stat.value}
+                  </Box>
+                  <Box
+                    sx={{
+                      fontSize: "14px",
+                      color: "rgba(255,255,255,0.65)",
+                      fontWeight: 500,
+                      marginTop: 0.75,
+                    }}
+                  >
+                    {stat.label}
+                  </Box>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+        </AppContainer>
+      </Box>
+
+      <Box
+        sx={{
+          background: "linear-gradient(135deg, #B8975A, #9E7E45)",
+          py: { xs: 6, md: 8 },
+          textAlign: "center",
+          px: 2,
+        }}
+      >
+        <Box
+          sx={{
+            color: "#fff",
+            fontSize: { xs: "1.75rem", md: "2.25rem" },
+            fontWeight: 800,
+            mb: 3,
+          }}
+        >
+          Ready to find your next home?
+        </Box>
+        <Box sx={{ display: "flex", justifyContent: "center", gap: 2, flexWrap: "wrap" }}>
+          <AppButton
+            variant="outlined"
+            onClick={() => navigate("/search")}
+            sx={{
+              color: "#fff",
+              borderColor: "rgba(255,255,255,0.6)",
+              "&:hover": { borderColor: "#fff", background: "rgba(255,255,255,0.1)" },
+            }}
+          >
+            Browse Properties
+          </AppButton>
+          <AppButton
+            variant="outlined"
+            onClick={() => navigate("/provider-signup")}
+            sx={{
+              color: "#fff",
+              borderColor: "rgba(255,255,255,0.6)",
+              "&:hover": { borderColor: "#fff", background: "rgba(255,255,255,0.1)" },
+            }}
+          >
+            List Your Property
+          </AppButton>
+        </Box>
+      </Box>
     </>
   );
 };

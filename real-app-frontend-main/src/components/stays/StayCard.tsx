@@ -1,6 +1,6 @@
 import { KeyboardEvent } from "react";
 import { Box, Chip, Stack } from "@mui/material";
-import { FaLocationDot, FaUserGroup } from "react-icons/fa6";
+import { MapPin, Users } from "lucide-react";
 import { Heading, SubHeading } from "../Heading";
 import AppButton from "../ui/AppButton";
 import AppCard from "../ui/AppCard";
@@ -150,11 +150,11 @@ const StayCard = ({ room, onOpen }: StayCardProps) => {
         <Heading sx={{ fontSize: "22px" }}>{getRoomName(room)}</Heading>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#475569" }}>
-          <FaLocationDot />
+          <MapPin size={14} />
           <SubHeading>{getRoomLocation(room)}</SubHeading>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#475569" }}>
-          <FaUserGroup />
+          <Users size={14} />
           <SubHeading>Up to {getRoomCapacity(room)} guests</SubHeading>
         </Box>
 

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 // MUI Imports
-import { Box, Typography } from "@mui/material";
+import { Avatar, Box, Typography } from "@mui/material";
 // Hook Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
@@ -13,9 +13,14 @@ import {
   useGetMySavedSearchesQuery,
 } from "../../redux/api/userApiSlice";
 import { useInitiateTenantPremiumMutation } from "../../redux/api/paymentApiSlice";
-import { selectedUserPremiumExpiry, setUser } from "../../redux/auth/authSlice";
+import {
+  selectedUserName,
+  selectedUserPremiumExpiry,
+  setUser,
+} from "../../redux/auth/authSlice";
 // Config Imports
 import { isPremiumTenant } from "../../config/monetization";
+import { getGreeting, getFirstName } from "../../utils/greeting";
 // Component Imports
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
@@ -29,6 +34,7 @@ const TenantDashboard = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const premiumExpiry = useTypedSelector(selectedUserPremiumExpiry);
+  const userName = useTypedSelector(selectedUserName);
   const authUser = useTypedSelector((state) => state.auth?.user);
 
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -61,6 +67,14 @@ const TenantDashboard = () => {
     ? premiumAmountNumber.toFixed(2)
     : "10.00";
   const premiumActive = isPremiumTenant({ premiumExpiry });
+  const firstName = getFirstName(userName);
+  const userInitials =
+    userName
+      ?.split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part: string) => part[0]?.toUpperCase())
+      .join("") || "U";
   const daysRemaining = premiumExpiry
     ? Math.ceil((new Date(premiumExpiry).getTime() - Date.now()) / 86_400_000)
     : null;
@@ -72,7 +86,7 @@ const TenantDashboard = () => {
         month: "short",
         year: "numeric",
       })
-    : "—";
+    : "-";
 
   useEffect(() => {
     if (!showPolling) return;
@@ -176,12 +190,28 @@ const TenantDashboard = () => {
   return (
     <Box sx={{ mt: { xs: 5, md: 6 } }}>
       <AppContainer>
-        <Heading>Tenant Dashboard</Heading>
-        <SubHeading sx={{ color: "text.secondary" }}>
-          Manage your premium plan and saved searches.
-        </SubHeading>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
+          <Avatar
+            alt={`${firstName} avatar`}
+            sx={{ width: 48, height: 48, bgcolor: "#B8975A", fontSize: "1.1rem" }}
+          >
+            {userInitials}
+          </Avatar>
+          <Box>
+            <Heading>{getGreeting(userName)}</Heading>
+            <SubHeading sx={{ color: "text.secondary" }}>
+              Here's what's happening with your account
+            </SubHeading>
+          </Box>
+        </Box>
 
-        <AppCard sx={{ mt: "20px", p: { xs: 2, md: 2.5 } }}>
+        <AppCard
+          sx={{
+            mt: "20px",
+            p: { xs: 2, md: 2.5 },
+            ...(premiumActive ? { borderLeft: "4px solid #B8975A" } : {}),
+          }}
+        >
           <Heading sx={{ fontSize: "20px", mb: 2 }}>Premium Membership</Heading>
           {premiumActive ? (
             <Box sx={{ marginTop: "12px" }}>

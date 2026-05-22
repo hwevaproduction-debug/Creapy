@@ -1412,10 +1412,10 @@ exports.dismissReport = catchAsync(async (req, res, next) => {
 });
 
 exports.getAllBookings = catchAsync(async (req, res, next) => {
-  const status = req.query.status ? String(req.query.status).trim() : "";
+  const status = req.query.status ? normalizeEnumValue(req.query.status) : "";
   const providerId = req.query.provider ? String(req.query.provider) : "";
   const settlementStatus = req.query.settlementStatus
-    ? String(req.query.settlementStatus).trim().toLowerCase()
+    ? normalizeEnumValue(req.query.settlementStatus)
     : "";
   const dateFrom = req.query.dateFrom ? new Date(req.query.dateFrom) : null;
   const dateTo = req.query.dateTo ? new Date(req.query.dateTo) : null;
@@ -1444,10 +1444,10 @@ exports.getAllBookings = catchAsync(async (req, res, next) => {
     if (dateTo) where.createdAt.lte = dateTo;
   }
 
-  if (settlementStatus === "settled") {
-    where.OR = [{ settlementStatus: "settled" }, { settledAt: { not: null } }];
-  } else if (settlementStatus === "pending") {
-    where.AND = [{ settlementStatus: { not: "settled" } }, { settledAt: null }];
+  if (settlementStatus === "SETTLED") {
+    where.OR = [{ settlementStatus: "SETTLED" }, { settledAt: { not: null } }];
+  } else if (settlementStatus === "PENDING") {
+    where.AND = [{ settlementStatus: { not: "SETTLED" } }, { settledAt: null }];
   }
 
   if (providerId.trim()) {
@@ -1482,7 +1482,7 @@ exports.getAllBookings = catchAsync(async (req, res, next) => {
   const data = bookings.map((booking) => {
     const room = roomsById.get(booking.roomId) || null;
     const provider = room ? providersById.get(room.providerId) || null : null;
-    const isSettled = booking.settlementStatus === "settled" || Boolean(booking.settledAt);
+    const isSettled = booking.settlementStatus === "SETTLED" || Boolean(booking.settledAt);
 
     return {
       ...booking,
@@ -1523,7 +1523,7 @@ exports.settleBooking = catchAsync(async (req, res, next) => {
   }
 
   if (
-    booking.settlementStatus === "settled" ||
+    booking.settlementStatus === "SETTLED" ||
     booking.settledAt ||
     SETTLEMENT_INELIGIBLE_STATUSES.includes(String(booking.status || "").toLowerCase())
   ) {
@@ -1533,7 +1533,7 @@ exports.settleBooking = catchAsync(async (req, res, next) => {
   const updatedBooking = await prisma.booking.update({
     where: { id: req.params.id },
     data: {
-      settlementStatus: "settled",
+      settlementStatus: "SETTLED",
       settledAt: new Date(),
       settlementReference:
         req.body.settlementReference || booking.settlementReference || null,

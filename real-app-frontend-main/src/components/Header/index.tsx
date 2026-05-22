@@ -36,8 +36,7 @@ import {
   setUser,
 } from "../../redux/auth/authSlice";
 // Icons Imports
-import { ImProfile } from "react-icons/im";
-import { IoLogOutOutline } from "react-icons/io5";
+import { LogOut, User } from "lucide-react";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
 import WbSunny from "@mui/icons-material/WbSunny";
@@ -226,13 +225,12 @@ const Header = () => {
         <AppContainer>
           <Box
             sx={{
-              display: "flex",
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr auto", md: "160px 1fr 200px" },
               alignItems: "center",
-              justifyContent: "space-between",
               minHeight: "72px",
               py: { xs: 1, md: 1.5 },
               gap: 2,
-              flexWrap: { xs: "wrap", md: "nowrap" },
             }}
           >
             <Box
@@ -281,13 +279,13 @@ const Header = () => {
 
             <Box
               sx={{
-                flex: 1,
-                minWidth: { xs: "100%", md: 320 },
-                maxWidth: { md: 480 },
-                display: isHomePage ? "none" : undefined,
+                display: { xs: "none", md: "flex" },
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 1,
               }}
             >
-              <form onSubmit={handleSubmit}>
+              <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%", maxWidth: 420 }}>
                 <SearchBar
                   placeholder="Search locations, listings..."
                   searchText={searchText}
@@ -295,37 +293,40 @@ const Header = () => {
                   value={searchTerm}
                   onChange={handleSearch}
                 />
-              </form>
+              </Box>
+
+              <Box sx={{ display: "flex", gap: 3, alignItems: "center" }}>
+                {[
+                  { label: "Home", path: "/" },
+                  { label: "About", path: "/about" },
+                  { label: "Properties", path: "/search" },
+                  { label: "Temporary Stays", path: "/stays" },
+                ].map((item) => (
+                  <Box
+                    key={item.path}
+                    sx={{
+                      ...getActiveMenuStyle(isActive(item.path)),
+                      ...(isHomePage && !scrolled ? { color: "#fff" } : {}),
+                    }}
+                    onClick={() => navigate(item.path)}
+                  >
+                    {item.label}
+                  </Box>
+                ))}
+              </Box>
             </Box>
 
             <Box
               sx={{
-                display: "none",
-                "@media (min-width:768px)": {
-                  display: "flex",
-                },
+                display: { xs: "none", md: "flex" },
                 alignItems: "center",
-                gap: { xs: 1.5, md: 3 },
-                flexWrap: "wrap",
-                justifyContent: { xs: "center", md: "flex-end" },
-                color: isHomePage && !scrolled ? "#fff" : "inherit",
+                justifyContent: "flex-end",
+                gap: 1.5,
                 "& > *": {
                   color: isHomePage && !scrolled ? "#fff !important" : undefined,
                 },
               }}
             >
-              <Box sx={getActiveMenuStyle(isActive("/"))} onClick={() => navigate("/")}>
-                Home
-              </Box>
-              <Box sx={getActiveMenuStyle(isActive("/about"))} onClick={() => navigate("/about")}>
-                About
-              </Box>
-              <Box sx={getActiveMenuStyle(isActive("/search"))} onClick={() => navigate("/search")}>
-                Properties
-              </Box>
-              <Box sx={getActiveMenuStyle(isActive("/stays"))} onClick={() => navigate("/stays")}>
-                Temporary Stays
-              </Box>
               <Tooltip title={theme.palette.mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
                 <IconButton
                   onClick={colorMode.toggleColorMode}
@@ -342,34 +343,6 @@ const Header = () => {
 
               {isAuthenticated ? (
                 <>
-                  <Box
-                    sx={getActiveMenuStyle(
-                      isActive("/dashboard/landlord") ||
-                        isActive("/dashboard/tenant") ||
-                        isActive("/dashboard/admin")
-                    )}
-                    onClick={() => {
-                      if (userRole === "landlord") {
-                        navigate("/dashboard/landlord");
-                      } else if (userRole === "tenant") {
-                        navigate("/dashboard/tenant");
-                      } else if (userRole === "admin") {
-                        navigate("/dashboard/admin");
-                      } else {
-                        navigate("/");
-                      }
-                    }}
-                  >
-                    Dashboard
-                  </Box>
-                  {userRole === "landlord" && (
-                    <AppButton
-                      variant="contained"
-                      onClick={() => navigate("/create-listing")}
-                    >
-                      Create Listing
-                    </AppButton>
-                  )}
                   <NotificationBell iconColor={headerIconColor} />
                   <Box sx={{ cursor: "pointer" }}>
                     <IconButton
@@ -446,7 +419,7 @@ const Header = () => {
                                 navigate("/profile");
                               }}
                             >
-                              <ImProfile />
+                              <User size={16} />
                               Profile
                             </Box>
                           </Tooltip>
@@ -472,7 +445,7 @@ const Header = () => {
                                 navigate("/");
                               }}
                             >
-                              <IoLogOutOutline /> Logout
+                              <LogOut size={16} /> Logout
                             </Box>
                           </Tooltip>
                         </Box>

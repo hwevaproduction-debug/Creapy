@@ -1,21 +1,26 @@
+import { useState } from "react";
 import {
   Box,
   Checkbox,
   Divider,
   FormControlLabel,
+  Slider,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip as MuiTooltip,
 } from "@mui/material";
+import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { Heading, SubHeading } from "../Heading";
 import AppButton from "../ui/AppButton";
 import AppCard from "../ui/AppCard";
-import AppInput from "../ui/AppInput";
-import AppSelect from "../ui/AppSelect";
 import { StayFilterField, StayFilterState } from "../../hooks/useStayFilters";
 
 interface FilterPanelProps {
   filters: StayFilterState;
   onChange: (field: StayFilterField, value: StayFilterState[StayFilterField]) => void;
   onClear: () => void;
+  activeFilterCount?: number;
 }
 
 const ROOM_TYPE_OPTIONS = [
@@ -28,17 +33,9 @@ const ROOM_TYPE_OPTIONS = [
   { label: "Entire unit", value: "ENTIRE_UNIT" },
 ];
 
-const RATING_OPTIONS = [
-  { label: "Any rating", value: "" },
-  { label: "3+", value: "3" },
-  { label: "4+", value: "4" },
-  { label: "5", value: "5" },
-];
-
 const BOOKING_MODE_OPTIONS = [
-  { label: "All booking types", value: "" },
   { label: "Instant", value: "INSTANT" },
-  { label: "Request to Book", value: "REQUEST" },
+  { label: "Request", value: "REQUEST" },
 ];
 
 const AMENITY_OPTIONS = [
@@ -61,7 +58,43 @@ const sectionTitleSx = {
   mb: 1.25,
 };
 
-const FilterPanel = ({ filters, onChange, onClear }: FilterPanelProps) => {
+const toggleGroupSx = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 0.5,
+  "& .MuiToggleButtonGroup-grouped": {
+    m: 0,
+    border: "1px solid #E2E8F0",
+  },
+};
+
+const toggleButtonSx = {
+  borderRadius: "999px !important",
+  fontSize: "12px",
+  py: 0.5,
+  px: 1.5,
+  textTransform: "none",
+  "&.Mui-selected": {
+    background: "#B8975A",
+    color: "#fff",
+    "&:hover": { background: "#9E7E45" },
+  },
+};
+
+const FilterPanel = ({
+  filters,
+  onChange,
+  onClear,
+  activeFilterCount = 0,
+}: FilterPanelProps) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const minPrice = Number(filters.minPrice) || 0;
+  const maxPrice = Number(filters.maxPrice) || 2000;
+  const priceRange: [number, number] = [
+    Math.min(minPrice, maxPrice),
+    Math.max(minPrice, maxPrice),
+  ];
+
   const toggleAmenity = (amenityValue: string) => {
     const nextAmenities = filters.amenities.includes(amenityValue)
       ? filters.amenities.filter((item) => item !== amenityValue)
@@ -70,64 +103,128 @@ const FilterPanel = ({ filters, onChange, onClear }: FilterPanelProps) => {
     onChange("amenities", nextAmenities);
   };
 
+  if (isCollapsed) {
+    return (
+      <Box
+        onClick={() => setIsCollapsed(false)}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          cursor: "pointer",
+          background: "#B8975A",
+          color: "#fff",
+          borderRadius: "999px",
+          px: 2,
+          py: 1,
+          fontSize: "14px",
+          fontWeight: 700,
+          width: "fit-content",
+        }}
+      >
+        <SlidersHorizontal size={16} />
+        Filters
+        {activeFilterCount > 0 ? `(${activeFilterCount})` : null}
+        <ChevronRight size={14} />
+      </Box>
+    );
+  }
+
   return (
-    <AppCard elevation="flat" sx={{ p: 2.5, borderRadius: "16px" }}>
+    <AppCard
+      elevation="flat"
+      sx={{
+        p: 2.5,
+        borderRadius: "16px",
+        position: "sticky",
+        top: "88px",
+        maxHeight: "calc(100vh - 100px)",
+        overflowY: "auto",
+      }}
+    >
       <Stack spacing={2}>
         <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, alignItems: "center" }}>
           <Heading sx={{ fontSize: "18px", fontWeight: 700 }}>Filters</Heading>
-          <AppButton size="small" variant="text" sx={{ color: "#1F4D3A" }} onClick={onClear}>
-            Clear
-          </AppButton>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <AppButton size="small" variant="text" sx={{ color: "#1F4D3A" }} onClick={onClear}>
+              Clear
+            </AppButton>
+            <MuiTooltip title="Collapse filters">
+              <Box
+                component="button"
+                type="button"
+                onClick={() => setIsCollapsed(true)}
+                sx={{
+                  border: "none",
+                  background: "transparent",
+                  color: "text.secondary",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  p: 0.5,
+                }}
+              >
+                <ChevronLeft size={18} />
+              </Box>
+            </MuiTooltip>
+          </Box>
         </Box>
 
         <Divider />
 
         <Box>
           <SubHeading sx={sectionTitleSx}>Price range</SubHeading>
-          <Stack direction={{ xs: "column", sm: "row", md: "column" }} spacing={1.25}>
-            <AppInput
-              label="Minimum"
-              type="number"
-              value={filters.minPrice}
-              onChange={(event) => onChange("minPrice", event.target.value)}
-              inputProps={{ min: 0 }}
-            />
-            <AppInput
-              label="Maximum"
-              type="number"
-              value={filters.maxPrice}
-              onChange={(event) => onChange("maxPrice", event.target.value)}
-              inputProps={{ min: 0 }}
-            />
-          </Stack>
+          <Slider
+            value={priceRange}
+            onChange={(_, newValue) => {
+              onChange("minPrice", String((newValue as number[])[0]));
+              onChange("maxPrice", String((newValue as number[])[1]));
+            }}
+            min={0}
+            max={2000}
+            step={50}
+            valueLabelDisplay="auto"
+            sx={{ color: "#B8975A" }}
+          />
+          <SubHeading sx={{ color: "text.secondary", fontSize: "13px" }}>
+            ${priceRange[0]} - ${priceRange[1]}
+          </SubHeading>
         </Box>
 
         <Divider />
 
         <Box>
           <SubHeading sx={sectionTitleSx}>Room type</SubHeading>
-          <AppSelect
-            name="roomType"
-            options={ROOM_TYPE_OPTIONS}
+          <ToggleButtonGroup
             value={filters.roomType}
-            onChange={(event) => onChange("roomType", event.target.value as string)}
-            size="small"
-            displayEmpty
-          />
+            exclusive
+            onChange={(_, value) => value !== null && onChange("roomType", value)}
+            sx={toggleGroupSx}
+          >
+            {ROOM_TYPE_OPTIONS.map((option) => (
+              <ToggleButton key={option.value || "all"} value={option.value} sx={toggleButtonSx}>
+                {option.label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
         </Box>
 
         <Divider />
 
         <Box>
-          <SubHeading sx={sectionTitleSx}>Minimum rating</SubHeading>
-          <AppSelect
-            name="minRating"
-            options={RATING_OPTIONS}
-            value={filters.minRating}
-            onChange={(event) => onChange("minRating", event.target.value as string)}
-            size="small"
-            displayEmpty
-          />
+          <SubHeading sx={sectionTitleSx}>Booking type</SubHeading>
+          <ToggleButtonGroup
+            value={filters.bookingMode}
+            exclusive
+            onChange={(_, value) => value !== null && onChange("bookingMode", value)}
+            sx={toggleGroupSx}
+          >
+            {BOOKING_MODE_OPTIONS.map((option) => (
+              <ToggleButton key={option.value} value={option.value} sx={toggleButtonSx}>
+                {option.label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
         </Box>
 
         <Divider />
@@ -145,7 +242,7 @@ const FilterPanel = ({ filters, onChange, onClear }: FilterPanelProps) => {
                   />
                 }
                 label={amenity.label}
-                sx={{ alignItems: "flex-start", m: 0 }}
+                sx={{ alignItems: "center", m: 0 }}
               />
             ))}
           </Stack>
@@ -154,15 +251,19 @@ const FilterPanel = ({ filters, onChange, onClear }: FilterPanelProps) => {
         <Divider />
 
         <Box>
-          <SubHeading sx={sectionTitleSx}>Booking type</SubHeading>
-          <AppSelect
-            name="bookingMode"
-            options={BOOKING_MODE_OPTIONS}
-            value={filters.bookingMode}
-            onChange={(event) => onChange("bookingMode", event.target.value as string)}
-            size="small"
-            displayEmpty
-          />
+          <SubHeading sx={sectionTitleSx}>Minimum rating</SubHeading>
+          <ToggleButtonGroup
+            value={filters.minRating}
+            exclusive
+            onChange={(_, value) => value !== null && onChange("minRating", value)}
+            sx={toggleGroupSx}
+          >
+            {["1", "2", "3", "4", "5"].map((rating) => (
+              <ToggleButton key={rating} value={rating} sx={toggleButtonSx}>
+                ★
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
         </Box>
 
         <Divider />

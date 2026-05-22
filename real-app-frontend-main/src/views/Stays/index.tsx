@@ -10,7 +10,15 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { FaSliders } from "react-icons/fa6";
+import {
+  Building,
+  Building2,
+  Home,
+  Home as House,
+  SlidersHorizontal,
+  Trees,
+  Users,
+} from "lucide-react";
 import { Heading, SubHeading } from "../../components/Heading";
 import EmptyState from "../../components/stays/EmptyState";
 import FilterPanel from "../../components/stays/FilterPanel";
@@ -28,15 +36,20 @@ import {
   useStayFilters,
 } from "../../hooks/useStayFilters";
 import { useSearchStaysQuery } from "../../redux/api/stayApiSlice";
+import useTypedSelector from "../../hooks/useTypedSelector";
+import {
+  selectedUserRole,
+  selectedUserToken,
+} from "../../redux/auth/authSlice";
 
 export const BUSINESS_TYPES = [
-  { label: "All", value: "" },
-  { label: "Hotel", value: "HOTEL" },
-  { label: "Lodge", value: "LODGE" },
-  { label: "BnB", value: "BNB" },
-  { label: "Apartment", value: "APARTMENT" },
-  { label: "Guesthouse", value: "GUEST_HOUSE" },
-  { label: "Hostel", value: "HOSTEL" },
+  { label: "All", value: "", icon: null },
+  { label: "Hotel", value: "HOTEL", icon: <Building2 size={14} /> },
+  { label: "Lodge", value: "LODGE", icon: <Trees size={14} /> },
+  { label: "BnB", value: "BNB", icon: <Home size={14} /> },
+  { label: "Apartment", value: "APARTMENT", icon: <Building size={14} /> },
+  { label: "Guesthouse", value: "GUEST_HOUSE", icon: <House size={14} /> },
+  { label: "Hostel", value: "HOSTEL", icon: <Users size={14} /> },
 ];
 
 const SORT_OPTIONS = [
@@ -91,6 +104,9 @@ const Stays = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const token = useTypedSelector(selectedUserToken);
+  const userRole = useTypedSelector(selectedUserRole);
+  const isAuthenticated = Boolean(token);
   const {
     filters,
     appliedFilters,
@@ -176,20 +192,54 @@ const Stays = () => {
     <Box sx={{ py: { xs: 4, md: 6 }, background: "background.default", minHeight: "calc(100vh - 72px)" }}>
       <AppContainer>
         <Stack spacing={3}>
-          <AppCard
+          <Box
             sx={{
               p: { xs: 2.5, md: 4 },
-              borderRadius: "20px",
+              borderRadius: { xs: "16px", md: "24px" },
               background:
                 "linear-gradient(135deg, #1F2937 0%, #2D3748 55%, #1F4D3A 100%)",
               color: "#fff",
+              position: "relative",
+              overflow: "hidden",
             }}
           >
-            <Stack spacing={3}>
+            <Box
+              sx={{
+                position: "absolute",
+                inset: 0,
+                backgroundImage:
+                  "radial-gradient(rgba(184,151,90,0.08) 1px, transparent 1px)",
+                backgroundSize: "24px 24px",
+                pointerEvents: "none",
+                zIndex: 0,
+              }}
+            />
+            <Stack spacing={3} sx={{ position: "relative", zIndex: 1 }}>
               <Box>
-                <Heading sx={{ mb: 1, color: "#fff" }}>Temporary Stays</Heading>
+                <Box
+                  sx={{
+                    color: "#B8975A",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    mb: 1,
+                  }}
+                >
+                  TEMPORARY STAYS
+                </Box>
+                <Heading
+                  sx={{
+                    mb: 1,
+                    color: "#fff",
+                    fontSize: { xs: "1.75rem", md: "2.5rem" },
+                    fontWeight: 800,
+                  }}
+                >
+                  Find Your Perfect Short Stay
+                </Heading>
                 <SubHeading sx={{ color: "rgba(255,255,255,0.8)" }}>
-                  Search short-stay rooms, compare nightly pricing, and move straight into the booking flow.
+                  Hotels, lodges, BnBs and apartments across Zimbabwe
                 </SubHeading>
               </Box>
 
@@ -281,15 +331,64 @@ const Stays = () => {
                         cursor: "pointer",
                         font: "inherit",
                         backgroundColor: isActive ? "#B8975A" : "rgba(255,255,255,0.08)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.75,
                       }}
                     >
+                      {type.icon}
                       {type.label}
                     </Box>
                   );
                 })}
               </Stack>
             </Stack>
-          </AppCard>
+          </Box>
+
+          <Box
+            sx={{
+              background: "linear-gradient(135deg, #B8975A, #9E7E45)",
+              borderRadius: "16px",
+              p: { xs: 2.5, md: 3 },
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 2,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Building2 size={24} color="#fff" />
+              <Box>
+                <Box sx={{ color: "#fff", fontWeight: 800 }}>
+                  Are you a hotel or lodge owner?
+                </Box>
+                <Box sx={{ color: "rgba(255,255,255,0.85)", fontSize: "14px" }}>
+                  List your property and reach thousands of guests
+                </Box>
+              </Box>
+            </Box>
+            <AppButton
+              variant="outlined"
+              onClick={() =>
+                navigate(
+                  isAuthenticated && userRole === "provider"
+                    ? "/dashboard/provider"
+                    : "/provider-signup"
+                )
+              }
+              sx={{
+                color: "#fff",
+                borderColor: "rgba(255,255,255,0.6)",
+                "&:hover": {
+                  borderColor: "#fff",
+                  background: "rgba(255,255,255,0.1)",
+                },
+              }}
+            >
+              List Your Stay &rarr;
+            </AppButton>
+          </Box>
 
           {error ? (
             <AppCard sx={{ p: 3, borderRadius: "8px", border: "1px solid #FECACA", boxShadow: "none" }}>
@@ -310,8 +409,13 @@ const Stays = () => {
           <Grid container spacing={3}>
             {!isMobile ? (
               <Grid item xs={12} md={3}>
-                <Box sx={{ position: "sticky", top: 96 }}>
-                  <FilterPanel filters={filters} onChange={updateField} onClear={clearFilters} />
+                <Box>
+                  <FilterPanel
+                    filters={filters}
+                    onChange={updateField}
+                    onClear={clearFilters}
+                    activeFilterCount={activeFilterCount}
+                  />
                 </Box>
               </Grid>
             ) : null}
@@ -436,6 +540,7 @@ const Stays = () => {
                 filters={mobileDraftFilters}
                 onChange={updateMobileDraft}
                 onClear={() => setMobileDraftFilters(cloneFilters(DEFAULT_STAY_FILTERS))}
+                activeFilterCount={activeFilterCount}
               />
             </Box>
 
@@ -471,7 +576,7 @@ const Stays = () => {
                   },
                 }}
               >
-                <FaSliders style={{ marginRight: 8 }} />
+                <SlidersHorizontal size={16} style={{ marginRight: 8 }} />
                 Filters
               </Fab>
             </Badge>

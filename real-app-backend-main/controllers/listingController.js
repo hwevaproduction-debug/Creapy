@@ -96,6 +96,46 @@ const applyListingLifecycle = async () => {
   });
 };
 
+exports.getPublicStats = async (req, res) => {
+  try {
+    const [activeListings, landlords, provinceRows] = await Promise.all([
+      prisma.listing.count({ where: { status: "active" } }),
+      prisma.user.count({ where: { role: "landlord" } }),
+      prisma.listing.findMany({
+        where: { status: "active", province: { not: "" } },
+        distinct: ["province"],
+        select: { province: true },
+      }),
+    ]);
+
+    let avgRating = 0;
+    try {
+      const ratingAggregate = await prisma.listing.aggregate({
+        where: { status: "active" },
+        _avg: { averageRating: true },
+      });
+      avgRating = Number(ratingAggregate?._avg?.averageRating || 0);
+    } catch {
+      avgRating = 0;
+    }
+
+    return res.status(200).json({
+      status: true,
+      data: {
+        activeListings,
+        landlords,
+        provinces: provinceRows.length,
+        avgRating,
+      },
+    });
+  } catch {
+    return res.status(500).json({
+      status: false,
+      message: "Unable to load public stats",
+    });
+  }
+};
+
 const normalizeListingPayload = (body) => {
   const payload = { ...body };
   if (payload.regularPrice != null && payload.monthlyRent == null) {

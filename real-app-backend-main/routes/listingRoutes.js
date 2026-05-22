@@ -7,6 +7,7 @@ const { createListingValidators } = require("../middleware/listingValidators");
 
 const router = express.Router();
 
+router.get("/stats", listingController.getPublicStats);
 router.get("/", authController.optionalAuth, listingController.getListings);
 router.get("/get", authController.optionalAuth, listingController.getListings);
 router.get("/home/highlighted", authController.optionalAuth, listingController.getHomeHighlighted);
