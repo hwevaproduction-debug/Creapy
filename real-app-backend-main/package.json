@@ -8,6 +8,7 @@
     "postinstall": "prisma generate",
     "server": "nodemon server.js",
     "s3:cors": "node scripts/configure-s3-cors.js",
+    "db:migrate:deploy": "prisma migrate deploy",
     "seed": "node seed/seed.js",
     "seed:db": "node seed/seed-direct.js",
     "build": "npm install --legacy-peer-deps && cd ../client && npm install --legacy-peer-deps && npm run build",
