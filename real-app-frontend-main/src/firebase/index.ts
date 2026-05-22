@@ -6,6 +6,7 @@ import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
   authDomain: "smtp-a6e98.firebaseapp.com",
   projectId: "smtp-a6e98",
   storageBucket: "smtp-a6e98.firebasestorage.app",
