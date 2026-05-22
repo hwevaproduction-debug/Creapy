@@ -3,7 +3,8 @@ import { Navigate, useLocation } from "react-router-dom";
 const PublicRoutes = (props: any) => {
   const location = useLocation();
   if (localStorage.getItem("user")) {
-    const from = (location.state as any)?.from || "/";
+    const locationState = location.state as any;
+    const from = locationState?.from || "/";
     return <Navigate to={from} replace />;
   }
   return props.children;

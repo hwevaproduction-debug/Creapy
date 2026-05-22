@@ -109,7 +109,7 @@ app.use((req, res, next) => {
 app.get("/api/v1", (req, res) => {
   res.status(200).json({
     status: "ok",
-    message: "Creapy API v1 is running.",
+    message: "Town Ruins API v1 is running.",
   });
 });
 app.use("/api/v1/users", userRouter);
@@ -137,7 +137,7 @@ app.use("/api/v1/stays", stayRouter);
 
 // PRODUCTION SETUP
 app.get("/", (req, res) => {
-  res.status(200).json({ status: "ok", message: "Creapy API is running." });
+  res.status(200).json({ status: "ok", message: "Town Ruins API is running." });
 });
 
 app.all("*", (req, res, next) => {

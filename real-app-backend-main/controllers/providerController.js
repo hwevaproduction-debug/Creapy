@@ -92,10 +92,10 @@ const sendVerificationEmail = async (user, rawToken) => {
 
   await sendEmail({
     to: user.email,
-    subject: "Verify your Creapy email",
-    text: `Welcome to Creapy. Verify your email by opening this link: ${verificationUrl}`,
+    subject: "Verify your Town Ruins email",
+    text: `Welcome to Town Ruins. Verify your email by opening this link: ${verificationUrl}`,
     html: `
-      <p>Welcome to Creapy.</p>
+      <p>Welcome to Town Ruins.</p>
       <p>Please verify your email by clicking the link below:</p>
       <p><a href="${verificationUrl}">${verificationUrl}</a></p>
       <p>This link expires in 24 hours.</p>

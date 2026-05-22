@@ -62,7 +62,7 @@ test("GET / returns the root health payload", async () => {
   assert.equal(result.statusCode, 200);
   assert.deepEqual(result.body, {
     status: "ok",
-    message: "Creapy API is running.",
+    message: "Town Ruins API is running.",
   });
 });
 
@@ -72,7 +72,7 @@ test("GET /api/v1 returns the API base health payload", async () => {
   assert.equal(result.statusCode, 200);
   assert.deepEqual(result.body, {
     status: "ok",
-    message: "Creapy API v1 is running.",
+    message: "Town Ruins API v1 is running.",
   });
 });
 

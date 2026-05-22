@@ -30,10 +30,10 @@ exports["provider.approved"] = ({ provider }) =>
     subject: "Your provider profile was approved",
     text: [
       `Hi ${getProviderName(provider)},`,
-      "Your Creapy provider profile has been approved.",
+      "Your Town Ruins provider profile has been approved.",
       "You can now publish stays and accept bookings.",
     ].join("\n"),
-    smsBody: "Your Creapy provider profile was approved.",
+    smsBody: "Your Town Ruins provider profile was approved.",
     inAppTitle: "Provider profile approved",
     inAppBody: "You can now publish stays and accept bookings.",
   });
@@ -43,10 +43,10 @@ exports["provider.rejected"] = ({ provider }) =>
     subject: "Your provider profile was rejected",
     text: [
       `Hi ${getProviderName(provider)},`,
-      "Your Creapy provider profile was rejected.",
+      "Your Town Ruins provider profile was rejected.",
       "Review the notes in your dashboard before submitting again.",
     ].join("\n"),
-    smsBody: "Your Creapy provider profile was rejected.",
+    smsBody: "Your Town Ruins provider profile was rejected.",
     inAppTitle: "Provider profile rejected",
     inAppBody: "Review the notes in your dashboard before submitting again.",
   });
@@ -56,10 +56,10 @@ exports["provider.suspended"] = ({ provider, reason }) =>
     subject: "Your provider profile was suspended",
     text: [
       `Hi ${getProviderName(provider)},`,
-      "Your Creapy provider profile has been suspended.",
+      "Your Town Ruins provider profile has been suspended.",
       reason ? `Reason: ${reason}` : "Please contact support for more information.",
     ].join("\n"),
-    smsBody: "Your Creapy provider profile was suspended.",
+    smsBody: "Your Town Ruins provider profile was suspended.",
     inAppTitle: "Provider profile suspended",
     inAppBody: reason || "Please contact support for more information.",
   });
@@ -69,10 +69,10 @@ exports["provider.reinstated"] = ({ provider }) =>
     subject: "Your provider profile was reinstated",
     text: [
       `Hi ${getProviderName(provider)},`,
-      "Your Creapy provider profile has been reinstated.",
+      "Your Town Ruins provider profile has been reinstated.",
       "You can accept new bookings again.",
     ].join("\n"),
-    smsBody: "Your Creapy provider profile was reinstated.",
+    smsBody: "Your Town Ruins provider profile was reinstated.",
     inAppTitle: "Provider profile reinstated",
     inAppBody: "You can accept new bookings again.",
   });
@@ -84,7 +84,7 @@ exports["accommodation.approved"] = ({ provider, accommodation }) =>
       `Hi ${getProviderName(provider)},`,
       `${getAccommodationName(accommodation)} has been approved and published.`,
     ].join("\n"),
-    smsBody: "Your Creapy accommodation was approved.",
+    smsBody: "Your Town Ruins accommodation was approved.",
     inAppTitle: "Accommodation approved",
     inAppBody: `${getAccommodationName(accommodation)} is now published.`,
   });
@@ -97,7 +97,7 @@ exports["accommodation.rejected"] = ({ provider, accommodation, reason }) =>
       `${getAccommodationName(accommodation)} was not approved.`,
       reason ? `Reason: ${reason}` : "Review the listing and submit it again.",
     ].join("\n"),
-    smsBody: "Your Creapy accommodation was rejected.",
+    smsBody: "Your Town Ruins accommodation was rejected.",
     inAppTitle: "Accommodation rejected",
     inAppBody: reason || "Review the listing and submit it again.",
   });
@@ -110,7 +110,7 @@ exports["accommodation.suspended"] = ({ provider, accommodation, reason }) =>
       `${getAccommodationName(accommodation)} has been suspended.`,
       reason ? `Reason: ${reason}` : "Please contact support for more information.",
     ].join("\n"),
-    smsBody: "Your Creapy accommodation was suspended.",
+    smsBody: "Your Town Ruins accommodation was suspended.",
     inAppTitle: "Accommodation suspended",
     inAppBody: reason || "Please contact support for more information.",
   });
@@ -119,11 +119,11 @@ exports["report.resolved"] = ({ report, resolution }) =>
   toTemplate({
     subject: "Your report was resolved",
     text: [
-      "Your Creapy report has been reviewed.",
+      "Your Town Ruins report has been reviewed.",
       resolution ? `Resolution: ${resolution}` : "The moderation team has closed the report.",
       report?.targetType ? `Reported item: ${report.targetType}` : "",
     ].join("\n"),
-    smsBody: "Your Creapy report was resolved.",
+    smsBody: "Your Town Ruins report was resolved.",
     inAppTitle: "Report resolved",
     inAppBody: resolution || "The moderation team has closed the report.",
   });

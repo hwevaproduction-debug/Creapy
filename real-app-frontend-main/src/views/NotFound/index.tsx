@@ -71,20 +71,6 @@ const NotFound = () => {
           >
             Browse Listings
           </AppButton>
-          <AppButton
-            variant="outlined"
-            onClick={() => navigate("/search")}
-            sx={{
-              color: "#fff",
-              borderColor: "rgba(255,255,255,0.7)",
-              "&:hover": {
-                borderColor: "#fff",
-                background: "rgba(255,255,255,0.1)",
-              },
-            }}
-          >
-            Search
-          </AppButton>
         </Box>
       </Box>
     </Box>

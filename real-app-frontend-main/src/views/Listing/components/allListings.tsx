@@ -18,11 +18,11 @@ import {
 import { selectedUserId } from "../../../redux/auth/authSlice";
 // Hook Imports
 import useTypedSelector from "../../../hooks/useTypedSelector";
-import { Pencil, Trash2 } from "lucide-react";
+import { Home, Pencil, Trash2 } from "lucide-react";
 // Utils Imports
 import { convertToFormattedDate } from "../../../utils";
 // Component Imports
-import { Heading } from "../../../components/Heading";
+import { Heading, SubHeading } from "../../../components/Heading";
 import OverlayLoader from "../../../components/Spinner/OverlayLoader";
 import ToastAlert from "../../../components/ToastAlert/ToastAlert";
 import DotLoader from "../../../components/Spinner/dotLoader";
@@ -162,14 +162,19 @@ const AllListings = () => {
       <AppContainer>
         <Box
           sx={{
-            display: "flex",
-            justifyContent: "flex-start",
-            alignItems: "center",
-            flexDirection: "column",
-            gap: 2,
+            background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)",
+            borderRadius: "20px",
+            p: { xs: 3, md: 4 },
+            mb: 4,
+            color: "#fff",
           }}
         >
-          <Heading>Your Listings</Heading>
+          <Box sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, fontWeight: 800 }}>
+            Your Listings
+          </Box>
+          <Box sx={{ opacity: 0.75, mt: 0.5 }}>
+            Manage and track your property listings.
+          </Box>
         </Box>
           {isSuccess && data?.data?.length === 0 ? (
             <AppCard
@@ -177,20 +182,27 @@ const AllListings = () => {
                 display: "flex",
                 alignItems: "center",
                 width: "100%",
-                padding: "20px",
+                p: { xs: 3, md: 4 },
                 margin: "20px 0",
                 justifyContent: "center",
                 flexDirection: "column",
+                textAlign: "center",
               }}
             >
-              No Listings to show
+              <Home size={40} color="#B8975A" />
+              <Heading sx={{ fontSize: "22px", mt: 1.5 }}>
+                No listings yet
+              </Heading>
+              <SubHeading sx={{ color: "text.secondary", mt: 0.5, mb: 2 }}>
+                You haven't created any listings. Get started by creating your
+                first property listing.
+              </SubHeading>
               <AppButton
                 onClick={() => {
                   navigate("/create-listing");
                 }}
-                sx={{ margin: "10px 0 0" }}
               >
-                Create Listing
+                Create your first listing
               </AppButton>
             </AppCard>
           ) : (

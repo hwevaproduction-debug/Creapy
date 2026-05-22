@@ -11,7 +11,7 @@ import {
   FormControlLabel,
   Grid,
 } from "@mui/material";
-import { Bookmark } from "lucide-react";
+import { Bookmark, Lock } from "lucide-react";
 
 import { Heading, SubHeading } from "../../components/Heading";
 import useTypedSelector from "../../hooks/useTypedSelector";
@@ -29,6 +29,24 @@ import AppInput from "../../components/ui/AppInput";
 const SavedSearches = () => {
   const role = useTypedSelector(selectedUserRole);
   const navigate = useNavigate();
+  const header = (
+    <Box
+      sx={{
+        background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)",
+        borderRadius: "20px",
+        p: { xs: 3, md: 4 },
+        mb: 4,
+        color: "#fff",
+      }}
+    >
+      <Box sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, fontWeight: 800 }}>
+        Saved Searches
+      </Box>
+      <Box sx={{ opacity: 0.75, mt: 0.5 }}>
+        Save your search criteria and get notified of new matches
+      </Box>
+    </Box>
+  );
 
   const { data: searchesData, refetch } = useGetMySavedSearchesQuery(undefined, {
     skip: role !== "tenant",
@@ -79,9 +97,21 @@ const SavedSearches = () => {
     return (
       <Box sx={{ mt: { xs: 5, md: 6 } }}>
         <AppContainer>
-          <Heading>Saved Searches</Heading>
-          <AppCard sx={{ marginTop: "10px", p: 2 }}>
-            Only tenant accounts can use saved searches.
+          {header}
+          <AppCard
+            sx={{
+              p: { xs: 3, md: 4 },
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              color: "text.secondary",
+            }}
+          >
+            <Lock size={34} color="#B8975A" />
+            <Box>
+              Saved searches are available to tenant accounts. Sign up as a
+              tenant to get started.
+            </Box>
           </AppCard>
         </AppContainer>
       </Box>
@@ -91,7 +121,7 @@ const SavedSearches = () => {
   return (
     <Box sx={{ mt: { xs: 5, md: 6 } }}>
       <AppContainer>
-        <Heading>Saved Searches</Heading>
+        {header}
 
         <AppCard sx={{ marginTop: "20px", p: 2 }}>
           <SubHeading sx={{ marginBottom: "10px" }}>Create</SubHeading>

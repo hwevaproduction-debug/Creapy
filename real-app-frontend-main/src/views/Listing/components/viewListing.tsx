@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 // MUI Imports
-import { Box, Grid, Divider } from "@mui/material";
+import { Box, Divider, Grid } from "@mui/material";
 // Component Imports
 import OverlayLoader from "../../../components/Spinner/OverlayLoader";
 import { Heading, SubHeading } from "../../../components/Heading";
@@ -129,7 +129,11 @@ const ViewListing = () => {
   ]);
 
   const locationData = listing?.location;
-  const publicLocation = [locationData?.city, locationData?.province, locationData?.country]
+  const publicLocation = [
+    locationData?.city,
+    locationData?.province,
+    locationData?.country,
+  ]
     .filter(Boolean)
     .join(", ");
   const locationText = publicLocation || "Location unavailable";
@@ -302,7 +306,11 @@ const ViewListing = () => {
                             alignItems: "center",
                           }}
                         >
-                          USD {thousandSeparatorNumber(data?.data?.discountedPrice)} discount
+                          USD{" "}
+                          {thousandSeparatorNumber(
+                            data?.data?.discountedPrice
+                          )}{" "}
+                          discount
                         </Box>
                         <Box
                           sx={{
@@ -316,7 +324,8 @@ const ViewListing = () => {
                         >
                           Now USD{" "}
                           {thousandSeparatorNumber(
-                            (data?.data?.monthlyRent || data?.data?.regularPrice) -
+                            (data?.data?.monthlyRent ||
+                              data?.data?.regularPrice) -
                               data?.data?.discountedPrice
                           )}
                           /
@@ -332,15 +341,26 @@ const ViewListing = () => {
                           fontWeight: 700,
                           borderRadius: "999px",
                           padding: "3px 10px",
-                          display: "inline-block",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 0.5,
                         }}
                       >
-                        ⚡ Early Access
+                        <Zap size={12} />
+                        Early Access
                       </Box>
                     ) : null}
                     {data?.data?.studentAccommodation ? (
-                      <Box sx={studentAccommodationBadgeSx}>
-                        🎓 Student Accommodation
+                      <Box
+                        sx={{
+                          ...studentAccommodationBadgeSx,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                        }}
+                      >
+                        <GraduationCap size={12} />
+                        Student Accommodation
                       </Box>
                     ) : null}
                   </Box>
@@ -389,7 +409,9 @@ const ViewListing = () => {
                     </Box>
                     <Box sx={iconStyle}>
                       <Car />
-                      {data?.data?.amenities?.parking ? "Parking" : "No Parking"}
+                      {data?.data?.amenities?.parking
+                        ? "Parking"
+                        : "No Parking"}
                     </Box>
                     <Box sx={iconStyle}>
                       <Sofa />
@@ -436,7 +458,10 @@ const ViewListing = () => {
                         sx={{ mt: 2 }}
                         onClick={() =>
                           navigate("/login", {
-                            state: { from: location.pathname },
+                            state: {
+                              from: location.pathname,
+                              openContact: true,
+                            },
                           })
                         }
                       >
