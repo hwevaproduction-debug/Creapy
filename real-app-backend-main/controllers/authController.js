@@ -122,6 +122,208 @@ const buildPendingVerificationUserPayload = (user) => ({
   isPhoneVerified: Boolean(user.isPhoneVerified),
 });
 
+const getUserId = (user) => user?.id || user?._id?.toString();
+
+const isAdminUser = (user) => ["admin", "super_admin"].includes(user?.role);
+
+const idsFrom = (records) => records.map((record) => record.id);
+
+const compact = (values) => values.filter(Boolean);
+
+const impossibleIdWhere = { id: "__never__" };
+
+const whereAny = (conditions) => {
+  const OR = compact(conditions);
+  return OR.length ? { OR } : impossibleIdWhere;
+};
+
+const idInWhere = (ids) => (ids.length ? { id: { in: ids } } : impossibleIdWhere);
+
+const fieldIn = (field, values) => (values.length ? { [field]: { in: values } } : null);
+
+const deleteUserAccount = async (userId) => {
+  await prisma.$transaction(async (tx) => {
+    const listings = await tx.listing.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    const listingIds = idsFrom(listings);
+
+    const accommodations = await tx.accommodation.findMany({
+      where: { ownerId: userId },
+      select: { id: true },
+    });
+    const accommodationIds = idsFrom(accommodations);
+
+    const rooms = await tx.room.findMany({
+      where: whereAny([
+        { providerId: userId },
+        fieldIn("accommodationId", accommodationIds),
+      ]),
+      select: { id: true },
+    });
+    const roomIds = idsFrom(rooms);
+
+    const bookings = await tx.booking.findMany({
+      where: whereAny([
+        { guestId: userId },
+        fieldIn("roomId", roomIds),
+      ]),
+      select: { id: true },
+    });
+    const bookingIds = idsFrom(bookings);
+
+    const payments = await tx.payment.findMany({
+      where: whereAny([
+        { userId },
+        fieldIn("listingId", listingIds),
+        fieldIn("bookingId", bookingIds),
+      ]),
+      select: { id: true },
+    });
+    const paymentIds = idsFrom(payments);
+
+    const deletedResourceIds = [
+      userId,
+      ...listingIds,
+      ...accommodationIds,
+      ...roomIds,
+      ...bookingIds,
+      ...paymentIds,
+    ];
+
+    await tx.notification.deleteMany({ where: { userId } });
+    await tx.savedSearch.deleteMany({ where: { userId } });
+    await tx.listingDraft.deleteMany({ where: { userId } });
+    await tx.engagement.deleteMany({
+      where: whereAny([
+        { tenantId: userId },
+        { landlordId: userId },
+        fieldIn("listingId", listingIds),
+      ]),
+    });
+    await tx.report.deleteMany({
+      where: whereAny([
+        { reporterId: userId },
+        fieldIn("targetId", deletedResourceIds),
+      ]),
+    });
+    await tx.dispute.deleteMany({
+      where: whereAny([
+        { raisedBy: userId },
+        fieldIn("bookingId", bookingIds),
+      ]),
+    });
+    await tx.review.deleteMany({
+      where: whereAny([
+        { guestId: userId },
+        fieldIn("bookingId", bookingIds),
+        fieldIn("accommodationId", accommodationIds),
+      ]),
+    });
+    await tx.auditLog.deleteMany({ where: { adminId: userId } });
+
+    await tx.bookingGuestInfo.deleteMany({
+      where: fieldIn("bookingId", bookingIds) || impossibleIdWhere,
+    });
+    await tx.bookingFeeSnapshot.deleteMany({
+      where: fieldIn("bookingId", bookingIds) || impossibleIdWhere,
+    });
+    await tx.refund.deleteMany({
+      where: whereAny([
+        fieldIn("paymentId", paymentIds),
+        fieldIn("bookingId", bookingIds),
+      ]),
+    });
+    await tx.payment.deleteMany({
+      where: whereAny([
+        { userId },
+        fieldIn("listingId", listingIds),
+        fieldIn("bookingId", bookingIds),
+      ]),
+    });
+    await tx.booking.deleteMany({
+      where: whereAny([
+        { guestId: userId },
+        fieldIn("roomId", roomIds),
+      ]),
+    });
+
+    await tx.availabilityBlock.deleteMany({
+      where: fieldIn("roomId", roomIds) || impossibleIdWhere,
+    });
+    await tx.roomImage.deleteMany({
+      where: fieldIn("roomId", roomIds) || impossibleIdWhere,
+    });
+    await tx.roomAmenity.deleteMany({
+      where: fieldIn("roomId", roomIds) || { roomId: "__never__" },
+    });
+    await tx.seasonalRate.deleteMany({
+      where: fieldIn("roomId", roomIds) || impossibleIdWhere,
+    });
+    await tx.roomFee.deleteMany({
+      where: fieldIn("roomId", roomIds) || impossibleIdWhere,
+    });
+    await tx.occupancyRule.deleteMany({
+      where: fieldIn("roomId", roomIds) || impossibleIdWhere,
+    });
+    await tx.occupancyPricingRule.deleteMany({
+      where: fieldIn("roomId", roomIds) || impossibleIdWhere,
+    });
+    await tx.promotion.updateMany({
+      where: fieldIn("roomId", roomIds) || impossibleIdWhere,
+      data: { roomId: null },
+    });
+    await tx.room.deleteMany({ where: idInWhere(roomIds) });
+
+    await tx.accommodationImage.deleteMany({
+      where: fieldIn("accommodationId", accommodationIds) || impossibleIdWhere,
+    });
+    await tx.accommodationAmenity.deleteMany({
+      where: fieldIn("accommodationId", accommodationIds) || { accommodationId: "__never__" },
+    });
+    await tx.cancellationPolicy.deleteMany({
+      where: fieldIn("accommodationId", accommodationIds) || impossibleIdWhere,
+    });
+    await tx.checkInOutRules.deleteMany({
+      where: fieldIn("accommodationId", accommodationIds) || impossibleIdWhere,
+    });
+    await tx.taxRule.deleteMany({
+      where: fieldIn("accommodationId", accommodationIds) || impossibleIdWhere,
+    });
+    await tx.promotion.updateMany({
+      where: fieldIn("accommodationId", accommodationIds) || impossibleIdWhere,
+      data: { accommodationId: null },
+    });
+    await tx.accommodation.deleteMany({ where: idInWhere(accommodationIds) });
+
+    await tx.listing.deleteMany({ where: idInWhere(listingIds) });
+
+    await tx.booking.updateMany({
+      where: { providerId: userId },
+      data: { providerId: null },
+    });
+    await tx.availabilityBlock.updateMany({
+      where: { createdBy: userId },
+      data: { createdBy: null },
+    });
+    await tx.notificationJob.updateMany({
+      where: { recipientId: userId },
+      data: { recipientId: null },
+    });
+    await tx.report.updateMany({
+      where: { resolvedBy: userId },
+      data: { resolvedBy: null },
+    });
+    await tx.dispute.updateMany({
+      where: { resolvedBy: userId },
+      data: { resolvedBy: null },
+    });
+
+    await tx.user.delete({ where: { id: userId } });
+  });
+};
+
 const createSendToken = (user, statusCode, res) => {
   const token = signToken(user.id);
   const { password, ...sanitizedUser } = user;
@@ -314,13 +516,34 @@ exports.getMe = catchAsync(async (req, res, next) => {
 });
 
 exports.delete = catchAsync(async (req, res, next) => {
+  const requestedUserId = req.params.id;
+  const currentUserId = getUserId(req.user);
+
+  if (requestedUserId !== currentUserId && !isAdminUser(req.user)) {
+    return next(new AppError("You can only delete your own account", 403));
+  }
+
   // 1) Find User
-  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  const user = await prisma.user.findUnique({ where: { id: requestedUserId } });
   if (!user) {
     return next(new AppError("No user found with that ID", 404));
   }
+
   // 2) Delete User
-  await prisma.user.delete({ where: { id: req.params.id } });
+  try {
+    await deleteUserAccount(requestedUserId);
+  } catch (error) {
+    if (error?.code === "P2003") {
+      return next(
+        new AppError(
+          "We couldn't delete this account because linked records still exist. Please contact support.",
+          409
+        )
+      );
+    }
+
+    throw error;
+  }
 
   // 3) If everything ok, send token to client
   res.status(204).json({

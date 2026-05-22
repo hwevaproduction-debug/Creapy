@@ -78,6 +78,8 @@ jobs:
       - name: Run E2E tests
         run: npm run test:e2e
         env:
+          E2E_ADMIN_EMAIL: admin@demo.com
+          E2E_ADMIN_PASSWORD: demo1234
           SEED_API_BASE: http://localhost:5000
 
   e2e-deployed:

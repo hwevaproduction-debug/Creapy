@@ -95,7 +95,7 @@ const FALLBACK_HERO_IMAGES = [
 const fallbackStats = [
   { value: "Curated", label: "Premium Listings" },
   { value: "Trusted", label: "Verified Landlords" },
-  { value: "10", label: "Provinces Covered" },
+  { value: "30+", label: "Neighbourhoods" },
   { value: "Top Rated", label: "Verified Stays" },
 ];
 
@@ -109,7 +109,6 @@ const computeStats = (data: any) => {
 
   const activeListings = Number(data.activeListings || 0);
   const landlords = Number(data.landlords || 0);
-  const provinces = Number(data.provinces || 0);
   const avgRating = Number(data.avgRating || 0);
   const hasAvgRating = Number.isFinite(avgRating) && avgRating > 0;
 
@@ -120,7 +119,7 @@ const computeStats = (data: any) => {
     landlords >= 50
       ? { value: `${landlords}+`, label: "Verified Landlords" }
       : { value: "Growing Network", label: "Trusted Landlords" },
-    { value: String(provinces || 10), label: "Provinces Covered" },
+    { value: "30+", label: "Neighbourhoods" },
     hasAvgRating && avgRating >= 4.0
       ? { value: avgRating.toFixed(1), label: "Average Rating" }
       : { value: "Highly Rated", label: "Verified Stays" },

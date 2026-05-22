@@ -98,7 +98,11 @@ const ensureConfirmedAmount = async (payment, explicitAmountPaid) => {
 
 exports.handlePaynowWebhook = async (req, res) => {
   try {
-    const provider = getProviderByName("paynow");
+    const webhookProviderName =
+      String(process.env.PAYMENT_PROVIDER || "").trim().toLowerCase() === "mock"
+        ? "mock"
+        : "paynow";
+    const provider = getProviderByName(webhookProviderName);
     const result = await provider.verifyWebhook(req.body, req.headers);
 
     if (!result.valid) {
@@ -106,8 +110,8 @@ exports.handlePaynowWebhook = async (req, res) => {
     }
 
     const eventId =
-      result.eventId || hashEventId("paynow", result.transactionRef, result.status);
-    const eventRecord = await recordWebhookEvent("paynow", eventId, req.body);
+      result.eventId || hashEventId(webhookProviderName, result.transactionRef, result.status);
+    const eventRecord = await recordWebhookEvent(webhookProviderName, eventId, req.body);
 
     if (eventRecord.duplicate) {
       return res.status(200).json({ status: "ok", reason: "already processed" });
@@ -183,7 +187,7 @@ exports.handlePaynowWebhook = async (req, res) => {
       } catch (resetErr) {
         console.log("[webhook] Error resetting webhook claim:", resetErr.message);
       }
-      await removeWebhookEvent("paynow", eventId);
+      await removeWebhookEvent(webhookProviderName, eventId);
 
       return res.status(200).json({ status: "error" });
     }

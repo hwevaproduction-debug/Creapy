@@ -1,5 +1,5 @@
 // React Imports
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 // MUI Imports
 import { Box, Grid, Divider } from "@mui/material";
@@ -14,13 +14,17 @@ import ImageLightbox from "../../../components/ImageLightbox";
 import { studentAccommodationBadgeSx } from "../../../styles/listingBadges";
 // Utils Imports
 import { thousandSeparatorNumber } from "../../../utils";
-import { Lock, MapPin, Phone } from "lucide-react";
-// React Icons
-import { FaLocationDot } from "react-icons/fa6";
-import { FaBath } from "react-icons/fa";
-import { FaParking } from "react-icons/fa";
-import { FaChair } from "react-icons/fa6";
-import { FaBed } from "react-icons/fa";
+import {
+  Bath,
+  BedDouble,
+  Car,
+  GraduationCap,
+  Lock,
+  MapPin,
+  Phone,
+  Sofa,
+  Zap,
+} from "lucide-react";
 // Redux Imports
 import useTypedSelector from "../../../hooks/useTypedSelector";
 import {
@@ -46,6 +50,7 @@ const ViewListing = () => {
   const userRole = useTypedSelector(selectedUserRole);
   const isLoggedIn = Boolean(userToken);
   const isTenant = userRole === "tenant";
+  const contactIntentConsumedRef = useRef(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -53,9 +58,10 @@ const ViewListing = () => {
   const { data, isLoading } = useGetSingleListingQuery(id as string, {
     skip: !id,
   });
-  const { data: engagementsData } = useGetMyEngagementsQuery(undefined, {
-    skip: !isTenant,
-  });
+  const { data: engagementsData, isLoading: engagementsLoading } =
+    useGetMyEngagementsQuery(undefined, {
+      skip: !isTenant,
+    });
   const listing = data?.data;
   const images = Array.isArray(listing?.imageUrls) ? listing.imageUrls : [];
   const existingEngagement = engagementsData?.data?.find(
@@ -86,6 +92,41 @@ const ViewListing = () => {
     ].slice(0, 10);
     localStorage.setItem("tr_recently_viewed", JSON.stringify(next));
   }, [id, listing]);
+
+  useEffect(() => {
+    const openContact = (location.state as any)?.openContact;
+    if (contactIntentConsumedRef.current || !openContact || !userRole) {
+      return;
+    }
+
+    if (userRole !== "tenant") {
+      contactIntentConsumedRef.current = true;
+      navigate(location.pathname, { replace: true, state: {} });
+      return;
+    }
+
+    if (!listing || engagementsLoading) {
+      return;
+    }
+
+    const engagementBlocksContact =
+      existingEngagement?.status === "PENDING" ||
+      existingEngagement?.status === "APPROVED";
+
+    contactIntentConsumedRef.current = true;
+    if (!engagementBlocksContact) {
+      setContactModalOpen(true);
+    }
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [
+    engagementsLoading,
+    existingEngagement,
+    listing,
+    location.pathname,
+    location.state,
+    navigate,
+    userRole,
+  ]);
 
   const locationData = listing?.location;
   const publicLocation = [locationData?.city, locationData?.province, locationData?.country]
@@ -224,7 +265,7 @@ const ViewListing = () => {
                       },
                     }}
                   >
-                    <FaLocationDot />
+                    <MapPin />
                     {locationText}
                   </Box>
                   <Box
@@ -339,19 +380,19 @@ const ViewListing = () => {
                     }}
                   >
                     <Box sx={iconStyle}>
-                      <FaBed />
+                      <BedDouble />
                       {data?.data?.bedrooms} Rooms
                     </Box>
                     <Box sx={iconStyle}>
-                      <FaBath />
+                      <Bath />
                       {data?.data?.bathrooms} Baths
                     </Box>
                     <Box sx={iconStyle}>
-                      <FaParking />
+                      <Car />
                       {data?.data?.amenities?.parking ? "Parking" : "No Parking"}
                     </Box>
                     <Box sx={iconStyle}>
-                      <FaChair />
+                      <Sofa />
                       {data?.data?.furnished ? "Furnished" : "Not Furnished"}
                     </Box>
                   </Box>

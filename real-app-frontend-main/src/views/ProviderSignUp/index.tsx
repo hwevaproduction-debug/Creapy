@@ -113,14 +113,6 @@ const ProviderSignUp = () => {
       }}
     >
       <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
-      <Box
-        sx={{
-          position: "absolute",
-          inset: 0,
-          background: "rgba(15,20,30,0.55)",
-          zIndex: 1,
-        }}
-      />
       <Box sx={{ position: "relative", zIndex: 2, width: "100%" }}>
         <AppContainer>
           <Grid container justifyContent="center">

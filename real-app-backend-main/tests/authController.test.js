@@ -9,6 +9,7 @@ const prisma = require("../utils/prisma");
 const originalSendEmail = emailUtils.sendEmail;
 const originalSendSms = smsUtils.sendSms;
 const originalPrisma = {
+  transaction: prisma.$transaction,
   listingFindUnique: prisma.listing.findUnique,
   userCreate: prisma.user.create,
   userDelete: prisma.user.delete,
@@ -47,6 +48,80 @@ const invokeController = (handler, req = {}) =>
     });
   });
 
+const buildAccountDeleteTx = ({
+  calls,
+  listings = [],
+  accommodations = [],
+  rooms = [],
+  bookings = [],
+  payments = [],
+} = {}) => {
+  const recordedCalls = calls || [];
+  const record = (name) => async (args) => {
+    recordedCalls.push({ name, args });
+    return { count: 0 };
+  };
+
+  return {
+    listing: {
+      findMany: async () => listings,
+      deleteMany: record("listing.deleteMany"),
+    },
+    accommodation: {
+      findMany: async () => accommodations,
+      deleteMany: record("accommodation.deleteMany"),
+    },
+    room: {
+      findMany: async () => rooms,
+      deleteMany: record("room.deleteMany"),
+    },
+    booking: {
+      findMany: async () => bookings,
+      deleteMany: record("booking.deleteMany"),
+      updateMany: record("booking.updateMany"),
+    },
+    payment: {
+      findMany: async () => payments,
+      deleteMany: record("payment.deleteMany"),
+    },
+    notification: { deleteMany: record("notification.deleteMany") },
+    savedSearch: { deleteMany: record("savedSearch.deleteMany") },
+    listingDraft: { deleteMany: record("listingDraft.deleteMany") },
+    engagement: { deleteMany: record("engagement.deleteMany") },
+    report: {
+      deleteMany: record("report.deleteMany"),
+      updateMany: record("report.updateMany"),
+    },
+    dispute: {
+      deleteMany: record("dispute.deleteMany"),
+      updateMany: record("dispute.updateMany"),
+    },
+    review: { deleteMany: record("review.deleteMany") },
+    auditLog: { deleteMany: record("auditLog.deleteMany") },
+    bookingGuestInfo: { deleteMany: record("bookingGuestInfo.deleteMany") },
+    bookingFeeSnapshot: { deleteMany: record("bookingFeeSnapshot.deleteMany") },
+    refund: { deleteMany: record("refund.deleteMany") },
+    availabilityBlock: {
+      deleteMany: record("availabilityBlock.deleteMany"),
+      updateMany: record("availabilityBlock.updateMany"),
+    },
+    roomImage: { deleteMany: record("roomImage.deleteMany") },
+    roomAmenity: { deleteMany: record("roomAmenity.deleteMany") },
+    seasonalRate: { deleteMany: record("seasonalRate.deleteMany") },
+    roomFee: { deleteMany: record("roomFee.deleteMany") },
+    occupancyRule: { deleteMany: record("occupancyRule.deleteMany") },
+    occupancyPricingRule: { deleteMany: record("occupancyPricingRule.deleteMany") },
+    promotion: { updateMany: record("promotion.updateMany") },
+    accommodationImage: { deleteMany: record("accommodationImage.deleteMany") },
+    accommodationAmenity: { deleteMany: record("accommodationAmenity.deleteMany") },
+    cancellationPolicy: { deleteMany: record("cancellationPolicy.deleteMany") },
+    checkInOutRules: { deleteMany: record("checkInOutRules.deleteMany") },
+    taxRule: { deleteMany: record("taxRule.deleteMany") },
+    notificationJob: { updateMany: record("notificationJob.updateMany") },
+    user: { delete: record("user.delete") },
+  };
+};
+
 test.before(() => {
   process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret";
   process.env.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
@@ -55,6 +130,7 @@ test.before(() => {
 test.afterEach(() => {
   emailUtils.sendEmail = originalSendEmail;
   smsUtils.sendSms = originalSendSms;
+  prisma.$transaction = originalPrisma.transaction;
   prisma.listing.findUnique = originalPrisma.listingFindUnique;
   prisma.user.create = originalPrisma.userCreate;
   prisma.user.delete = originalPrisma.userDelete;
@@ -668,6 +744,81 @@ test("getMe strips OTP and verification secrets from the authenticated payload",
   assert.equal("emailVerificationToken" in result.body.data.user, false);
   assert.equal("emailVerificationExpires" in result.body.data.user, false);
   assert.equal("nationalId" in result.body.data.user, false);
+});
+
+test("delete removes dependent account records before deleting the user", async () => {
+  const authController = loadAuthController();
+  const calls = [];
+
+  prisma.user.findUnique = async ({ where }) => ({
+    id: where.id,
+    role: "tenant",
+  });
+  prisma.$transaction = async (callback) =>
+    callback(
+      buildAccountDeleteTx({
+        calls,
+        listings: [{ id: "listing-1" }],
+        accommodations: [{ id: "accommodation-1" }],
+        rooms: [{ id: "room-1" }],
+        bookings: [{ id: "booking-1" }],
+        payments: [{ id: "payment-1" }],
+      })
+    );
+
+  const result = await invokeController(authController.delete, {
+    params: { id: "user-1" },
+    user: { id: "user-1", role: "tenant" },
+  });
+
+  const callNames = calls.map((call) => call.name);
+
+  assert.equal(result.statusCode, 204);
+  assert(
+    callNames.indexOf("savedSearch.deleteMany") < callNames.indexOf("user.delete"),
+    "saved searches should be removed before user deletion"
+  );
+  assert(
+    callNames.indexOf("refund.deleteMany") < callNames.indexOf("payment.deleteMany"),
+    "refunds should be removed before payments"
+  );
+  assert(
+    callNames.indexOf("review.deleteMany") < callNames.indexOf("booking.deleteMany"),
+    "reviews should be removed before bookings"
+  );
+  assert.deepEqual(
+    calls.find((call) => call.name === "savedSearch.deleteMany").args,
+    { where: { userId: "user-1" } }
+  );
+  assert.deepEqual(
+    calls.find((call) => call.name === "user.delete").args,
+    { where: { id: "user-1" } }
+  );
+});
+
+test("delete rejects attempts to remove another user's account", async () => {
+  const authController = loadAuthController();
+  let findUniqueCalled = false;
+  let transactionCalled = false;
+
+  prisma.user.findUnique = async () => {
+    findUniqueCalled = true;
+    return { id: "victim-1" };
+  };
+  prisma.$transaction = async () => {
+    transactionCalled = true;
+  };
+
+  const result = await invokeController(authController.delete, {
+    params: { id: "victim-1" },
+    user: { id: "attacker-1", role: "tenant" },
+  });
+
+  assert(result.error);
+  assert.equal(result.error.statusCode, 403);
+  assert.equal(result.error.message, "You can only delete your own account");
+  assert.equal(findUniqueCalled, false);
+  assert.equal(transactionCalled, false);
 });
 
 test("submitVerification rejects non-landlords before updates or admin email", async () => {

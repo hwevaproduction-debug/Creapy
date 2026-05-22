@@ -4,8 +4,7 @@ import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 // Material UI Imports
 import { Box, Grid } from "@mui/material";
-// React Icons
-import { AiOutlineEyeInvisible, AiOutlineEye } from "react-icons/ai";
+import { Eye, EyeOff } from "lucide-react";
 // Formik Imports
 import { Form, Formik, FormikProps } from "formik";
 // Utils Imports
@@ -81,8 +80,12 @@ const Login = () => {
         dispatch(setUser(user?.data));
         localStorage.setItem("user", JSON.stringify(user?.data));
         const from = (location.state as any)?.from;
+        const openContact = (location.state as any)?.openContact;
         if (from && from !== "/login" && from !== "/signup") {
-          navigate(from, { replace: true });
+          navigate(from, {
+            replace: true,
+            state: openContact ? { openContact } : undefined,
+          });
         } else {
           navigate("/", { replace: true });
         }
@@ -119,14 +122,6 @@ const Login = () => {
       }}
     >
       <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
-      <Box
-        sx={{
-          position: "absolute",
-          inset: 0,
-          background: "rgba(15,20,30,0.55)",
-          zIndex: 1,
-        }}
-      />
       <Box sx={{ position: "relative", zIndex: 2, width: "100%" }}>
       <AppContainer>
         <Grid container spacing={2} justifyContent="center">
@@ -224,9 +219,9 @@ const Login = () => {
                           onClick={hideShowPassword}
                           endAdornment={
                             showPassword ? (
-                              <AiOutlineEye color="disabled" />
+                              <Eye color="disabled" />
                             ) : (
-                              <AiOutlineEyeInvisible color="disabled" />
+                              <EyeOff color="disabled" />
                             )
                           }
                         />

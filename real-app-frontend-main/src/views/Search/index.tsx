@@ -225,10 +225,10 @@ const FilterForm = ({
         <Divider sx={{ my: 2 }} />
 
         <Box>
-          <Box sx={sectionTitleSx}>Province</Box>
+          <Box sx={sectionTitleSx}>Location</Box>
           <AppSelect
             options={[
-              { label: "All Provinces", value: "" },
+              { label: "All locations", value: "" },
               ...ZIMBABWE_PROVINCES,
             ]}
             value={sideBarData.location}
@@ -239,7 +239,7 @@ const FilterForm = ({
             displayEmpty
             renderValue={(selected) => {
               const province = selected as string;
-              return province || "All Provinces";
+              return province || "All locations";
             }}
           />
         </Box>

@@ -106,6 +106,16 @@ const getInitials = (name?: string) => {
     .join("");
 };
 
+const HERO_PATHS = [
+  "/",
+  "/stays",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/provider-signup",
+];
+
 const StyledMenu = styled((props: MenuProps) => (
   <Menu
     elevation={0}
@@ -155,10 +165,12 @@ const Header = () => {
   const [anchorEl, setAnchorEl] = useState<Element | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const isHomePage = location.pathname === "/";
+  const isHeroPage = HERO_PATHS.some(
+    (p) => location.pathname === p || location.pathname.startsWith(p + "/")
+  );
   const [scrolled, setScrolled] = useState(false);
   const headerIconColor =
-    isHomePage && !scrolled
+    isHeroPage && !scrolled
       ? "#fff"
       : theme.palette.mode === "dark"
       ? "#E6EDF3"
@@ -193,7 +205,7 @@ const Header = () => {
   }, [window.location.search]);
 
   useEffect(() => {
-    if (!isHomePage) {
+    if (!isHeroPage) {
       setScrolled(false);
       return;
     }
@@ -201,27 +213,27 @@ const Header = () => {
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [isHomePage]);
+  }, [isHeroPage]);
 
   return (
     <header>
       <Box
         sx={{
-          position: isHomePage ? "fixed" : "sticky",
+          position: isHeroPage ? "fixed" : "sticky",
           top: 0,
-          left: isHomePage ? 0 : undefined,
-          right: isHomePage ? 0 : undefined,
-          width: isHomePage ? "100%" : undefined,
+          left: isHeroPage ? 0 : undefined,
+          right: isHeroPage ? 0 : undefined,
+          width: isHeroPage ? "100%" : undefined,
           zIndex: 1100,
           background:
-            isHomePage && !scrolled
+            isHeroPage && !scrolled
               ? "rgba(31,77,58,0.18)"
               : theme.palette.mode === "dark"
               ? "rgba(13,17,23,0.94)"
               : "rgba(245,240,235,0.94)",
-          backdropFilter: isHomePage && !scrolled ? "blur(4px)" : "blur(16px)",
+          backdropFilter: isHeroPage && !scrolled ? "blur(4px)" : "blur(16px)",
           borderBottom:
-            isHomePage && !scrolled
+            isHeroPage && !scrolled
               ? "none"
               : "1px solid rgba(184,151,90,0.18)",
           transition: "background 0.35s ease, backdrop-filter 0.35s ease, border-color 0.35s ease",
@@ -311,7 +323,7 @@ const Header = () => {
                     key={item.path}
                     sx={{
                       ...getActiveMenuStyle(isActive(item.path)),
-                      ...(isHomePage && !scrolled ? { color: "#fff" } : {}),
+                      ...(isHeroPage && !scrolled ? { color: "#fff" } : {}),
                     }}
                     onClick={() => navigate(item.path)}
                   >
@@ -328,7 +340,7 @@ const Header = () => {
                 justifyContent: "flex-end",
                 gap: 1.5,
                 "& > *": {
-                  color: isHomePage && !scrolled ? "#fff !important" : undefined,
+                  color: isHeroPage && !scrolled ? "#fff !important" : undefined,
                 },
               }}
             >

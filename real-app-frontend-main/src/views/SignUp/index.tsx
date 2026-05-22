@@ -3,8 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 // MUI Imports
 import { Box, FormControlLabel, Grid, Radio, RadioGroup } from "@mui/material";
-// React Icons
-import { AiOutlineEyeInvisible, AiOutlineEye } from "react-icons/ai";
+import { Eye, EyeOff } from "lucide-react";
 // Formik Imports
 import { Form, Formik, FormikProps } from "formik";
 // Utils Imports
@@ -164,14 +163,6 @@ const SignUp = () => {
       }}
     >
       <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
-      <Box
-        sx={{
-          position: "absolute",
-          inset: 0,
-          background: "rgba(15,20,30,0.55)",
-          zIndex: 1,
-        }}
-      />
       <Box sx={{ position: "relative", zIndex: 2, width: "100%" }}>
       <AppContainer>
         <Grid container spacing={2} justifyContent="center">
@@ -333,9 +324,9 @@ const SignUp = () => {
                           onClick={hideShowPassword}
                           endAdornment={
                             showPassword ? (
-                              <AiOutlineEye color="disabled" />
+                              <Eye color="disabled" />
                             ) : (
-                              <AiOutlineEyeInvisible color="disabled" />
+                              <EyeOff color="disabled" />
                             )
                           }
                         />
