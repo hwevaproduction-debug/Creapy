@@ -1,17 +1,15 @@
 import {
   Box,
   Checkbox,
-  Chip,
   Divider,
   FormControlLabel,
-  Radio,
-  RadioGroup,
   Stack,
 } from "@mui/material";
-import { Heading } from "../Heading";
+import { Heading, SubHeading } from "../Heading";
 import AppButton from "../ui/AppButton";
 import AppCard from "../ui/AppCard";
 import AppInput from "../ui/AppInput";
+import AppSelect from "../ui/AppSelect";
 import { StayFilterField, StayFilterState } from "../../hooks/useStayFilters";
 
 interface FilterPanelProps {
@@ -21,6 +19,7 @@ interface FilterPanelProps {
 }
 
 const ROOM_TYPE_OPTIONS = [
+  { label: "Any room type", value: "" },
   { label: "Single", value: "SINGLE" },
   { label: "Double", value: "DOUBLE" },
   { label: "Twin", value: "TWIN" },
@@ -30,10 +29,16 @@ const ROOM_TYPE_OPTIONS = [
 ];
 
 const RATING_OPTIONS = [
-  { label: "Any", value: "" },
+  { label: "Any rating", value: "" },
   { label: "3+", value: "3" },
   { label: "4+", value: "4" },
   { label: "5", value: "5" },
+];
+
+const BOOKING_MODE_OPTIONS = [
+  { label: "All booking types", value: "" },
+  { label: "Instant", value: "INSTANT" },
+  { label: "Request to Book", value: "REQUEST" },
 ];
 
 const AMENITY_OPTIONS = [
@@ -55,23 +60,6 @@ const sectionTitleSx = {
   color: "#94A3B8",
   mb: 1.25,
 };
-
-const filterChipSx = (active: boolean) =>
-  active
-    ? {
-        background: "#B8975A",
-        color: "#FFFFFF",
-        border: "1px solid #B8975A",
-        fontWeight: 700,
-        "&:hover": {
-          background: "#9E7E45",
-        },
-      }
-    : {
-        border: "1px solid #E2E8F0",
-        color: "#475569",
-        fontWeight: 600,
-      };
 
 const FilterPanel = ({ filters, onChange, onClear }: FilterPanelProps) => {
   const toggleAmenity = (amenityValue: string) => {
@@ -95,7 +83,7 @@ const FilterPanel = ({ filters, onChange, onClear }: FilterPanelProps) => {
         <Divider />
 
         <Box>
-          <Heading sx={sectionTitleSx}>Price range</Heading>
+          <SubHeading sx={sectionTitleSx}>Price range</SubHeading>
           <Stack direction={{ xs: "column", sm: "row", md: "column" }} spacing={1.25}>
             <AppInput
               label="Minimum"
@@ -117,41 +105,35 @@ const FilterPanel = ({ filters, onChange, onClear }: FilterPanelProps) => {
         <Divider />
 
         <Box>
-          <Heading sx={sectionTitleSx}>Room type</Heading>
-          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            {ROOM_TYPE_OPTIONS.map((option) => (
-              <Chip
-                key={option.value}
-                label={option.label}
-                variant="outlined"
-                sx={filterChipSx(filters.roomType === option.value)}
-                onClick={() => onChange("roomType", filters.roomType === option.value ? "" : option.value)}
-              />
-            ))}
-          </Stack>
+          <SubHeading sx={sectionTitleSx}>Room type</SubHeading>
+          <AppSelect
+            name="roomType"
+            options={ROOM_TYPE_OPTIONS}
+            value={filters.roomType}
+            onChange={(event) => onChange("roomType", event.target.value as string)}
+            size="small"
+            displayEmpty
+          />
         </Box>
 
         <Divider />
 
         <Box>
-          <Heading sx={sectionTitleSx}>Minimum rating</Heading>
-          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            {RATING_OPTIONS.map((option) => (
-              <Chip
-                key={option.label}
-                label={option.label}
-                variant="outlined"
-                sx={filterChipSx(filters.minRating === option.value)}
-                onClick={() => onChange("minRating", option.value)}
-              />
-            ))}
-          </Stack>
+          <SubHeading sx={sectionTitleSx}>Minimum rating</SubHeading>
+          <AppSelect
+            name="minRating"
+            options={RATING_OPTIONS}
+            value={filters.minRating}
+            onChange={(event) => onChange("minRating", event.target.value as string)}
+            size="small"
+            displayEmpty
+          />
         </Box>
 
         <Divider />
 
         <Box>
-          <Heading sx={sectionTitleSx}>Amenities</Heading>
+          <SubHeading sx={sectionTitleSx}>Amenities</SubHeading>
           <Stack spacing={0.5}>
             {AMENITY_OPTIONS.map((amenity) => (
               <FormControlLabel
@@ -172,21 +154,21 @@ const FilterPanel = ({ filters, onChange, onClear }: FilterPanelProps) => {
         <Divider />
 
         <Box>
-          <Heading sx={sectionTitleSx}>Booking type</Heading>
-          <RadioGroup
+          <SubHeading sx={sectionTitleSx}>Booking type</SubHeading>
+          <AppSelect
+            name="bookingMode"
+            options={BOOKING_MODE_OPTIONS}
             value={filters.bookingMode}
-            onChange={(event) => onChange("bookingMode", event.target.value)}
-          >
-            <FormControlLabel value="" control={<Radio />} label="All" />
-            <FormControlLabel value="INSTANT" control={<Radio />} label="Instant" />
-            <FormControlLabel value="REQUEST" control={<Radio />} label="Request to Book" />
-          </RadioGroup>
+            onChange={(event) => onChange("bookingMode", event.target.value as string)}
+            size="small"
+            displayEmpty
+          />
         </Box>
 
         <Divider />
 
         <Box>
-          <Heading sx={sectionTitleSx}>Property rules</Heading>
+          <SubHeading sx={sectionTitleSx}>Property rules</SubHeading>
           <Stack spacing={0.5}>
             <FormControlLabel
               control={

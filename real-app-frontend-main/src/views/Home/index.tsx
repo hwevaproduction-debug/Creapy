@@ -6,6 +6,7 @@ import type { FormEvent, MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 // Custom Imports
 import { Heading, SubHeading } from "../../components/Heading";
+import PropertyCard from "../../components/PropertyCard";
 // Swiper Imports
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Pagination } from "swiper/modules";
@@ -27,8 +28,6 @@ import {
   selectedUserRole,
   selectedUserToken,
 } from "../../redux/auth/authSlice";
-import { studentAccommodationOverlayBadgeSx } from "../../styles/listingBadges";
-import { thousandSeparatorNumber } from "../../utils";
 
 type SearchTab = "rent" | "stays" | "student";
 
@@ -64,15 +63,6 @@ const trustStats = [
   { value: "4.8★", label: "Average Rating" },
 ];
 
-const amenityLabels = [
-  { key: "solar", label: "Solar" },
-  { key: "parking", label: "Parking" },
-  { key: "furnished", label: "Furnished" },
-  { key: "borehole", label: "Borehole" },
-  { key: "security", label: "Security" },
-  { key: "internet", label: "Internet" },
-];
-
 const Home = () => {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -95,15 +85,6 @@ const Home = () => {
 
   const highlightedListings = (highlightedData?.data || []).slice(0, 6);
   const groupedSlides = groupedByLocationData?.data || [];
-
-  const getListingImage = (item: any) =>
-    item?.image || item?.images?.[0] || item?.imageUrls?.[0] || null;
-
-  const getAmenityLabel = (item: any) => {
-    const amenities = item?.amenities || {};
-    const match = amenityLabels.find(({ key }) => item?.[key] || amenities?.[key]);
-    return match?.label || "Verified";
-  };
 
   // Never block the whole landing page forever.
   // If the API is down or DB isn't connected, show the page and allow retry.
@@ -187,195 +168,6 @@ const Home = () => {
       isAuthenticated ? getAuthenticatedListPropertyPath() : "/provider-signup"
     );
   };
-
-  const renderPropertyBadge = (item: any) => {
-    if (item?.status === "early_access") {
-      return (
-        <Box
-          sx={{
-            background: "#FDF8F0",
-            color: "#9E7E45",
-            fontSize: "11px",
-            fontWeight: 700,
-            borderRadius: "999px",
-            padding: "5px 11px",
-            display: "inline-block",
-            position: "absolute",
-            top: 12,
-            left: 12,
-            zIndex: 1,
-            pointerEvents: "none",
-          }}
-        >
-          Early Access
-        </Box>
-      );
-    }
-
-    if (item?.studentAccommodation) {
-      return (
-        <Box
-          sx={{
-            ...studentAccommodationOverlayBadgeSx,
-            background: "#D1EAE0",
-            color: "#1F4D3A",
-            padding: "5px 11px",
-            top: 12,
-            left: 12,
-          }}
-        >
-          Student Accommodation
-        </Box>
-      );
-    }
-
-    return null;
-  };
-
-  const renderPropertyCard = (item: any) => (
-    <Box
-      onClick={() => navigate(`/listing/${item?._id}`)}
-      sx={{
-        cursor: "pointer",
-        borderRadius: "16px",
-        overflow: "hidden",
-        background: "background.paper",
-        boxShadow: "0 4px 16px rgba(31,41,55,0.08)",
-        transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
-        "&:hover": {
-          transform: "translateY(-4px)",
-          boxShadow: "0 16px 48px rgba(31,41,55,0.16)",
-        },
-        "&:hover .listing-image": {
-          transform: "scale(1.06)",
-        },
-      }}
-    >
-      <Box
-        sx={{
-          position: "relative",
-          height: 220,
-          overflow: "hidden",
-          background: "#E2E8F0",
-        }}
-      >
-        {getListingImage(item) ? (
-          <Box
-            component="img"
-            className="listing-image"
-            src={getListingImage(item)}
-            alt={item?.name || "listing"}
-            sx={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              transition: "transform 0.4s ease",
-            }}
-          />
-        ) : null}
-        <Box
-          sx={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: "40%",
-            background: "linear-gradient(to top, rgba(31,41,55,0.5), transparent)",
-            pointerEvents: "none",
-          }}
-        />
-        {renderPropertyBadge(item)}
-        <Box
-          component="button"
-          type="button"
-          aria-label="Save property"
-          onClick={(e: MouseEvent<HTMLButtonElement>) => e.stopPropagation()}
-          sx={{
-            position: "absolute",
-            top: 12,
-            right: 12,
-            width: 32,
-            height: 32,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.9)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "16px",
-            cursor: "pointer",
-            border: "none",
-            color: "#1F2937",
-          }}
-        >
-          ♡
-        </Box>
-      </Box>
-      <Box sx={{ padding: "16px 18px 18px" }}>
-        <Box
-          sx={{
-            fontSize: "22px",
-            fontWeight: 800,
-            color: "text.primary",
-            marginBottom: 0.5,
-          }}
-        >
-          ${thousandSeparatorNumber(Number(item?.monthlyRent || item?.regularPrice || 0))}{" "}
-          /month
-        </Box>
-        <Box
-          sx={{
-            fontSize: "15px",
-            fontWeight: 600,
-            color: "text.primary",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            marginBottom: 0.75,
-          }}
-        >
-          {item?.name || "Property listing"}
-        </Box>
-        <Box
-          sx={{
-            fontSize: "13px",
-            color: "#475569",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            marginBottom: 1.5,
-          }}
-        >
-          📍 {item?.address || item?.province || "Zimbabwe"}
-        </Box>
-        <Box
-          sx={{
-            borderTop: "1px solid #E2E8F0",
-            pt: 1.5,
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            flexWrap: "wrap",
-            fontSize: "12px",
-            color: "#64748B",
-          }}
-        >
-          <Box>{item?.totalRooms ?? item?.bedrooms ?? 1} Rooms</Box>
-          <Box>{item?.bathrooms ?? 1} Baths</Box>
-          <Box
-            sx={{
-              background: "#F7EDDA",
-              color: "#7D6234",
-              borderRadius: "999px",
-              padding: "3px 9px",
-              fontWeight: 700,
-            }}
-          >
-            {getAmenityLabel(item)}
-          </Box>
-        </Box>
-      </Box>
-    </Box>
-  );
 
   return (
     <Box sx={{ background: "background.default" }}>
@@ -711,7 +503,10 @@ const Home = () => {
               ))
             : highlightedListings.map((item: any) => (
                 <Grid item xs={12} sm={6} md={4} key={item?._id}>
-                  {renderPropertyCard(item)}
+                  <PropertyCard
+                    item={item}
+                    onClick={() => navigate(`/listing/${item?._id}`)}
+                  />
                 </Grid>
               ))}
         </Grid>
@@ -871,7 +666,10 @@ const Home = () => {
                   <Grid container spacing={2}>
                     {group?.listings?.map((item: any) => (
                       <Grid item xs={12} sm={6} md={4} key={item?._id}>
-                        {renderPropertyCard(item)}
+                        <PropertyCard
+                          item={item}
+                          onClick={() => navigate(`/listing/${item?._id}`)}
+                        />
                       </Grid>
                     ))}
                   </Grid>

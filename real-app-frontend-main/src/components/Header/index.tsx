@@ -255,7 +255,7 @@ const Header = () => {
               >
                 <Box
                   component="img"
-                  src="/app logob.PNG"
+                  src="/app-logo.png"
                   alt="Town Ruins"
                   sx={{
                     height: { xs: 32, md: 40 },
@@ -509,7 +509,7 @@ const Header = () => {
           <Box sx={{ padding: "16px 16px 12px" }}>
             <Box
               component="img"
-              src="/app logob.PNG"
+              src="/app-logo.png"
               alt="Town Ruins"
               sx={{ height: 32, width: "auto", objectFit: "contain", display: "block" }}
             />

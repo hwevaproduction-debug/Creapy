@@ -18,6 +18,7 @@ import {
 // Custom Imports
 import SearchBar from "../../components/SearchBar";
 import { Heading, SubHeading } from "../../components/Heading";
+import PropertyCard from "../../components/PropertyCard";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppInput from "../../components/ui/AppInput";
@@ -25,7 +26,6 @@ import AppSelect from "../../components/ui/AppSelect";
 import AppButton from "../../components/ui/AppButton";
 import DotLoader from "../../components/Spinner/dotLoader";
 import { ZIMBABWE_PROVINCES } from "../../config/zimbabweProvinces";
-import { studentAccommodationBadgeSx } from "../../styles/listingBadges";
 // Hooks Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
@@ -34,21 +34,9 @@ import {
   setSearchText,
 } from "../../redux/global/globalSlice";
 // React Icons
-import { FaLocationDot } from "react-icons/fa6";
-import { FaBed } from "react-icons/fa";
-import { FaBath } from "react-icons/fa";
 import { IoFilter } from "react-icons/io5";
 // Utils Imports
-import { getApiBaseUrl, thousandSeparatorNumber } from "../../utils";
-
-const iconStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "5px",
-  color: "#334155",
-  fontWeight: "bold",
-  fontSize: "13px",
-};
+import { getApiBaseUrl } from "../../utils";
 
 const sortTypes = [
   {
@@ -555,152 +543,11 @@ const SearchPage = () => {
               ) : (
                 <>
                   {listings?.map((item: any, index: number) => (
-                    <Grid item xs={12} sm={6} md={4} key={index}>
-                      <AppCard
-                        sx={{ cursor: "pointer" }}
-                        onClick={() => {
-                          navigate(`/listing/${item._id}`);
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            height: { xs: 180, md: 200 },
-                            overflow: "hidden",
-                            position: "relative",
-                            "&:hover img": {
-                              transform: "scale(1.1)",
-                            },
-                          }}
-                        >
-                          <img
-                            src={item?.imageUrls[0]}
-                            alt="listing"
-                            height="100%"
-                            width="100%"
-                            style={{
-                              objectFit: "cover",
-                              borderRadius: "12px 12px 0 0",
-                              transition: "transform 0.3s ease",
-                            }}
-                          />
-                          {item?.status === "early_access" ? (
-                            <Box
-                              sx={{
-                                background: "#dbeafe",
-                                color: "#1e40af",
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                borderRadius: "999px",
-                                padding: "3px 10px",
-                                display: "inline-block",
-                                position: "absolute",
-                                top: 8,
-                                left: 8,
-                                zIndex: 1,
-                                pointerEvents: "none",
-                              }}
-                            >
-                              ⚡ Early Access
-                            </Box>
-                          ) : null}
-                        </Box>
-                        <Box sx={{ padding: "18px 16px" }}>
-                          <SubHeading
-                            sx={{
-                              fontWeight: 600,
-                              fontSize: "18px",
-                              color: "#1f2937",
-                            }}
-                          >
-                            {item?.name?.length > 30
-                              ? item?.name?.substring(0, 30) + "..."
-                              : item?.name}
-                          </SubHeading>
-                          <Box
-                            sx={{
-                              marginTop: "5px",
-                              color: "text.secondary",
-                              fontSize: "13px",
-                              fontWeight: 500,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "5px",
-                            }}
-                          >
-                            <FaLocationDot style={{ color: "#15803d" }} />
-                            {item?.address}
-                          </Box>
-                          <Box
-                            sx={{
-                              marginTop: "5px",
-                              color: "text.secondary",
-                              fontSize: "13px",
-                              minHeight: { xs: "auto", md: "44px" },
-                            }}
-                          >
-                            {item?.description?.length > 150
-                              ? item?.description?.substring(0, 150) + "..."
-                              : item?.description}
-                          </Box>
-                          <Box
-                            sx={{
-                              color: "text.primary",
-                              fontWeight: 600,
-                              fontSize: "16px",
-                              marginTop: "10px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              gap: "5px",
-                            }}
-                          >
-                            USD {thousandSeparatorNumber(item?.monthlyRent || item?.regularPrice)}{" "}
-                            / month
-                            <Box>
-                              <Box
-                                sx={{
-                                  background: "#2B6A50",
-                                  fontSize: "12px",
-                                  color: "#fff",
-                                  borderRadius: "999px",
-                                  padding: "6px 12px",
-                                  display: "inline-block",
-                                }}
-                              >
-                                Rent
-                              </Box>
-                            </Box>
-                          </Box>
-                          {item?.studentAccommodation ? (
-                            <Box sx={{ ...studentAccommodationBadgeSx, mt: 1 }}>
-                              🎓 Student Accommodation
-                            </Box>
-                          ) : null}
-                          <Box
-                            sx={{
-                              marginTop: "7px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <Box sx={{ display: "flex", gap: 1 }}>
-                              <Box sx={iconStyle}>
-                                <FaBed
-                                  style={{ color: "#334155", marginTop: "3px" }}
-                                />
-                                {item?.totalRooms ?? item?.bedrooms} Rooms
-                              </Box>
-                              <Box sx={iconStyle}>
-                                <FaBath
-                                  style={{ color: "#334155", marginTop: "3px" }}
-                                />
-                                {item?.bathrooms} Baths
-                              </Box>
-                            </Box>
-                          </Box>
-                        </Box>
-                      </AppCard>
+                    <Grid item xs={12} sm={6} md={4} key={item?._id || index}>
+                      <PropertyCard
+                        item={item}
+                        onClick={() => navigate(`/listing/${item._id}`)}
+                      />
                     </Grid>
                   ))}
                 </>

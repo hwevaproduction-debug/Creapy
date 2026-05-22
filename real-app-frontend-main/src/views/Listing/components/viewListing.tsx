@@ -30,7 +30,7 @@ const iconStyle = {
   display: "flex",
   alignItems: "center",
   gap: "5px",
-  color: "#15803d",
+  color: "secondary.main",
   fontWeight: "bold",
 };
 
@@ -45,6 +45,9 @@ const ViewListing = () => {
     skip: !id,
   });
   const images = data?.data?.imageUrls;
+  const price = thousandSeparatorNumber(
+    data?.data?.monthlyRent || data?.data?.regularPrice
+  );
 
   const locationData = data?.data?.location;
   const publicLocation = [locationData?.city, locationData?.province, locationData?.country]
@@ -58,29 +61,51 @@ const ViewListing = () => {
     <>
       {isLoading && <OverlayLoader />}
       <Box>
-        <Swiper navigation={true}>
-          {images?.map((image: any) => (
-            <SwiperSlide key={image}>
-              <Box sx={{ height: { xs: 260, sm: 360, md: 520 } }}>
-                <img
-                  src={image}
-                  alt="listing"
-                  width="100%"
-                  height="100%"
-                  style={{ objectFit: "cover" }}
-                />
-              </Box>
-            </SwiperSlide>
-          ))}
-        </Swiper>
+        <Box sx={{ borderRadius: "16px 16px 0 0", overflow: "hidden" }}>
+          <Swiper navigation={true}>
+            {images?.map((image: any) => (
+              <SwiperSlide key={image}>
+                <Box sx={{ height: { xs: 260, sm: 360, md: 520 }, position: "relative" }}>
+                  <img
+                    src={image}
+                    alt="listing"
+                    width="100%"
+                    height="100%"
+                    style={{ objectFit: "cover" }}
+                  />
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: "35%",
+                      background: "linear-gradient(to top, rgba(31,41,55,0.45), transparent)",
+                      pointerEvents: "none",
+                    }}
+                  />
+                </Box>
+              </SwiperSlide>
+            ))}
+          </Swiper>
+        </Box>
         <AppContainer>
           <Box sx={{ my: { xs: 3, md: 4 } }}>
             <Grid container spacing={3}>
               <Grid item xs={12} md={8} lg={8}>
                 <AppCard sx={{ p: { xs: 2.5, md: 3 } }}>
-                  <Heading>{`${data?.data?.name} - USD ${thousandSeparatorNumber(
-                    data?.data?.monthlyRent || data?.data?.regularPrice
-                  )}/`}</Heading>
+                  <Heading>{data?.data?.name}</Heading>
+                  <Box
+                    sx={{
+                      fontSize: "28px",
+                      fontWeight: 800,
+                      color: "#B8975A",
+                      mt: 0.5,
+                      mb: 1,
+                    }}
+                  >
+                    USD {price} / month
+                  </Box>
                   <Box
                     sx={{
                       marginTop: "14px",
@@ -89,9 +114,12 @@ const ViewListing = () => {
                       gap: 1,
                       color: "text.secondary",
                       fontWeight: 600,
+                      "& svg": {
+                        color: "secondary.main",
+                      },
                     }}
                   >
-                    <FaLocationDot style={{ color: "#2B6A50" }} />
+                    <FaLocationDot />
                     {locationText}
                   </Box>
                   <Box
@@ -206,19 +234,19 @@ const ViewListing = () => {
                     }}
                   >
                     <Box sx={iconStyle}>
-                      <FaBed style={{ color: "#2B6A50" }} />
+                      <FaBed />
                       {data?.data?.bedrooms} Rooms
                     </Box>
                     <Box sx={iconStyle}>
-                      <FaBath style={{ color: "#2B6A50" }} />
+                      <FaBath />
                       {data?.data?.bathrooms} Baths
                     </Box>
                     <Box sx={iconStyle}>
-                      <FaParking style={{ color: "#2B6A50" }} />
+                      <FaParking />
                       {data?.data?.amenities?.parking ? "Parking" : "No Parking"}
                     </Box>
                     <Box sx={iconStyle}>
-                      <FaChair style={{ color: "#2B6A50" }} />
+                      <FaChair />
                       {data?.data?.furnished ? "Furnished" : "Not Furnished"}
                     </Box>
                   </Box>
@@ -243,8 +271,9 @@ const ViewListing = () => {
                       marginTop: 2,
                       padding: "20px",
                       borderRadius: "10px",
-                      border: "1px dashed #cbd5e1",
-                      background: "#f8fafc",
+                      border: "1px dashed",
+                      borderColor: "divider",
+                      background: "background.default",
                       color: "text.secondary",
                       textAlign: "center",
                       lineHeight: 1.6,

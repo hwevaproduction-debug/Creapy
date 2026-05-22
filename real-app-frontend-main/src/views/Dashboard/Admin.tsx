@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Paper,
   Tab,
   Table,
   TableBody,
@@ -20,13 +19,14 @@ import {
   Tabs,
   Typography,
 } from "@mui/material";
+import SearchOffIcon from "@mui/icons-material/SearchOff";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
 import AppInput from "../../components/ui/AppInput";
 import AppSelect from "../../components/ui/AppSelect";
 import MUITable from "../../components/MUITable";
-import { Heading } from "../../components/Heading";
+import { Heading, SubHeading } from "../../components/Heading";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import {
   AdminBooking,
@@ -143,25 +143,45 @@ function formatStatusLabel(value?: string | null) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function getStatusChipColor(
-  value?: string | null
-): "default" | "success" | "warning" | "error" | "info" {
+const statusChipColors = {
+  success: { background: "#D1EAE0", color: "#1F4D3A", fontWeight: 700 },
+  info: { background: "#DBEAFE", color: "#1E3A8A", fontWeight: 700 },
+  warning: { background: "#FEF3C7", color: "#92400E", fontWeight: 700 },
+  error: { background: "#FEE2E2", color: "#991B1B", fontWeight: 700 },
+  default: { background: "#F1F5F9", color: "#64748B", fontWeight: 700 },
+};
+
+function getStatusChipColor(value?: string | null) {
   switch ((value || "").toLowerCase()) {
     case "approved":
     case "active":
+    case "completed":
     case "confirmed":
+    case "paid":
     case "settled":
-      return "success";
+    case "success":
+    case "verified":
+      return statusChipColors.success;
+    case "checked_in":
+    case "refunded":
+      return statusChipColors.info;
     case "pending":
+    case "pending_confirmation":
     case "pending_payment":
-      return "warning";
+    case "unsettled":
+    case "warning":
+      return statusChipColors.warning;
+    case "error":
+    case "failed":
+    case "failure":
+    case "declined":
     case "rejected":
     case "cancelled":
     case "canceled":
     case "expired":
-      return "error";
+      return statusChipColors.error;
     default:
-      return "default";
+      return statusChipColors.default;
   }
 }
 
@@ -499,16 +519,28 @@ const AdminDashboard: React.FC = () => {
   };
 
   const renderEmptyState = (message: string) => (
-    <AppCard sx={{ p: "40px", textAlign: "center", color: "#9ca3af" }}>
-      {message}
-    </AppCard>
+    <Box
+      sx={{
+        py: 6,
+        px: 2,
+        textAlign: "center",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 1,
+      }}
+    >
+      <SearchOffIcon sx={{ color: "text.secondary", fontSize: 42 }} />
+      <SubHeading sx={{ color: "text.secondary" }}>{message}</SubHeading>
+    </Box>
   );
 
   const renderExpiredListings = () => (
     <>
       <Heading sx={{ mb: "20px" }}>Admin - Expired Listings</Heading>
 
-      <Paper
+      <AppCard
+        elevation="flat"
         sx={{
           p: 2,
           mb: 2,
@@ -617,7 +649,7 @@ const AdminDashboard: React.FC = () => {
             Search
           </AppButton>
         </Box>
-      </Paper>
+      </AppCard>
 
       {hasSearchedExpired && (
         <>
@@ -691,17 +723,17 @@ const AdminDashboard: React.FC = () => {
       ) : listings.length === 0 ? (
         renderEmptyState("No expired listings match your filters.")
       ) : (
-        <TableContainer
-          component={Paper}
+        <AppCard
           sx={{
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
-            overflowX: "auto",
+            overflow: "hidden",
           }}
         >
-          <Table>
+          <TableContainer sx={{ overflowX: "auto" }}>
+            <Table>
             <TableHead>
-              <TableRow sx={{ background: "#f8fafc" }}>
+              <TableRow sx={{ background: "background.paper" }}>
                 <TableCell padding="checkbox">
                   <Checkbox
                     checked={allCurrentPageSelected}
@@ -717,7 +749,7 @@ const AdminDashboard: React.FC = () => {
                       sx={{
                         fontWeight: 700,
                         fontSize: "12px",
-                        color: "#6b7280",
+                        color: "text.secondary",
                         textTransform: "uppercase",
                       }}
                     >
@@ -758,8 +790,9 @@ const AdminDashboard: React.FC = () => {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </TableContainer>
+            </Table>
+          </TableContainer>
+        </AppCard>
       )}
 
       {hasSearchedExpired && !isFetchingInactive && totalPages > 1 && (
@@ -794,7 +827,8 @@ const AdminDashboard: React.FC = () => {
     <>
       <Heading sx={{ mb: "20px" }}>Admin - Providers</Heading>
 
-      <Paper
+      <AppCard
+        elevation="flat"
         sx={{
           p: 2,
           mb: 2,
@@ -845,7 +879,7 @@ const AdminDashboard: React.FC = () => {
             Search
           </AppButton>
         </Box>
-      </Paper>
+      </AppCard>
 
       {isFetchingProviders ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
@@ -887,8 +921,8 @@ const AdminDashboard: React.FC = () => {
                 <TableCell>
                   <Chip
                     label={formatStatusLabel(verificationStatus)}
-                    color={getStatusChipColor(verificationStatus)}
                     size="small"
+                    sx={getStatusChipColor(verificationStatus)}
                   />
                 </TableCell>
                 <TableCell sx={{ minWidth: 170 }}>
@@ -997,7 +1031,7 @@ const AdminDashboard: React.FC = () => {
           <Typography variant="body2" sx={{ color: "#6b7280", mb: 0.5 }}>
             Total Bookings
           </Typography>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          <Typography variant="h5" sx={{ color: "#B8975A", fontWeight: 800 }}>
             {bookings.length}
           </Typography>
         </AppCard>
@@ -1005,7 +1039,7 @@ const AdminDashboard: React.FC = () => {
           <Typography variant="body2" sx={{ color: "#6b7280", mb: 0.5 }}>
             Pending Settlement
           </Typography>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          <Typography variant="h5" sx={{ color: "#B8975A", fontWeight: 800 }}>
             {pendingSettlementCount}
           </Typography>
         </AppCard>
@@ -1013,7 +1047,7 @@ const AdminDashboard: React.FC = () => {
           <Typography variant="body2" sx={{ color: "#6b7280", mb: 0.5 }}>
             Settled
           </Typography>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          <Typography variant="h5" sx={{ color: "#B8975A", fontWeight: 800 }}>
             {settledBookingsCount}
           </Typography>
         </AppCard>
@@ -1021,13 +1055,14 @@ const AdminDashboard: React.FC = () => {
           <Typography variant="body2" sx={{ color: "#6b7280", mb: 0.5 }}>
             Providers in View
           </Typography>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          <Typography variant="h5" sx={{ color: "#B8975A", fontWeight: 800 }}>
             {uniqueBookingProviders}
           </Typography>
         </AppCard>
       </Box>
 
-      <Paper
+      <AppCard
+        elevation="flat"
         sx={{
           p: 2,
           mb: 2,
@@ -1137,7 +1172,7 @@ const AdminDashboard: React.FC = () => {
             Search
           </AppButton>
         </Box>
-      </Paper>
+      </AppCard>
 
       {isFetchingBookings ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
@@ -1192,16 +1227,16 @@ const AdminDashboard: React.FC = () => {
                 <TableCell>
                   <Chip
                     label={formatStatusLabel(booking.status)}
-                    color={getStatusChipColor(booking.status)}
                     size="small"
+                    sx={getStatusChipColor(booking.status)}
                   />
                 </TableCell>
                 <TableCell>
                   <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                     <Chip
                       label={formatStatusLabel(booking.settlementStatus)}
-                      color={getStatusChipColor(booking.settlementStatus)}
                       size="small"
+                      sx={getStatusChipColor(booking.settlementStatus)}
                     />
                     <Typography variant="caption" sx={{ color: "#6b7280" }}>
                       {booking.settledAt
@@ -1245,16 +1280,36 @@ const AdminDashboard: React.FC = () => {
   return (
     <Box sx={{ mt: { xs: 5, md: 6 } }}>
       <AppContainer>
+        <Box sx={{ mb: 3 }}>
+          <Heading>Admin Dashboard</Heading>
+          <SubHeading sx={{ color: "text.secondary" }}>
+            Manage listings, providers, and bookings.
+          </SubHeading>
+        </Box>
+
         <Tabs
           value={activeTab}
           onChange={(_event, value: AdminTab) => setActiveTab(value)}
           sx={{ mb: 3 }}
+          textColor="primary"
           variant="scrollable"
           allowScrollButtonsMobile
         >
-          <Tab value="expired" label="Expired Listings" />
-          <Tab value="providers" label="Providers" />
-          <Tab value="bookings" label="Bookings & Settlements" />
+          <Tab
+            value="expired"
+            label="Expired Listings"
+            sx={{ textTransform: "none", fontWeight: 600 }}
+          />
+          <Tab
+            value="providers"
+            label="Providers"
+            sx={{ textTransform: "none", fontWeight: 600 }}
+          />
+          <Tab
+            value="bookings"
+            label="Bookings & Settlements"
+            sx={{ textTransform: "none", fontWeight: 600 }}
+          />
         </Tabs>
 
         {activeTab === "expired" && renderExpiredListings()}

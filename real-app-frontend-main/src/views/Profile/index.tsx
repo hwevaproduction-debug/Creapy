@@ -245,11 +245,17 @@ const Profile = () => {
   };
 
   return (
-    <Box sx={{ mt: { xs: 5, md: 6 } }}>
+    <Box sx={{ minHeight: "calc(100vh - 72px)", py: { xs: 4, md: 6 } }}>
       <AppContainer>
+        <Box sx={{ mb: 3 }}>
+          <Heading>My Profile</Heading>
+          <SubHeading sx={{ color: "text.secondary" }}>
+            Update your account details and avatar.
+          </SubHeading>
+        </Box>
         <Grid container spacing={2} justifyContent="center">
           <Grid item xs={12} md={7} lg={6}>
-            <AppCard sx={{ p: { xs: 2.5, md: 3.5 } }}>
+            <AppCard sx={{ p: { xs: 2.5, md: 3.5 }, borderRadius: "24px" }}>
               <Box
                 sx={{
                   display: "flex",
@@ -274,14 +280,45 @@ const Profile = () => {
                       name=""
                       id=""
                     />
-                    <img
+                    <Box
                       onClick={() => fileRef.current.click()}
-                      height={95}
-                      width={95}
-                      src={formData.avatar || userAvatar}
-                      alt="user"
-                      style={{ borderRadius: "50%" }}
-                    />
+                      sx={{
+                        position: "relative",
+                        width: 95,
+                        height: 95,
+                        cursor: "pointer",
+                        "&:hover .upload-overlay": { opacity: 1 },
+                      }}
+                    >
+                      <img
+                        src={formData.avatar || userAvatar}
+                        alt="user"
+                        style={{
+                          borderRadius: "50%",
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                      <Box
+                        className="upload-overlay"
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                          borderRadius: "50%",
+                          background: "rgba(0,0,0,0.45)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          opacity: 0,
+                          transition: "opacity 0.2s",
+                        }}
+                      >
+                        <Box sx={{ color: "#fff", fontSize: "22px" }}>
+                          &#128247;
+                        </Box>
+                      </Box>
+                    </Box>
                   </Box>
                 </Tooltip>
                 <Box sx={{ marginTop: "7px" }}>

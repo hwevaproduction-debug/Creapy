@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 // MUI Imports
-import { Box, Typography, Chip, CircularProgress } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 // Hook Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
@@ -22,6 +22,8 @@ import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
 import PrimaryInput from "../../components/PrimaryInput/PrimaryInput";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
+import { Heading, SubHeading } from "../../components/Heading";
+import DotLoader from "../../components/Spinner/dotLoader";
 
 const TenantDashboard = () => {
   const navigate = useNavigate();
@@ -174,24 +176,26 @@ const TenantDashboard = () => {
   return (
     <Box sx={{ mt: { xs: 5, md: 6 } }}>
       <AppContainer>
-        <Typography variant="h5">Tenant Dashboard</Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Heading>Tenant Dashboard</Heading>
+        <SubHeading sx={{ color: "text.secondary" }}>
           Manage your premium plan and saved searches.
-        </Typography>
+        </SubHeading>
 
         <AppCard sx={{ mt: "20px", p: { xs: 2, md: 2.5 } }}>
-          <Typography variant="h6">Premium Membership</Typography>
+          <Heading sx={{ fontSize: "20px", mb: 2 }}>Premium Membership</Heading>
           {premiumActive ? (
             <Box sx={{ marginTop: "12px" }}>
-              <Chip label="Premium Active" color="success" size="small" />
-              <Typography color="text.secondary" sx={{ marginBottom: "14px" }}>
+              <Box sx={{ display: "inline-block", background: "#D1EAE0", color: "#1F4D3A", borderRadius: "999px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, mb: 1.5 }}>
+                Premium Active
+              </Box>
+              <SubHeading sx={{ color: "text.secondary", marginBottom: "14px" }}>
                 Active until: {formattedPremiumExpiry}
-              </Typography>
-              <Typography color="text.secondary" sx={{ marginBottom: "14px" }}>
+              </SubHeading>
+              <SubHeading sx={{ color: "text.secondary", marginBottom: "14px" }}>
                 {daysRemaining !== null
                   ? `${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining`
                   : "Expiry not available"}
-              </Typography>
+              </SubHeading>
               {showRenew ? (
                 <AppButton onClick={() => setShowPaymentForm(true)}>
                   Renew Premium
@@ -200,10 +204,12 @@ const TenantDashboard = () => {
             </Box>
           ) : (
             <Box sx={{ marginTop: "12px" }}>
-              <Chip label="No Premium" color="default" size="small" />
-              <Typography color="text.secondary" sx={{ marginBottom: "14px" }}>
+              <Box sx={{ display: "inline-block", background: "#F1F5F9", color: "#64748B", borderRadius: "999px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, mb: 1.5 }}>
+                No Premium
+              </Box>
+              <SubHeading sx={{ color: "text.secondary", marginBottom: "14px" }}>
                 Upgrade to Premium for early access to new listings.
-              </Typography>
+              </SubHeading>
               {!showPaymentForm ? (
                 <AppButton onClick={() => setShowPaymentForm(true)}>
                   Upgrade to Premium
@@ -213,12 +219,12 @@ const TenantDashboard = () => {
           )}
           {showPaymentForm ? (
             <Box sx={{ marginTop: "12px" }}>
-              <Typography color="text.secondary" sx={{ marginBottom: "10px" }}>
+              <SubHeading sx={{ color: "text.secondary", marginBottom: "10px" }}>
                 Premium price: USD {premiumAmountDisplay}
-              </Typography>
-              <Typography color="text.secondary" sx={{ marginBottom: "10px" }}>
+              </SubHeading>
+              <SubHeading sx={{ color: "text.secondary", marginBottom: "10px" }}>
                 Duration: 30-day membership
-              </Typography>
+              </SubHeading>
               {showPolling ? (
                 <Box
                   sx={{
@@ -230,13 +236,10 @@ const TenantDashboard = () => {
                     py: 1,
                   }}
                 >
-                  <CircularProgress size={26} />
-                  <Typography
-                    color="text.secondary"
-                    sx={{ fontSize: "13px", textAlign: "center" }}
-                  >
+                  <DotLoader color="#B8975A" size={14} />
+                  <SubHeading sx={{ color: "text.secondary", fontSize: "13px", textAlign: "center" }}>
                     Waiting for payment confirmation. Checking every 5 seconds...
-                  </Typography>
+                  </SubHeading>
                 </Box>
               ) : null}
               {!showPolling ? (
@@ -274,24 +277,26 @@ const TenantDashboard = () => {
         </AppCard>
 
         <AppCard sx={{ mt: "20px", p: { xs: 2, md: 2.5 } }}>
-          <Typography variant="h6" sx={{ marginBottom: "10px" }}>
+          <Heading sx={{ fontSize: "20px", mb: 2 }}>
             Saved Searches
-          </Typography>
+          </Heading>
           {savedSearchesLoading ? (
-            <Typography color="text.secondary">Loading saved searches...</Typography>
+            <SubHeading sx={{ color: "text.secondary" }}>
+              Loading saved searches...
+            </SubHeading>
           ) : savedSearchesData?.data?.length === 0 ? (
-            <Typography color="text.secondary">
+            <SubHeading sx={{ color: "text.secondary" }}>
               No saved searches yet. Use the search page to save a search.
-            </Typography>
+            </SubHeading>
           ) : (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
               {savedSearchesData?.data?.map((search: any) => (
-                <Box
+                <AppCard
                   key={search?._id}
+                  elevation="flat"
+                  interactive
                   sx={{
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "10px",
-                    padding: "12px",
+                    p: "12px 16px",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
@@ -303,7 +308,7 @@ const TenantDashboard = () => {
                     <Typography sx={{ fontWeight: 600 }}>
                       {search?.name || "Saved Search"}
                     </Typography>
-                    <Typography color="text.secondary" sx={{ fontSize: "13px" }}>
+                    <SubHeading sx={{ color: "text.secondary", fontSize: "13px" }}>
                       Location: {search?.criteria?.location || "Any location"} | Rent:{" "}
                       {search?.criteria?.minRent && search?.criteria?.maxRent
                         ? `${search.criteria.minRent} - ${search.criteria.maxRent}`
@@ -316,13 +321,13 @@ const TenantDashboard = () => {
                       {Object.keys(search?.criteria?.amenities || {})
                         .filter((key) => search?.criteria?.amenities?.[key] === true)
                         .join(", ") || "None"}
-                    </Typography>
-                    <Typography color="text.secondary" sx={{ fontSize: "13px" }}>
+                    </SubHeading>
+                    <SubHeading sx={{ color: "text.secondary", fontSize: "13px" }}>
                       Last notified:{" "}
                       {search?.lastNotifiedAt
                         ? new Date(search.lastNotifiedAt).toLocaleString()
                         : "Never"}
-                    </Typography>
+                    </SubHeading>
                   </Box>
                   <Box sx={{ display: "flex", gap: 1 }}>
                     <AppButton
@@ -342,7 +347,7 @@ const TenantDashboard = () => {
                       Delete
                     </AppButton>
                   </Box>
-                </Box>
+                </AppCard>
               ))}
             </Box>
           )}

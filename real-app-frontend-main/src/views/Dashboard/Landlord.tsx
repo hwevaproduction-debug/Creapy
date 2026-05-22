@@ -1,10 +1,10 @@
 // React Imports
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 // MUI Imports
 import {
   Box,
   IconButton,
-  Paper,
   Table,
   TableBody,
   TableCell,
@@ -30,8 +30,9 @@ import { convertToFormattedDate } from "../../utils";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
-import { Heading } from "../../components/Heading";
+import { Heading, SubHeading } from "../../components/Heading";
 import OverlayLoader from "../../components/Spinner/OverlayLoader";
+import DotLoader from "../../components/Spinner/dotLoader";
 import { studentAccommodationBadgeSx } from "../../styles/listingBadges";
 
 const getListingStatusBadge = (status: string) => {
@@ -39,8 +40,8 @@ const getListingStatusBadge = (status: string) => {
     return (
       <Box
         sx={{
-          background: "#fef3c7",
-          color: "#92400e",
+          background: "#FEF3C7",
+          color: "#92400E",
           borderRadius: "999px",
           padding: "6px 12px",
           fontSize: "12px",
@@ -56,8 +57,8 @@ const getListingStatusBadge = (status: string) => {
     return (
       <Box
         sx={{
-          background: "#dbeafe",
-          color: "#1e40af",
+          background: "#F7EDDA",
+          color: "#7D6234",
           borderRadius: "999px",
           padding: "6px 12px",
           fontSize: "12px",
@@ -73,8 +74,8 @@ const getListingStatusBadge = (status: string) => {
     return (
       <Box
         sx={{
-          background: "#dcfce7",
-          color: "#166534",
+          background: "#D1EAE0",
+          color: "#1F4D3A",
           borderRadius: "999px",
           padding: "6px 12px",
           fontSize: "12px",
@@ -89,8 +90,8 @@ const getListingStatusBadge = (status: string) => {
   return (
     <Box
       sx={{
-        background: "#f1f5f9",
-        color: "#64748b",
+        background: "#F1F5F9",
+        color: "#64748B",
         borderRadius: "999px",
         padding: "6px 12px",
         fontSize: "12px",
@@ -107,8 +108,8 @@ const getPaymentStatusBadge = (status: string) => {
     return (
       <Box
         sx={{
-          background: "#fef3c7",
-          color: "#92400e",
+          background: "#FEF3C7",
+          color: "#92400E",
           borderRadius: "999px",
           padding: "6px 12px",
           fontSize: "12px",
@@ -124,8 +125,8 @@ const getPaymentStatusBadge = (status: string) => {
     return (
       <Box
         sx={{
-          background: "#dcfce7",
-          color: "#166534",
+          background: "#D1EAE0",
+          color: "#1F4D3A",
           borderRadius: "999px",
           padding: "6px 12px",
           fontSize: "12px",
@@ -140,8 +141,8 @@ const getPaymentStatusBadge = (status: string) => {
   return (
     <Box
       sx={{
-        background: "#fee2e2",
-        color: "#991b1b",
+        background: "#FEE2E2",
+        color: "#991B1B",
         borderRadius: "999px",
         padding: "6px 12px",
         fontSize: "12px",
@@ -172,7 +173,8 @@ const LandlordDashboard = () => {
   const navigate = useNavigate();
 
   const { data: listingsData, isLoading: listingsLoading } = useGetListingQuery(userId);
-  const [deleteListing, { isLoading: isDeleting }] = useDeleteListingMutation();
+  const [deletingListingId, setDeletingListingId] = useState<string | null>(null);
+  const [deleteListing] = useDeleteListingMutation();
   const { data: listingDraft } = useGetListingDraftQuery(undefined, {
     skip: !userId,
   });
@@ -186,9 +188,27 @@ const LandlordDashboard = () => {
   const { data: paymentsData, isLoading: paymentsLoading } =
     useGetMyPaymentsQuery(undefined);
 
+  const handleDeleteListing = async (listingId?: string) => {
+    if (!listingId) return;
+
+    setDeletingListingId(listingId);
+    try {
+      await deleteListing(listingId).unwrap();
+    } finally {
+      setDeletingListingId(null);
+    }
+  };
+
   return (
     <Box sx={{ mt: { xs: 5, md: 6 } }}>
       <AppContainer>
+        <Box sx={{ mb: 3 }}>
+          <Heading>My Dashboard</Heading>
+          <SubHeading sx={{ color: "text.secondary" }}>
+            Manage your listings and track payments.
+          </SubHeading>
+        </Box>
+
         <Box
           sx={{
             display: "flex",
@@ -291,17 +311,16 @@ const LandlordDashboard = () => {
             </AppButton>
           </AppCard>
         ) : (
-          <TableContainer
-            component={Paper}
+          <AppCard
             sx={{
               borderRadius: "12px",
               boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
-              overflowX: "auto",
             }}
           >
-            <Table>
+            <TableContainer sx={{ overflowX: "auto" }}>
+              <Table>
               <TableHead>
-                <TableRow sx={{ background: "#f8fafc" }}>
+                <TableRow sx={{ background: "background.paper" }}>
                   {["Listing", "Location", "Status", "Published", "Actions"].map(
                     (header) => (
                       <TableCell
@@ -309,7 +328,7 @@ const LandlordDashboard = () => {
                         sx={{
                           fontWeight: 700,
                           fontSize: "12px",
-                          color: "#6b7280",
+                          color: "text.secondary",
                           textTransform: "uppercase",
                         }}
                       >
@@ -395,8 +414,8 @@ const LandlordDashboard = () => {
                           <Tooltip title="Delete">
                             <IconButton
                               size="small"
-                              onClick={() => deleteListing(item?._id)}
-                              disabled={isDeleting}
+                              onClick={() => handleDeleteListing(item?._id)}
+                              disabled={deletingListingId === item?._id}
                               sx={{
                                 border: "1px solid #fecaca",
                                 borderRadius: "8px",
@@ -406,7 +425,11 @@ const LandlordDashboard = () => {
                                 },
                               }}
                             >
-                              🗑️
+                              {deletingListingId === item?._id ? (
+                                <DotLoader color="#dc2626" size={10} />
+                              ) : (
+                                "🗑️"
+                              )}
                             </IconButton>
                           </Tooltip>
                         </Box>
@@ -415,8 +438,9 @@ const LandlordDashboard = () => {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
-          </TableContainer>
+              </Table>
+            </TableContainer>
+          </AppCard>
         )}
 
         <Heading sx={{ mt: { xs: 4, md: 5 }, mb: "16px" }}>
@@ -430,24 +454,23 @@ const LandlordDashboard = () => {
             No payment history yet.
           </AppCard>
         ) : (
-          <TableContainer
-            component={Paper}
+          <AppCard
             sx={{
               borderRadius: "12px",
               boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
-              overflowX: "auto",
             }}
           >
-            <Table>
+            <TableContainer sx={{ overflowX: "auto" }}>
+              <Table>
               <TableHead>
-                <TableRow sx={{ background: "#f8fafc" }}>
+                <TableRow sx={{ background: "background.paper" }}>
                   {["Date", "Listing", "Amount", "Status"].map((header) => (
                     <TableCell
                       key={header}
                       sx={{
                         fontWeight: 700,
                         fontSize: "12px",
-                        color: "#6b7280",
+                        color: "text.secondary",
                         textTransform: "uppercase",
                       }}
                     >
@@ -476,8 +499,9 @@ const LandlordDashboard = () => {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
-          </TableContainer>
+              </Table>
+            </TableContainer>
+          </AppCard>
         )}
       </AppContainer>
     </Box>

@@ -137,12 +137,17 @@ const SignUp = () => {
               }}
             >
               <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
-                <Box component="span" sx={{ color: "text.primary", fontSize: "26px", fontWeight: 800 }}>
-                  Town
-                </Box>
-                <Box component="span" sx={{ color: "#B8975A", fontSize: "26px", fontWeight: 800 }}>
-                  &nbsp;Ruins
-                </Box>
+                <Box
+                  component="img"
+                  src="/app-logo.png"
+                  alt="Town Ruins"
+                  sx={{
+                    height: { xs: 32, md: 40 },
+                    width: "auto",
+                    objectFit: "contain",
+                    display: "block",
+                  }}
+                />
               </Box>
               {pendingVerificationEmail ? (
                 <Box

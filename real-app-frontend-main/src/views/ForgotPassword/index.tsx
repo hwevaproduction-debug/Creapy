@@ -72,11 +72,37 @@ const ForgotPassword = () => {
   };
 
   return (
-    <Box sx={{ margin: "70px 0" }}>
+    <Box
+      sx={{
+        minHeight: "calc(100vh - 72px)",
+        display: "flex",
+        alignItems: "center",
+        py: 4,
+      }}
+    >
       <AppContainer>
         <Grid container spacing={2} justifyContent="center">
           <Grid item xs={12} md={6} lg={5}>
-            <AppCard sx={{ p: { xs: 2.5, md: 3.5 } }}>
+            <AppCard
+              sx={{
+                p: { xs: 2.5, md: 3.5 },
+                borderRadius: "24px",
+                boxShadow: "0 16px 60px rgba(31,41,55,0.12)",
+              }}
+            >
+              <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
+                <Box
+                  component="img"
+                  src="/app-logo.png"
+                  alt="Town Ruins"
+                  sx={{
+                    height: { xs: 32, md: 40 },
+                    width: "auto",
+                    objectFit: "contain",
+                    display: "block",
+                  }}
+                />
+              </Box>
               {sentResetEmail ? (
                 <Box
                   sx={{

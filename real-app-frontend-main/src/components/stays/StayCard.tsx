@@ -93,6 +93,9 @@ const StayCard = ({ room, onOpen }: StayCardProps) => {
           transform: "translateY(-3px)",
           boxShadow: "0 12px 40px rgba(31,41,55,0.16)",
         },
+        "&:hover .stay-card-image": {
+          transform: "scale(1.06)",
+        },
         "&:focus-visible": {
           outline: "2px solid #B8975A",
           outlineOffset: "2px",
@@ -101,10 +104,16 @@ const StayCard = ({ room, onOpen }: StayCardProps) => {
     >
       <Box sx={{ position: "relative", height: 240, overflow: "hidden" }}>
         <Box
+          className="stay-card-image"
           component="img"
           src={getRoomImage(room)}
           alt={getRoomName(room)}
-          sx={{ height: "100%", objectFit: "cover", width: "100%" }}
+          sx={{
+            height: "100%",
+            objectFit: "cover",
+            transition: "transform 0.4s ease",
+            width: "100%",
+          }}
         />
         <Box
           sx={{
