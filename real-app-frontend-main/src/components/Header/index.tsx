@@ -17,6 +17,7 @@ import {
   ListItemButton,
   ListItemText,
   Divider,
+  Badge,
   useTheme,
 } from "@mui/material";
 // Component Imports
@@ -33,6 +34,7 @@ import {
   selectedUserName,
   selectedUserRole,
   selectedUserToken,
+  selectedIsEmailVerified,
   setUser,
 } from "../../redux/auth/authSlice";
 // Icons Imports
@@ -159,6 +161,7 @@ const Header = () => {
   const avatar = useTypedSelector(selectedUserAvatar);
   const userName = useTypedSelector(selectedUserName);
   const userRole = useTypedSelector(selectedUserRole);
+  const isEmailVerified = useTypedSelector(selectedIsEmailVerified);
   const searchText = useTypedSelector(selectedSearchText);
   const isAuthenticated = Boolean(token);
 
@@ -330,6 +333,25 @@ const Header = () => {
                     {item.label}
                   </Box>
                 ))}
+                {isAuthenticated && (
+                  <Box
+                    sx={{
+                      ...getActiveMenuStyle(location.pathname.startsWith("/dashboard")),
+                      color: "#B8975A",
+                      fontWeight: 700,
+                      ...(isHeroPage && !scrolled ? { color: "#B8975A" } : {}),
+                    }}
+                    onClick={() => {
+                      if (userRole === "landlord") navigate("/dashboard/landlord");
+                      else if (userRole === "tenant") navigate("/dashboard/tenant");
+                      else if (userRole === "provider") navigate("/dashboard/provider");
+                      else if (userRole === "admin" || userRole === "super_admin") navigate("/dashboard/admin");
+                      else navigate("/");
+                    }}
+                  >
+                    Dashboard
+                  </Box>
+                )}
               </Box>
             </Box>
 
@@ -366,13 +388,15 @@ const Header = () => {
                       onClick={(e) => setAnchorEl(e.currentTarget)}
                       color="inherit"
                     >
-                      <Avatar
-                        alt={userName || "User Avatar"}
-                        src={avatar || undefined}
-                        sx={{ bgcolor: "#B8975A", color: "#FFFFFF" }}
-                      >
-                        {getInitials(userName)}
-                      </Avatar>
+                      <Badge badgeContent="" variant="dot" color="warning" invisible={isEmailVerified || !isAuthenticated}>
+                        <Avatar
+                          alt={userName || "User Avatar"}
+                          src={avatar || undefined}
+                          sx={{ bgcolor: "#B8975A", color: "#FFFFFF" }}
+                        >
+                          {getInitials(userName)}
+                        </Avatar>
+                      </Badge>
                     </IconButton>
                     <StyledMenu
                       onClick={() => setAnchorEl(null)}

@@ -4,6 +4,7 @@ const { renderTemplate } = require("./notificationTemplates");
 const emailChannel = require("./channels/emailChannel");
 const smsChannel = require("./channels/smsChannel");
 const inAppChannel = require("./channels/inAppChannel");
+const pushChannel = require("./channels/pushChannel");
 
 let scheduledTask = null;
 let isRunning = false;
@@ -66,6 +67,15 @@ const dispatchJob = async (job, rendered) => {
     return inAppChannel.send({
       userId: job.recipientId,
       event: job.event,
+      title: rendered.inAppTitle || rendered.subject,
+      body: rendered.inAppBody || rendered.text || rendered.subject,
+      metadata: getMetadata(job.context),
+    });
+  }
+
+  if (job.channel === "push") {
+    return pushChannel.send({
+      userId: job.recipientId,
       title: rendered.inAppTitle || rendered.subject,
       body: rendered.inAppBody || rendered.text || rendered.subject,
       metadata: getMetadata(job.context),

@@ -71,6 +71,9 @@ export const selectedUserAvatar = (state: RootState) =>
 export const selectedUserRole = (state: RootState) =>
   state.auth?.user?.data?.user?.role;
 
+export const selectedIsEmailVerified = (state: RootState) =>
+  state.auth?.user?.data?.user?.isEmailVerified ?? false;
+
 export const selectedUserPremiumExpiry = (state: RootState) =>
   state.auth?.user?.data?.user?.premiumExpiry;
 

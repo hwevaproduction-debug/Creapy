@@ -2,6 +2,7 @@ const express = require("express");
 const authController = require("../controllers/authController");
 const adminController = require("../controllers/adminController");
 const reviewController = require("../controllers/reviewController");
+const legalDocController = require("../controllers/legalDocController");
 
 const router = express.Router();
 
@@ -48,5 +49,11 @@ router.put("/reports/:id/dismiss", adminController.dismissReport);
 
 router.get("/audit-logs", adminController.getAuditLogs);
 router.get("/audit-logs/:id", adminController.getAuditLogById);
+
+router.get("/legal-docs", legalDocController.listDocs);
+router.get("/legal-docs/:slug/history", legalDocController.getDocHistory);
+router.post("/legal-docs", legalDocController.createDoc);
+router.put("/legal-docs/:id", legalDocController.updateDoc);
+router.delete("/legal-docs/:id", legalDocController.archiveDoc);
 
 module.exports = router;

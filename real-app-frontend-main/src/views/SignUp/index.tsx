@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 // MUI Imports
-import { Box, FormControlLabel, Radio, RadioGroup } from "@mui/material";
+import { Box, Checkbox, FormControlLabel, Link, Radio, RadioGroup } from "@mui/material";
 import { Eye, EyeOff } from "lucide-react";
 // Formik Imports
 import { Form, Formik, FormikProps } from "formik";
@@ -38,6 +38,9 @@ interface ISSignUpForm {
   email: string;
   password: string;
   role: "tenant" | "landlord";
+  consentTerms: boolean;
+  consentPrivacy: boolean;
+  consentLandlord: boolean;
 }
 
 const signUpFormSchema = signUpSchema.omit(["phoneNumber", "nationalId"] as any);
@@ -54,6 +57,9 @@ const SignUp = () => {
     email: "",
     password: "",
     role: "tenant",
+    consentTerms: false,
+    consentPrivacy: false,
+    consentLandlord: false,
   });
 
   const [toast, setToast] = useState({
@@ -91,6 +97,7 @@ const SignUp = () => {
       email: data.email,
       password: data.password,
       role: data.role,
+      consentAcceptedAt: new Date().toISOString(),
     };
     try {
       const user: any = await signupUser(payload);
@@ -248,6 +255,12 @@ const SignUp = () => {
                   if (!["tenant", "landlord"].includes(values.role)) {
                     validationErrors.role = "Role must be tenant or landlord";
                   }
+                  if (!values.consentTerms || !values.consentPrivacy) {
+                    validationErrors.consentTerms = "Required";
+                  }
+                  if (values.role === "landlord" && !values.consentLandlord) {
+                    validationErrors.consentLandlord = "Required";
+                  }
                   return validationErrors;
                 }}
                 onSubmit={(values: ISSignUpForm) => {
@@ -358,6 +371,32 @@ const SignUp = () => {
                           </Box>
                         )}
                       </Box>
+                      <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                        <Box sx={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#B8975A", mb: 1.5 }}>Before you continue</Box>
+                        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 1 }}>
+                          <Checkbox name="consentTerms" checked={values.consentTerms} onChange={handleChange} sx={{ p: 0, color: "#B8975A", "&.Mui-checked": { color: "#B8975A" } }} />
+                          <Box sx={{ fontSize: "13px", color: "text.secondary", lineHeight: 1.5 }}>
+                            I agree to the <Link href="/terms" target="_blank" sx={{ color: "#B8975A" }}>Terms of Use</Link> and <Link href="/community-guidelines" target="_blank" sx={{ color: "#B8975A" }}>Community Guidelines</Link>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 1 }}>
+                          <Checkbox name="consentPrivacy" checked={values.consentPrivacy} onChange={handleChange} sx={{ p: 0, color: "#B8975A", "&.Mui-checked": { color: "#B8975A" } }} />
+                          <Box sx={{ fontSize: "13px", color: "text.secondary", lineHeight: 1.5 }}>
+                            I have read and accept the <Link href="/privacy" target="_blank" sx={{ color: "#B8975A" }}>Privacy Policy</Link>
+                          </Box>
+                        </Box>
+                        {values.role === "landlord" && (
+                          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 1 }}>
+                            <Checkbox name="consentLandlord" checked={values.consentLandlord} onChange={handleChange} sx={{ p: 0, color: "#B8975A", "&.Mui-checked": { color: "#B8975A" } }} />
+                            <Box sx={{ fontSize: "13px", color: "text.secondary", lineHeight: 1.5 }}>
+                              I agree to the <Link href="/landlord-terms" target="_blank" sx={{ color: "#B8975A" }}>Host & Landlord Agreement</Link>
+                            </Box>
+                          </Box>
+                        )}
+                        {(touched.consentTerms || touched.consentPrivacy) && (!values.consentTerms || !values.consentPrivacy || (values.role === "landlord" && !values.consentLandlord)) && (
+                          <Box sx={{ fontSize: "12px", color: "#f87171", mt: 0.5 }}>You must accept all required agreements to continue</Box>
+                        )}
+                      </Box>
                       <Box
                         sx={{
                           display: "flex",
@@ -393,7 +432,7 @@ const SignUp = () => {
                           },
                         }}
                       >
-                        <GoogleOAuth />
+                        <GoogleOAuth role={values.role} />
                       </Box>
                       <Box
                         sx={{

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 // MUI Imports
 import { Box, Typography } from "@mui/material";
+import { Bookmark, MessageSquare } from "lucide-react";
 // Hook Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
@@ -233,7 +234,8 @@ const TenantDashboard = () => {
 
   return (
     <Box sx={{ background: "background.default", minHeight: "100vh" }}>
-      <Box sx={{ background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)", pt: { xs: 8, md: 10 }, pb: { xs: 8, md: 10 }, px: 3, mb: -6 }}>
+      <Box sx={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)", pt: { xs: 8, md: 10 }, pb: { xs: 8, md: 10 }, px: 3, mb: -6 }}>
+        <Box sx={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 20% 50%, rgba(31,77,58,0.3) 0%, transparent 60%)", pointerEvents: "none" }} />
         <Box sx={{ maxWidth: 900, mx: "auto" }}>
           <Box sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, fontWeight: 800, color: "#fff" }}>{getGreeting(userName)}</Box>
           <Box sx={{ color: "rgba(255,255,255,0.7)", fontSize: "1rem", mt: 1 }}>Here's what's happening with your account</Box>
@@ -393,9 +395,11 @@ const TenantDashboard = () => {
               Loading saved searches...
             </SubHeading>
           ) : savedSearchesData?.data?.length === 0 ? (
-            <SubHeading sx={{ color: "text.secondary" }}>
-              No saved searches yet. Use the search page to save a search.
-            </SubHeading>
+            <Box sx={{ textAlign: "center", py: 6 }}>
+              <Bookmark size={36} color="#B8975A" />
+              <Heading sx={{ fontSize: "18px", mt: 1 }}>No saved searches</Heading>
+              <SubHeading sx={{ color: "text.secondary" }}>Use the search page to save a search.</SubHeading>
+            </Box>
           ) : (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
               {savedSearchesData?.data?.map((search: any) => (
@@ -468,10 +472,11 @@ const TenantDashboard = () => {
           {engagementsLoading ? (
             <SubHeading sx={{ color: "text.secondary" }}>Loading...</SubHeading>
           ) : engagements.length === 0 ? (
-            <SubHeading sx={{ color: "text.secondary" }}>
-              No engagement requests yet. Browse listings and reach out to
-              landlords.
-            </SubHeading>
+            <Box sx={{ textAlign: "center", py: 6 }}>
+              <MessageSquare size={36} color="#B8975A" />
+              <Heading sx={{ fontSize: "18px", mt: 1 }}>No engagement requests</Heading>
+              <SubHeading sx={{ color: "text.secondary" }}>Browse listings and reach out to landlords.</SubHeading>
+            </Box>
           ) : (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
               {engagements.map((engagement: any) => (

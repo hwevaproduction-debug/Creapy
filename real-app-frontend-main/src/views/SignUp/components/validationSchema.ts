@@ -18,6 +18,9 @@ export const signUpSchema = Yup.object().shape({
     .matches(/[@$!%*?&]/, passwordMessage)
     .matches(/\d/, passwordMessage)
     .matches(/[A-Z]/, passwordMessage),
+  consentTerms: Yup.boolean().oneOf([true], "Required"),
+  consentPrivacy: Yup.boolean().oneOf([true], "Required"),
+  consentLandlord: Yup.boolean(),
   phoneNumber: Yup.string().when("role", {
     is: "landlord",
     then: (schema) => schema.required("Phone number is required for landlords"),

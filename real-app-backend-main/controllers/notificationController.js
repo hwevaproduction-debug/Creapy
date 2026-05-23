@@ -164,3 +164,55 @@ exports.markAllAsRead = catchAsync(async (req, res) => {
     data: { updated: result.count },
   });
 });
+
+exports.savePushSubscription = catchAsync(async (req, res) => {
+  const userId = getUserId(req.user);
+  const { endpoint, p256dh, auth } = req.body;
+
+  const subscription = await prisma.userPushSubscription.upsert({
+    where: { userId },
+    update: { endpoint, p256dh, auth },
+    create: { userId, endpoint, p256dh, auth },
+  });
+
+  res.status(200).json({ status: "success", data: subscription });
+});
+
+exports.deletePushSubscription = catchAsync(async (req, res) => {
+  const userId = getUserId(req.user);
+
+  await prisma.userPushSubscription.deleteMany({ where: { userId } });
+
+  res.status(204).json({ status: "success", data: null });
+});
+
+exports.getPreferences = catchAsync(async (req, res) => {
+  const userId = getUserId(req.user);
+
+  const preferences = await prisma.userNotificationPreferences.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
+  });
+
+  res.status(200).json({ status: "success", data: preferences });
+});
+
+exports.updatePreferences = catchAsync(async (req, res) => {
+  const userId = getUserId(req.user);
+  const data = {};
+
+  ["emailEnabled", "pushEnabled", "inAppEnabled"].forEach((field) => {
+    if (typeof req.body[field] === "boolean") {
+      data[field] = req.body[field];
+    }
+  });
+
+  const preferences = await prisma.userNotificationPreferences.upsert({
+    where: { userId },
+    update: data,
+    create: { userId, ...data },
+  });
+
+  res.status(200).json({ status: "success", data: preferences });
+});

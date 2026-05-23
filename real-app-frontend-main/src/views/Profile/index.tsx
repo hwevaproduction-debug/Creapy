@@ -4,9 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 // Formik Imports
 import { Form, Formik, FormikProps } from "formik";
+import * as Yup from "yup";
 // Component Imports
 import { SubHeading } from "../../components/Heading";
-import { signUpSchema } from "../SignUp/components/validationSchema";
 import PrimaryInput from "../../components/PrimaryInput/PrimaryInput";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import DotLoader from "../../components/Spinner/dotLoader";
@@ -15,7 +15,7 @@ import { onKeyDown } from "../../utils";
 import { getGreeting, getFirstName } from "../../utils/greeting";
 // Hooks Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
-import { Camera, Eye, EyeOff, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle, Eye, EyeOff, Trash2, Upload } from "lucide-react";
 // Redux Imports
 import {
   useDeleteMutation,
@@ -34,7 +34,9 @@ import {
   setUser,
   selectedUserId,
   selectedUserToken,
+  selectedIsEmailVerified,
 } from "../../redux/auth/authSlice";
+import { useResendVerificationMutation } from "../../redux/api/authApiSlice";
 // MUI Imports
 import {
   Box,
@@ -57,6 +59,23 @@ interface ISProfileForm {
   email: string;
   password: string;
 }
+
+const passwordMessage =
+  "Password should contain minimum 8 characters, with a mix of uppercase letter, number, and symbol.";
+
+const profileSchema = Yup.object().shape({
+  userName: Yup.string().required("Username is required").nullable(),
+  email: Yup.string()
+    .email("Invalid email address")
+    .required("Email is required")
+    .nullable(),
+  password: Yup.string()
+    .required(passwordMessage)
+    .min(8, passwordMessage)
+    .matches(/[@$!%*?&]/, passwordMessage)
+    .matches(/\d/, passwordMessage)
+    .matches(/[A-Z]/, passwordMessage),
+});
 
 const getInitials = (name?: string) => {
   if (!name) {
@@ -90,9 +109,12 @@ const Profile = () => {
   const userId = useTypedSelector(selectedUserId);
   const token = useTypedSelector(selectedUserToken);
   const userRole = useTypedSelector(selectedUserRole);
+  const isEmailVerified = useTypedSelector(selectedIsEmailVerified);
   const authUser = useTypedSelector((state) => state.auth?.user);
   const [getR2SignedUrl] = useGetR2SignedUrlMutation();
   const [submitVerification] = useSubmitVerificationMutation();
+  const [resendVerification, { isLoading: isResendingVerification }] =
+    useResendVerificationMutation();
   const firstName = getFirstName(userName);
 
   // states
@@ -277,6 +299,28 @@ const Profile = () => {
 
   const handleCloseToast = () => {
     setToast({ ...toast, appearence: false });
+  };
+
+  const handleResendVerification = async () => {
+    try {
+      await resendVerification({ email: userEmail }).unwrap();
+      setToast({
+        ...toast,
+        message: "Verification email sent.",
+        appearence: true,
+        type: "success",
+      });
+    } catch (error: any) {
+      setToast({
+        ...toast,
+        message:
+          error?.data?.message ||
+          error?.message ||
+          "Unable to resend verification email.",
+        appearence: true,
+        type: "error",
+      });
+    }
   };
 
   // Update Profile API bind
@@ -501,6 +545,58 @@ const Profile = () => {
                 <WalletCard compact />
               </Box>
 
+              <Box sx={{ width: "100%", mt: 2 }}>
+                {isEmailVerified ? (
+                  <Box
+                    sx={{
+                      color: "#22c55e",
+                      background: "rgba(34,197,94,0.1)",
+                      border: "1px solid rgba(34,197,94,0.2)",
+                      borderRadius: "999px",
+                      px: 2,
+                      py: 0.5,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      fontWeight: 700,
+                      fontSize: 13,
+                    }}
+                  >
+                    <CheckCircle size={16} />
+                    Email Verified
+                  </Box>
+                ) : (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+                    <Box
+                      sx={{
+                        color: "#f59e0b",
+                        background: "rgba(245,158,11,0.1)",
+                        border: "1px solid rgba(245,158,11,0.24)",
+                        borderRadius: "999px",
+                        px: 2,
+                        py: 0.5,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 0.5,
+                        fontWeight: 700,
+                        fontSize: 13,
+                      }}
+                    >
+                      <AlertTriangle size={16} />
+                      Email Not Verified
+                    </Box>
+                    <AppButton
+                      size="small"
+                      disabled={isResendingVerification}
+                      loading={isResendingVerification}
+                      onClick={handleResendVerification}
+                    >
+                      Resend verification email
+                    </AppButton>
+                  </Box>
+                )}
+              </Box>
+
               {userRole === "landlord" ? (
                 <Box sx={{ width: "100%", mt: 2 }}>
                   {verificationStatus === "PENDING_REVIEW" ? (
@@ -602,7 +698,7 @@ const Profile = () => {
                   onSubmit={(values: ISProfileForm) => {
                     ProfileHandler(values);
                   }}
-                  validationSchema={signUpSchema}
+                  validationSchema={profileSchema}
                 >
                   {(props: FormikProps<ISProfileForm>) => {
                     const { values, touched, errors, handleBlur, handleChange } =

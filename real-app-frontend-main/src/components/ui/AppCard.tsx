@@ -1,8 +1,9 @@
 import { Card, CardProps } from "@mui/material";
 
-interface AppCardProps extends Omit<CardProps, "elevation"> {
+interface AppCardProps extends Omit<CardProps, "elevation" | "variant"> {
   elevation?: "flat" | "raised" | "floating";
   interactive?: boolean;
+  variant?: "default" | "glass";
 }
 
 const elevationStyles = {
@@ -27,6 +28,7 @@ const nextElevation = {
 const AppCard = ({
   elevation = "raised",
   interactive = false,
+  variant = "default",
   sx,
   ...props
 }: AppCardProps) => {
@@ -37,8 +39,19 @@ const AppCard = ({
           backgroundColor: "background.paper",
           color: "text.primary",
           borderRadius: "16px",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.12)",
+          border: "1px solid rgba(255,255,255,0.07)",
         },
         elevationStyles[elevation],
+        variant === "glass"
+          ? {
+              backdropFilter: "blur(12px)",
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              boxShadow:
+                "0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.12)",
+            }
+          : {},
         (theme) =>
           theme.palette.mode === "dark"
             ? { border: "1px solid rgba(255,255,255,0.06)" }

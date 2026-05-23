@@ -15,7 +15,7 @@ import { setUser } from "../../redux/auth/authSlice";
 // Custom Imports
 import DotLoader from "../Spinner/dotLoader";
 
-const GoogleOAuth = () => {
+const GoogleOAuth = ({ role }: { role?: string }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -31,6 +31,7 @@ const GoogleOAuth = () => {
         name: res.user.displayName,
         email: res.user.email,
         photo: res.user.photoURL,
+        role,
       };
       const user: any = await google(payload);
       dispatch(setUser(user.data));

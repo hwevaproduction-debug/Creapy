@@ -205,8 +205,11 @@ model User {
   verificationIdUrl        String?
   verificationSelfieUrl    String?
   verificationSubmittedAt  DateTime?
+  consentAcceptedAt        DateTime?
   tenantEngagements        Engagement[]        @relation("TenantEngagements")
   landlordEngagements      Engagement[]        @relation("LandlordEngagements")
+  pushSubscription         UserPushSubscription?
+  notificationPreferences  UserNotificationPreferences?
 }
 
 model Listing {
@@ -824,4 +827,40 @@ model Engagement {
   @@index([tenantId, status])
   @@index([landlordId, status])
   @@index([listingId])
+}
+
+model UserPushSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserNotificationPreferences {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailEnabled Boolean  @default(true)
+  pushEnabled  Boolean  @default(true)
+  inAppEnabled Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model LegalDocument {
+  id         String    @id @default(cuid())
+  slug       String
+  title      String
+  version    Int       @default(1)
+  content    String
+  isActive   Boolean   @default(true)
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([slug, isActive])
 }

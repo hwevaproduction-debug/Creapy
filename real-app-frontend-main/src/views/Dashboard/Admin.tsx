@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
+  Button,
   Checkbox,
   Chip,
   CircularProgress,
@@ -9,6 +10,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  IconButton,
   Tab,
   Table,
   TableBody,
@@ -17,8 +19,11 @@ import {
   TableHead,
   TableRow,
   Tabs,
+  TextField,
   Typography,
 } from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import ArchiveIcon from "@mui/icons-material/Archive";
 import SearchOffIcon from "@mui/icons-material/SearchOff";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
@@ -31,12 +36,17 @@ import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import {
   AdminBooking,
   BulkReviveFailure,
+  LegalDocument,
   ProviderRecord,
+  useArchiveLegalDocMutation,
   useBulkReviveListingsMutation,
+  useCreateLegalDocMutation,
   useGetAllBookingsQuery,
+  useGetLegalDocsQuery,
   useGetProvidersQuery,
   useLazyGetInactiveListingsQuery,
   useSettleBookingMutation,
+  useUpdateLegalDocMutation,
   useUpdateCommissionRateMutation,
   useVerifyProviderMutation,
 } from "../../redux/api/adminApiSlice";
@@ -72,7 +82,7 @@ interface ToastState {
   type: "success" | "error" | "warning";
 }
 
-type AdminTab = "expired" | "providers" | "bookings";
+type AdminTab = "expired" | "providers" | "bookings" | "legal";
 type PaginationItem = number | "ellipsis-start" | "ellipsis-end";
 
 const MAX_BULK_REVIVE_IDS = 100;
@@ -247,6 +257,14 @@ const AdminDashboard: React.FC = () => {
     onConfirm: (() => void) | null;
     commissionRate?: string;
   }>({ open: false, title: "", body: "", onConfirm: null });
+  const [legalDialog, setLegalDialog] = useState<{
+    open: boolean;
+    mode: "create" | "edit";
+    doc: LegalDocument | null;
+    slug: string;
+    title: string;
+    content: string;
+  }>({ open: false, mode: "create", doc: null, slug: "", title: "", content: "" });
 
   const [triggerSearch, { data: inactiveData, isFetching: isFetchingInactive }] =
     useLazyGetInactiveListingsQuery();
@@ -262,6 +280,14 @@ const AdminDashboard: React.FC = () => {
     useGetAllBookingsQuery(bookingFilters);
   const [settleBooking, { isLoading: isSettlingBooking }] =
     useSettleBookingMutation();
+  const { data: legalDocsData, isFetching: isFetchingLegalDocs } =
+    useGetLegalDocsQuery();
+  const [createLegalDoc, { isLoading: isCreatingLegalDoc }] =
+    useCreateLegalDocMutation();
+  const [updateLegalDoc, { isLoading: isUpdatingLegalDoc }] =
+    useUpdateLegalDocMutation();
+  const [archiveLegalDoc, { isLoading: isArchivingLegalDoc }] =
+    useArchiveLegalDocMutation();
 
   const listings = inactiveData?.data ?? [];
   const totalListings = inactiveData?.total ?? 0;
@@ -291,6 +317,7 @@ const AdminDashboard: React.FC = () => {
   const uniqueBookingProviders = Array.from(
     new Set(bookings.map((booking) => booking.provider?._id).filter(Boolean))
   ).length;
+  const legalDocs = legalDocsData?.data ?? [];
 
   useEffect(() => {
     if (selectedCount === 0 && showConfirm) {
@@ -1277,10 +1304,143 @@ const AdminDashboard: React.FC = () => {
     </>
   );
 
+  const openCreateLegalDialog = () =>
+    setLegalDialog({
+      open: true,
+      mode: "create",
+      doc: null,
+      slug: "",
+      title: "",
+      content: "",
+    });
+
+  const openEditLegalDialog = (doc: LegalDocument) =>
+    setLegalDialog({
+      open: true,
+      mode: "edit",
+      doc,
+      slug: doc.slug,
+      title: doc.title,
+      content: doc.content,
+    });
+
+  const closeLegalDialog = () =>
+    setLegalDialog({
+      open: false,
+      mode: "create",
+      doc: null,
+      slug: "",
+      title: "",
+      content: "",
+    });
+
+  const handleSaveLegalDoc = async () => {
+    try {
+      if (legalDialog.mode === "edit" && legalDialog.doc) {
+        await updateLegalDoc({
+          id: legalDialog.doc.id,
+          title: legalDialog.title,
+          content: legalDialog.content,
+        }).unwrap();
+      } else {
+        await createLegalDoc({
+          slug: legalDialog.slug,
+          title: legalDialog.title,
+          content: legalDialog.content,
+        }).unwrap();
+      }
+      setToast({ open: true, message: "Legal document saved.", type: "success" });
+      closeLegalDialog();
+    } catch (error) {
+      setToast({
+        open: true,
+        message: getErrorMessage(error, "Unable to save legal document."),
+        type: "error",
+      });
+    }
+  };
+
+  const handleArchiveLegalDoc = async (doc: LegalDocument) => {
+    if (!window.confirm(`Archive ${doc.title}?`)) return;
+
+    try {
+      await archiveLegalDoc(doc.id).unwrap();
+      setToast({ open: true, message: "Legal document archived.", type: "success" });
+    } catch (error) {
+      setToast({
+        open: true,
+        message: getErrorMessage(error, "Unable to archive legal document."),
+        type: "error",
+      });
+    }
+  };
+
+  const renderLegalDocs = () => (
+    <>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2, gap: 2, flexWrap: "wrap" }}>
+        <Heading sx={{ mb: 0 }}>Legal Documents</Heading>
+        <Button variant="contained" onClick={openCreateLegalDialog}>
+          New Document
+        </Button>
+      </Box>
+      <AppCard sx={{ boxShadow: "0 4px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        {isFetchingLegalDocs ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+            <CircularProgress />
+          </Box>
+        ) : legalDocs.length === 0 ? (
+          renderEmptyState("No legal documents yet.")
+        ) : (
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  {["Title", "Slug", "Version", "Status", "Last Updated", "Actions"].map((header) => (
+                    <TableCell key={header} sx={{ fontWeight: 800 }}>{header}</TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {legalDocs.map((doc) => (
+                  <TableRow key={doc.id}>
+                    <TableCell>{doc.title}</TableCell>
+                    <TableCell>{doc.slug}</TableCell>
+                    <TableCell>{doc.version}</TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        label={doc.isActive ? "Active" : "Archived"}
+                        sx={getStatusChipColor(doc.isActive ? "active" : "archived")}
+                      />
+                    </TableCell>
+                    <TableCell>{convertToFormattedDate(doc.updatedAt)}</TableCell>
+                    <TableCell>
+                      <IconButton onClick={() => openEditLegalDialog(doc)} size="small">
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        onClick={() => handleArchiveLegalDoc(doc)}
+                        size="small"
+                        disabled={isArchivingLegalDoc}
+                      >
+                        <ArchiveIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </AppCard>
+    </>
+  );
+
   return (
     <Box sx={{ mt: { xs: 5, md: 6 } }}>
       <AppContainer>
-        <Box sx={{ mb: 3 }}>
+        <Box sx={{ mb: 3, position: "relative", overflow: "hidden", background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)", borderRadius: "18px", p: 3 }}>
+          <Box sx={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 20% 50%, rgba(31,77,58,0.3) 0%, transparent 60%)", pointerEvents: "none" }} />
           <Heading>Admin Dashboard</Heading>
           <SubHeading sx={{ color: "text.secondary" }}>
             Manage listings, providers, and bookings.
@@ -1310,11 +1470,17 @@ const AdminDashboard: React.FC = () => {
             label="Bookings & Settlements"
             sx={{ textTransform: "none", fontWeight: 600 }}
           />
+          <Tab
+            value="legal"
+            label="Legal Documents"
+            sx={{ textTransform: "none", fontWeight: 600 }}
+          />
         </Tabs>
 
         {activeTab === "expired" && renderExpiredListings()}
         {activeTab === "providers" && renderProviders()}
         {activeTab === "bookings" && renderBookings()}
+        {activeTab === "legal" && renderLegalDocs()}
       </AppContainer>
 
       <ToastAlert
@@ -1365,6 +1531,48 @@ const AdminDashboard: React.FC = () => {
             }}
           >
             Confirm
+          </AppButton>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={legalDialog.open} onClose={closeLegalDialog} maxWidth="md" fullWidth>
+        <DialogTitle>
+          {legalDialog.mode === "edit" ? "Edit Legal Document" : "New Legal Document"}
+        </DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+          <TextField
+            label="Slug"
+            value={legalDialog.slug}
+            disabled={legalDialog.mode === "edit"}
+            onChange={(event) =>
+              setLegalDialog((previous) => ({ ...previous, slug: event.target.value }))
+            }
+          />
+          <TextField
+            label="Title"
+            value={legalDialog.title}
+            onChange={(event) =>
+              setLegalDialog((previous) => ({ ...previous, title: event.target.value }))
+            }
+          />
+          <TextField
+            label="Content"
+            value={legalDialog.content}
+            multiline
+            minRows={10}
+            onChange={(event) =>
+              setLegalDialog((previous) => ({ ...previous, content: event.target.value }))
+            }
+          />
+        </DialogContent>
+        <DialogActions>
+          <AppButton variant="outlined" onClick={closeLegalDialog}>
+            Cancel
+          </AppButton>
+          <AppButton
+            disabled={isCreatingLegalDoc || isUpdatingLegalDoc}
+            onClick={handleSaveLegalDoc}
+          >
+            Save
           </AppButton>
         </DialogActions>
       </Dialog>

@@ -48,6 +48,14 @@ export interface MarkAllAsReadResponse {
   };
 }
 
+export interface NotificationPreferences {
+  id: string;
+  userId: string;
+  emailEnabled: boolean;
+  pushEnabled: boolean;
+  inAppEnabled: boolean;
+}
+
 export const unreadCountPollingOptions = {
   pollingInterval: 60000,
 };
@@ -109,6 +117,40 @@ export const notificationApiSlice = notificationApi.injectEndpoints({
         { type: "NotificationCount", id: "UNREAD" },
       ],
     }),
+    savePushSubscription: builder.mutation<any, any>({
+      query: (data) => ({
+        url: "notifications/push-subscription",
+        method: "POST",
+        body: data,
+      }),
+    }),
+    deletePushSubscription: builder.mutation<void, void>({
+      query: () => ({
+        url: "notifications/push-subscription",
+        method: "DELETE",
+      }),
+    }),
+    getNotificationPreferences: builder.query<
+      { status: string; data: NotificationPreferences },
+      void
+    >({
+      query: () => ({
+        url: "notifications/preferences",
+        method: "GET",
+      }),
+      providesTags: ["Notification"],
+    }),
+    updateNotificationPreferences: builder.mutation<
+      { status: string; data: NotificationPreferences },
+      Partial<Pick<NotificationPreferences, "emailEnabled" | "pushEnabled" | "inAppEnabled">>
+    >({
+      query: (data) => ({
+        url: "notifications/preferences",
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: ["Notification"],
+    }),
   }),
 });
 
@@ -117,4 +159,8 @@ export const {
   useGetUnreadCountQuery,
   useMarkAsReadMutation,
   useMarkAllAsReadMutation,
+  useSavePushSubscriptionMutation,
+  useDeletePushSubscriptionMutation,
+  useGetNotificationPreferencesQuery,
+  useUpdateNotificationPreferencesMutation,
 } = notificationApiSlice;

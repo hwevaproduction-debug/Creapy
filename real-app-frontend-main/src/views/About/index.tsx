@@ -1,7 +1,7 @@
 // MUI Imports
-import { Box, Grid } from "@mui/material";
-import { useNavigate } from "react-router-dom";
-import { Eye, Home, Key, Search, Shield, Smartphone, UserX } from "lucide-react";
+import { Box, Grid, Link, Typography } from "@mui/material";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Eye, FileText, Home, Key, Search, Shield, Smartphone, UserX, Users } from "lucide-react";
 // Custom Imports
 import { SubHeading } from "../../components/Heading";
 import AppContainer from "../../components/ui/AppContainer";
@@ -196,6 +196,55 @@ const About = () => {
                     {title}
                   </Box>
                   <SubHeading sx={{ color: "text.secondary" }}>{body}</SubHeading>
+                </AppCard>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        <Box sx={{ mt: { xs: 6, md: 8 }, mb: 8 }}>
+          <Box sx={{ textAlign: "center", mb: 4 }}>
+            <Box sx={{ color: "#B8975A", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", mb: 1 }}>Safety First</Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: "text.primary" }}>Trust & Safety</Typography>
+          </Box>
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={6}>
+              <AppCard sx={{ p: 3, height: "100%", boxShadow: "0 4px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <Shield size={32} color="#B8975A" style={{ marginBottom: 12 }} />
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Landlord Verification</Typography>
+                <Typography sx={{ color: "text.secondary", fontSize: 14, mb: 2 }}>All landlords on Town Ruins go through identity and document verification before listing properties.</Typography>
+                <Link component={RouterLink} to="/trust-safety" sx={{ color: "#B8975A", fontWeight: 600, fontSize: 14 }}>Learn more →</Link>
+              </AppCard>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <AppCard sx={{ p: 3, height: "100%", boxShadow: "0 4px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <Users size={32} color="#B8975A" style={{ marginBottom: 12 }} />
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Community Standards</Typography>
+                <Typography sx={{ color: "text.secondary", fontSize: 14, mb: 2 }}>Our community guidelines ensure respectful, safe interactions for every tenant and landlord on the platform.</Typography>
+                <Link component={RouterLink} to="/community-guidelines" sx={{ color: "#B8975A", fontWeight: 600, fontSize: 14 }}>Read guidelines →</Link>
+              </AppCard>
+            </Grid>
+          </Grid>
+        </Box>
+
+        <Box sx={{ mb: 8 }}>
+          <Box sx={{ textAlign: "center", mb: 4 }}>
+            <Box sx={{ color: "#B8975A", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", mb: 1 }}>Transparency</Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: "text.primary" }}>Legal & Compliance</Typography>
+          </Box>
+          <Grid container spacing={2}>
+            {[
+              { title: "Terms of Use", desc: "Rules governing use of the platform", path: "/terms" },
+              { title: "Privacy Policy", desc: "How we collect and protect your data", path: "/privacy" },
+              { title: "Refund Policy", desc: "Cancellation and refund procedures", path: "/refund-policy" },
+              { title: "Landlord Agreement", desc: "Terms for hosting on Town Ruins", path: "/landlord-terms" },
+            ].map((doc) => (
+              <Grid item xs={12} sm={6} md={3} key={doc.path}>
+                <AppCard sx={{ p: 2.5, boxShadow: "0 4px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <FileText size={24} color="#B8975A" style={{ marginBottom: 8 }} />
+                  <Typography sx={{ fontWeight: 700, mb: 0.5 }}>{doc.title}</Typography>
+                  <Typography sx={{ color: "text.secondary", fontSize: 13, mb: 1.5 }}>{doc.desc}</Typography>
+                  <Link component={RouterLink} to={doc.path} sx={{ color: "#B8975A", fontWeight: 600, fontSize: 13 }}>Read →</Link>
                 </AppCard>
               </Grid>
             ))}

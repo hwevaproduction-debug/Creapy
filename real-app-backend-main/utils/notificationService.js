@@ -148,12 +148,63 @@ const buildContext = (context, recipient) => {
   });
 };
 
-const buildJobsForRecipient = ({ event, context, recipient, scheduledAt, locale }) => {
+const defaultPreferences = {
+  emailEnabled: true,
+  pushEnabled: true,
+  inAppEnabled: true,
+};
+
+const getRecipientDeliverySettings = async (recipients) => {
+  const userIds = [
+    ...new Set(
+      recipients
+        .map((recipient) => recipient.userId)
+        .filter(Boolean)
+    ),
+  ];
+
+  if (!userIds.length) {
+    return { preferencesByUserId: new Map(), pushUserIds: new Set() };
+  }
+
+  const [preferences, pushSubscriptions] = await Promise.all([
+    prisma.userNotificationPreferences.findMany({
+      where: { userId: { in: userIds } },
+    }),
+    prisma.userPushSubscription.findMany({
+      where: { userId: { in: userIds } },
+      select: { userId: true },
+    }),
+  ]);
+
+  return {
+    preferencesByUserId: new Map(
+      preferences.map((preference) => [preference.userId, preference])
+    ),
+    pushUserIds: new Set(
+      pushSubscriptions.map((subscription) => subscription.userId)
+    ),
+  };
+};
+
+const buildJobsForRecipient = ({
+  event,
+  context,
+  recipient,
+  scheduledAt,
+  locale,
+  preferences,
+  hasPushSubscription,
+}) => {
   const templateKey = event;
   const jobContext = buildContext(context, recipient);
+  const deliveryPreferences = {
+    ...defaultPreferences,
+    ...(preferences || {}),
+  };
   const jobs = [];
 
-  if (recipient.email) {
+  if (deliveryPreferences.emailEnabled && recipient.email) {
     jobs.push({
       event,
       channel: "email",
@@ -179,10 +230,27 @@ const buildJobsForRecipient = ({ event, context, recipient, scheduledAt, locale 
     });
   }
 
-  if (recipient.userId) {
+  if (deliveryPreferences.inAppEnabled && recipient.userId) {
     jobs.push({
       event,
       channel: "in_app",
+      recipientId: recipient.userId,
+      recipientAddress: null,
+      templateKey,
+      context: jobContext,
+      locale,
+      scheduledAt,
+    });
+  }
+
+  if (
+    deliveryPreferences.pushEnabled &&
+    recipient.userId &&
+    hasPushSubscription
+  ) {
+    jobs.push({
+      event,
+      channel: "push",
       recipientId: recipient.userId,
       recipientAddress: null,
       templateKey,
@@ -200,6 +268,8 @@ const enqueue = async (event, context = {}, options = {}) => {
     const scheduledAt = options.scheduledAt ? new Date(options.scheduledAt) : new Date();
     const locale = options.locale || context.locale || "en";
     const recipients = resolveRecipients(event, context);
+    const { preferencesByUserId, pushUserIds } =
+      await getRecipientDeliverySettings(recipients);
     const jobs = recipients.flatMap((recipient) =>
       buildJobsForRecipient({
         event,
@@ -207,6 +277,12 @@ const enqueue = async (event, context = {}, options = {}) => {
         recipient,
         scheduledAt,
         locale,
+        preferences: recipient.userId
+          ? preferencesByUserId.get(recipient.userId)
+          : null,
+        hasPushSubscription: recipient.userId
+          ? pushUserIds.has(recipient.userId)
+          : false,
       })
     );
 

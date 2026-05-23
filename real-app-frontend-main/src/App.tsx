@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useMemo, useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import Home from "./views/Home";
 import NotFound from "./views/NotFound";
@@ -29,9 +29,34 @@ import StayRoomDetail from "./views/Stays/RoomDetail";
 import BookingConfirmation from "./views/Stays/BookingConfirmation";
 import MyStayBookings from "./views/Stays/MyBookings";
 import ProviderSignUp from "./views/ProviderSignUp";
+import TermsOfUse from "./views/Legal/TermsOfUse";
+import PrivacyPolicy from "./views/Legal/PrivacyPolicy";
+import LandlordTerms from "./views/Legal/LandlordTerms";
+import RefundPolicy from "./views/Legal/RefundPolicy";
+import CommunityGuidelines from "./views/Legal/CommunityGuidelines";
+import TrustSafety from "./views/Legal/TrustSafety";
+import Footer from "./components/Footer";
 import { createAppTheme } from "./theme";
 
 export const ColorModeContext = React.createContext({ toggleColorMode: () => {} });
+
+const AUTH_FOOTER_PATHS = [
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/provider-signup",
+  "/verify-email",
+  "/verify-phone",
+];
+
+const AppFooter = () => {
+  const location = useLocation();
+  if (AUTH_FOOTER_PATHS.some((path) => location.pathname.startsWith(path))) {
+    return null;
+  }
+  return <Footer />;
+};
 
 const getInitialColorMode = (): "light" | "dark" => {
   const storedMode = localStorage.getItem("colorMode");
@@ -110,6 +135,12 @@ function App() {
             <Route path="/verify-phone" element={<VerifyPhone />} />
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
+            <Route path="/terms" element={<TermsOfUse />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/landlord-terms" element={<LandlordTerms />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
+            <Route path="/community-guidelines" element={<CommunityGuidelines />} />
+            <Route path="/trust-safety" element={<TrustSafety />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/stays" element={<Stays />} />
             <Route path="/stays/rooms/:roomId" element={<StayRoomDetail />} />
@@ -221,6 +252,7 @@ function App() {
             />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <AppFooter />
         </Router>
       </ThemeProvider>
     </ColorModeContext.Provider>

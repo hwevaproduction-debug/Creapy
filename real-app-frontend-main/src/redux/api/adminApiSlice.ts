@@ -355,6 +355,18 @@ interface AdminAuditLogsResponse {
   pagination?: PaginationMeta;
 }
 
+export interface LegalDocument {
+  id: string;
+  slug: string;
+  title: string;
+  version: number;
+  content: string;
+  isActive: boolean;
+  archivedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 function buildSearchParams(params: Record<string, string | number | undefined>) {
   const searchParams = new URLSearchParams();
 
@@ -766,6 +778,39 @@ export const adminApiSlice = apiSlice.injectEndpoints({
         response.data,
       providesTags: (_result, _error, id) => [{ type: "AuditLog", id }],
     }),
+    getLegalDocs: builder.query<{ status: string; data: LegalDocument[] }, void>({
+      query: () => ({ url: "admin/legal-docs", method: "GET" }),
+      providesTags: ["AuditLog"],
+    }),
+    getLegalDocHistory: builder.query<
+      { status: string; data: LegalDocument[] },
+      string
+    >({
+      query: (slug) => ({ url: `admin/legal-docs/${slug}/history`, method: "GET" }),
+      providesTags: ["AuditLog"],
+    }),
+    createLegalDoc: builder.mutation<
+      { status: string; data: LegalDocument },
+      Pick<LegalDocument, "slug" | "title" | "content">
+    >({
+      query: (body) => ({ url: "admin/legal-docs", method: "POST", body }),
+      invalidatesTags: ["AuditLog"],
+    }),
+    updateLegalDoc: builder.mutation<
+      { status: string; data: LegalDocument },
+      { id: string; title?: string; content: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `admin/legal-docs/${id}`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["AuditLog"],
+    }),
+    archiveLegalDoc: builder.mutation<{ status: string; data: LegalDocument }, string>({
+      query: (id) => ({ url: `admin/legal-docs/${id}`, method: "DELETE" }),
+      invalidatesTags: ["AuditLog"],
+    }),
   }),
 });
 
@@ -800,4 +845,9 @@ export const {
   useDismissReportMutation,
   useGetAuditLogsQuery,
   useGetAuditLogByIdQuery,
+  useGetLegalDocsQuery,
+  useGetLegalDocHistoryQuery,
+  useCreateLegalDocMutation,
+  useUpdateLegalDocMutation,
+  useArchiveLegalDocMutation,
 } = adminApiSlice;

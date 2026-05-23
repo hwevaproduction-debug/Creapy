@@ -21,6 +21,7 @@ const disputeRouter = require("./routes/disputeRoutes");
 const reportRouter = require("./routes/reportRoutes");
 const engagementRouter = require("./routes/engagementRoutes");
 const leadRouter = require("./routes/leadRoutes");
+const legalDocController = require("./controllers/legalDocController");
 const { globalLimiter } = require("./middleware/rateLimiter");
 
 const listingRoutes = require("./routes/listingRoutes");
@@ -134,6 +135,8 @@ app.use("/api/v1/bookings", bookingRouter);
 app.use("/api/v1/engagements", engagementRouter);
 app.use("/api/v1/leads", leadRouter);
 app.use("/api/v1/stays", stayRouter);
+app.get("/api/v1/legal-docs/:slug", legalDocController.getPublicDoc);
+app.get("/legal-docs/:slug", legalDocController.getPublicDoc);
 
 // PRODUCTION SETUP
 app.get("/", (req, res) => {

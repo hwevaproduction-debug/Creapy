@@ -14,7 +14,7 @@ import {
   TableRow,
   Tooltip,
 } from "@mui/material";
-import { GraduationCap, Pencil, Trash2 } from "lucide-react";
+import { ClipboardList, GraduationCap, Pencil, Trash2 } from "lucide-react";
 // Hook Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
@@ -286,7 +286,8 @@ const LandlordDashboard = () => {
 
   return (
     <Box sx={{ background: "background.default", minHeight: "100vh" }}>
-      <Box sx={{ background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)", pt: { xs: 8, md: 10 }, pb: { xs: 8, md: 10 }, px: 3, mb: -6 }}>
+      <Box sx={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)", pt: { xs: 8, md: 10 }, pb: { xs: 8, md: 10 }, px: 3, mb: -6 }}>
+        <Box sx={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 20% 50%, rgba(31,77,58,0.3) 0%, transparent 60%)", pointerEvents: "none" }} />
         <Box sx={{ maxWidth: 900, mx: "auto" }}>
           <Box sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, fontWeight: 800, color: "#fff" }}>My Dashboard</Box>
           <Box sx={{ color: "rgba(255,255,255,0.7)", fontSize: "1rem", mt: 1 }}>Manage your listings and track engagement</Box>
@@ -294,16 +295,18 @@ const LandlordDashboard = () => {
       </Box>
       <AppContainer sx={{ pb: { xs: 4, md: 6 } }}>
 
-        <AppCard sx={{ mb: 3, p: { xs: 2, md: 2.5 } }}>
+        <AppCard sx={{ mb: 6, p: { xs: 2, md: 2.5 }, boxShadow: "0 4px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.07)", "&:hover": { transform: "translateY(-2px)", transition: "transform 0.2s ease" } }}>
           <Heading sx={{ fontSize: "20px", mb: 2 }}>
             Incoming Engagement Requests
           </Heading>
           {incomingEngagementsLoading ? (
             <SubHeading sx={{ color: "text.secondary" }}>Loading...</SubHeading>
           ) : incomingEngagementsData?.data?.length === 0 ? (
-            <SubHeading sx={{ color: "text.secondary" }}>
-              No engagement requests yet.
-            </SubHeading>
+            <Box sx={{ textAlign: "center", py: 6 }}>
+              <ClipboardList size={36} color="#B8975A" />
+              <Heading sx={{ fontSize: "18px", mt: 1 }}>No engagement requests</Heading>
+              <SubHeading sx={{ color: "text.secondary" }}>New tenant requests will appear here.</SubHeading>
+            </Box>
           ) : (
             incomingEngagementsData?.data?.map((engagement: any) => (
               <Box
@@ -386,7 +389,7 @@ const LandlordDashboard = () => {
           )}
         </AppCard>
 
-        <AppCard sx={{ mb: 3, p: { xs: 2, md: 2.5 } }}>
+        <AppCard sx={{ mb: 6, p: { xs: 2, md: 2.5 }, boxShadow: "0 4px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.07)", "&:hover": { transform: "translateY(-2px)", transition: "transform 0.2s ease" } }}>
           <WalletCard />
           <Box sx={{ mt: 2 }}>
             <Heading sx={{ fontSize: "20px", mb: 2 }}>Transactions</Heading>

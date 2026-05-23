@@ -8,7 +8,7 @@ const catchAsync = require("../utils/catchAsync");
 const prisma = require("../utils/prisma");
 const { comparePassword } = require("../utils/auth");
 const { isPremiumTenant } = require("../utils/monetization");
-const { sendEmail } = require("../utils/email");
+const { sendEmail, buildBrandedEmail } = require("../utils/email");
 const { sendSms } = require("../utils/sms");
 
 const signToken = (id) => {
@@ -75,12 +75,13 @@ const sendVerificationEmail = async (user, rawToken) => {
     to: user.email,
     subject: "Verify your Town Ruins email",
     text: `Welcome to Town Ruins. Verify your email by opening this link: ${verificationUrl}`,
-    html: `
-      <p>Welcome to Town Ruins.</p>
-      <p>Please verify your email by clicking the link below:</p>
-      <p><a href="${verificationUrl}">${verificationUrl}</a></p>
-      <p>This link expires in 24 hours.</p>
-    `,
+    html: buildBrandedEmail({
+      title: "Verify your email",
+      preheader: "One click to verify your Town Ruins account",
+      body: `<p>Welcome to Town Ruins! Please verify your email address to activate your account.</p><p>This link expires in <strong>24 hours</strong>.</p>`,
+      ctaText: "Verify Email",
+      ctaUrl: verificationUrl,
+    }),
   });
 };
 
@@ -338,7 +339,7 @@ const createSendToken = (user, statusCode, res) => {
 };
 
 exports.signup = catchAsync(async (req, res, next) => {
-  const { username, email, password, role } = req.body;
+  const { username, email, password, role, consentAcceptedAt } = req.body;
   const allowedRoles = ["tenant", "landlord"];
 
   if (role && !allowedRoles.includes(role)) {
@@ -352,6 +353,7 @@ exports.signup = catchAsync(async (req, res, next) => {
       email,
       password: await bcrypt.hash(password, 12),
       ...(role ? { role } : {}),
+      consentAcceptedAt: consentAcceptedAt ? new Date(consentAcceptedAt) : undefined,
       isEmailVerified: false,
       emailVerificationToken: verification.hashedToken,
       emailVerificationExpires: new Date(verification.expiresAt),
@@ -553,7 +555,7 @@ exports.delete = catchAsync(async (req, res, next) => {
 });
 
 exports.google = catchAsync(async (req, res, next) => {
-  const { name, email, photo } = req.body;
+  const { name, email, photo, role } = req.body;
 
   const user = await prisma.user.findUnique({ where: { email } });
 
@@ -574,6 +576,7 @@ exports.google = catchAsync(async (req, res, next) => {
         email,
         password: await bcrypt.hash(Math.random().toString(), 12),
         avatar: photo,
+        role: ["tenant", "landlord"].includes(role) ? role : "tenant",
         isEmailVerified: true,
         isPhoneVerified: true,
       },
@@ -734,7 +737,13 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
     to: user.email,
     subject: "Reset your Town Ruins password",
     text: `Reset your password by visiting: ${resetUrl}\nThis link expires in 1 hour.`,
-    html: `<p>Hello ${user.username},</p><p>Click the link below to reset your Town Ruins password:</p><p><a href="${resetUrl}" style="background:#B8975A;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:700;">Reset Password</a></p><p>This link expires in 1 hour. If you did not request this, ignore this email.</p>`,
+    html: buildBrandedEmail({
+      title: "Reset your password",
+      preheader: "Reset your Town Ruins password",
+      body: `<p>Hello ${user.username},</p><p>Click below to reset your Town Ruins password. This link expires in <strong>1 hour</strong>.</p><p>If you did not request this, you can safely ignore this email.</p>`,
+      ctaText: "Reset Password",
+      ctaUrl: resetUrl,
+    }),
   });
 
   res.status(200).json({
@@ -826,7 +835,10 @@ exports.submitVerification = catchAsync(async (req, res, next) => {
       to: adminEmail,
       subject: "New landlord verification submission",
       text: `User ${req.user.username} (${req.user.email}) has submitted identity verification documents for review.`,
-      html: `<p>User <strong>${req.user.username}</strong> (${req.user.email}) has submitted identity verification. Please review in the admin dashboard.</p>`,
+      html: buildBrandedEmail({
+        title: "New landlord verification submission",
+        body: `<p>User <strong>${req.user.username}</strong> (${req.user.email}) has submitted identity verification documents. Please review in the admin dashboard.</p>`,
+      }),
     });
   }
 
