@@ -219,6 +219,7 @@ const Stays = () => {
               backgroundColor: "#0F141E",
               overflow: "hidden",
               color: "#fff",
+              borderRadius: { xs: "16px", md: "24px" },
             }}
           >
             <HeroSlideshow images={STAY_HERO_IMAGES} />
@@ -228,8 +229,9 @@ const Stays = () => {
                 position: "relative",
                 zIndex: 3,
                 width: "100%",
-                pt: { xs: 4, md: 6 },
-                pb: { xs: 4, md: 6 },
+                pt: { xs: 5, md: 7 },
+                pb: { xs: 5, md: 7 },
+                px: { xs: 3, md: 5 },
               }}
             >
               <Box>
@@ -423,7 +425,7 @@ const Stays = () => {
             </AppCard>
           ) : null}
 
-          <Grid container spacing={3}>
+          <Grid container spacing={3} alignItems="flex-start">
             {!isMobile ? (
               <Grid item xs={12} md={3}>
                 <Box>

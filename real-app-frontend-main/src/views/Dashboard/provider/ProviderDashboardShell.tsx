@@ -61,10 +61,18 @@ const ProviderDashboardShell = () => {
   return (
     <Box sx={{ mt: { xs: 5, md: 6 }, mb: 6 }}>
       <AppContainer>
-        <AppCard elevation="raised" sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
+        <AppCard
+          elevation="raised"
+          sx={{
+            background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)",
+            color: "#fff",
+            p: { xs: 2, md: 3 },
+            mb: 3,
+          }}
+        >
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: { xs: "flex-start", md: "center" }, flexDirection: { xs: "column", md: "row" }, gap: 2 }}>
             <Box>
-              <Typography variant="h4" fontWeight={800} color="text.primary">{businessName}</Typography>
+              <Typography variant="h4" fontWeight={800} color="#fff">{businessName}</Typography>
               <Chip
                 size="small"
                 label={String(accommodation?.verificationStatus || profile?.providerProfile?.verificationStatus || "PENDING").replace(/_/g, " ")}

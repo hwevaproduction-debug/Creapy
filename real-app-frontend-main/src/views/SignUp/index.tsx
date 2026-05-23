@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 // MUI Imports
-import { Box, FormControlLabel, Grid, Radio, RadioGroup } from "@mui/material";
+import { Box, FormControlLabel, Radio, RadioGroup } from "@mui/material";
 import { Eye, EyeOff } from "lucide-react";
 // Formik Imports
 import { Form, Formik, FormikProps } from "formik";
@@ -21,7 +21,6 @@ import { signUpSchema } from "./components/validationSchema";
 import { Heading, SubHeading } from "../../components/Heading";
 // Google OAuth Imports
 import GoogleOAuth from "../../components/OAuth";
-import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
 import HeroSlideshow from "../../views/Home/HeroSlideshow";
@@ -163,19 +162,20 @@ const SignUp = () => {
       }}
     >
       <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
-      <Box sx={{ position: "relative", zIndex: 2, width: "100%" }}>
-      <AppContainer>
-        <Grid container spacing={2} justifyContent="center">
-          <Grid item xs={12} md={6} lg={5}>
-            <AppCard
-              sx={{
-                maxWidth: 460,
-                mx: "auto",
-                p: { xs: 3, md: "48px 44px" },
-                borderRadius: "24px",
-                boxShadow: "0 32px 80px rgba(0,0,0,0.35)",
-              }}
-            >
+      <AppCard
+        sx={{
+          width: { xs: "calc(100% - 32px)", sm: "480px", md: "min(560px, 33vw)" },
+          maxHeight: "calc(100vh - 64px)",
+          overflowY: "auto",
+          p: { xs: 3, md: "52px 52px" },
+          borderRadius: "28px",
+          boxShadow:
+            "0 40px 100px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)",
+          backdropFilter: "blur(24px)",
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
               <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
                 <Box
                   component="img"
@@ -428,11 +428,7 @@ const SignUp = () => {
                   </Box>
                 </>
               )}
-            </AppCard>
-          </Grid>
-        </Grid>
-      </AppContainer>
-      </Box>
+      </AppCard>
       <ToastAlert
         appearence={toast.appearence}
         type={toast.type}

@@ -126,6 +126,11 @@ const FilterPanel = ({
           fontSize: "14px",
           fontWeight: 700,
           width: "fit-content",
+          position: "sticky",
+          top: "88px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+          transition: "all 0.25s ease",
+          zIndex: 10,
         }}
       >
         <SlidersHorizontal size={16} />
@@ -144,7 +149,7 @@ const FilterPanel = ({
         borderRadius: "16px",
         position: "sticky",
         top: "88px",
-        maxHeight: "calc(100vh - 100px)",
+        maxHeight: "calc(100vh - 108px)",
         overflowY: "auto",
       }}
     >

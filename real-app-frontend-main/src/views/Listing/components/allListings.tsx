@@ -215,6 +215,11 @@ const AllListings = () => {
                       p: { xs: 2, md: 2.5 },
                       my: { xs: 2, md: 2.5 },
                       borderRadius: "16px",
+                      transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                      "&:hover": {
+                        transform: "translateY(-2px)",
+                        boxShadow: "0 12px 32px rgba(31,41,55,0.12)",
+                      },
                     }}
                     key={item?._id}
                   >

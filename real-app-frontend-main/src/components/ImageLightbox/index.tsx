@@ -153,6 +153,7 @@ const ImageLightbox = ({
               display: "flex",
               gap: "8px",
               overflowX: "auto",
+              overflowY: "auto",
               maxWidth: "90vw",
               zIndex: 3,
               p: 0.5,

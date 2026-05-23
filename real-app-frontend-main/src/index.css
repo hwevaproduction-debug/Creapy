@@ -166,3 +166,43 @@ code {
     height: 300px;
   }
 }
+
+/* Premium Scrollbar System */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(31,77,58,0.35) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(31,77,58,0.35);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(31,77,58,0.65);
+}
+@media (prefers-color-scheme: dark) {
+  * {
+    scrollbar-color: rgba(43,106,80,0.45) transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(43,106,80,0.45);
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(43,106,80,0.75);
+  }
+}
+html[data-color-scheme="dark"] * {
+  scrollbar-color: rgba(43,106,80,0.45) transparent;
+}
+html[data-color-scheme="dark"] *::-webkit-scrollbar-thumb {
+  background: rgba(43,106,80,0.45);
+}
+html[data-color-scheme="dark"] *::-webkit-scrollbar-thumb:hover {
+  background: rgba(43,106,80,0.75);
+}

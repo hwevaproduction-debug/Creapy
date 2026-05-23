@@ -145,7 +145,7 @@ const NotificationBell = ({ iconColor = "#1F2937" }: NotificationBellProps) => {
           </Box>
         </Box>
         <Divider />
-        <List disablePadding sx={{ maxHeight: 360, overflowY: "auto", py: 0 }}>
+        <List disablePadding sx={{ maxHeight: "360px", overflowY: "auto", py: 0 }}>
           {isFetching ? (
             <Box sx={{ px: 2, py: 3 }}>
               <Typography sx={{ color: "#64748B", fontSize: 13 }}>

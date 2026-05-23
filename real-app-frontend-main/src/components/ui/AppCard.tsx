@@ -36,8 +36,13 @@ const AppCard = ({
         {
           backgroundColor: "background.paper",
           color: "text.primary",
+          borderRadius: "16px",
         },
         elevationStyles[elevation],
+        (theme) =>
+          theme.palette.mode === "dark"
+            ? { border: "1px solid rgba(255,255,255,0.06)" }
+            : {},
         elevation === "flat" ? { borderColor: "divider" } : {},
         interactive
           ? {

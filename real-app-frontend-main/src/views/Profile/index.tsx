@@ -50,6 +50,7 @@ import {
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
+import WalletCard from "../../components/wallet/WalletCard";
 
 interface ISProfileForm {
   userName: string;
@@ -494,6 +495,10 @@ const Profile = () => {
                     ""
                   )}
                 </Box>
+              </Box>
+
+              <Box sx={{ width: "100%", mt: 2 }}>
+                <WalletCard compact />
               </Box>
 
               {userRole === "landlord" ? (

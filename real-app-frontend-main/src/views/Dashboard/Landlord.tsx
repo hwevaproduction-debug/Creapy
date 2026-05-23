@@ -1,6 +1,7 @@
 // React Imports
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 // MUI Imports
 import {
   Box,
@@ -18,6 +19,7 @@ import { GraduationCap, Pencil, Trash2 } from "lucide-react";
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
 import { selectedUserId } from "../../redux/auth/authSlice";
+import { deductTokens } from "../../redux/wallet/walletSlice";
 import {
   useDeleteListingMutation,
   useDeleteListingDraftMutation,
@@ -40,6 +42,8 @@ import OverlayLoader from "../../components/Spinner/OverlayLoader";
 import DotLoader from "../../components/Spinner/dotLoader";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import { studentAccommodationBadgeSx } from "../../styles/listingBadges";
+import WalletCard from "../../components/wallet/WalletCard";
+import TransactionList from "../../components/wallet/TransactionList";
 
 const getListingStatusBadge = (status: string) => {
   if (status === "pending_payment") {
@@ -202,6 +206,7 @@ const formatDraftTimestamp = (value?: string) => {
 const LandlordDashboard = () => {
   const userId = useTypedSelector(selectedUserId);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [toast, setToast] = useState({
     message: "",
     appearence: false,
@@ -247,12 +252,22 @@ const LandlordDashboard = () => {
   };
 
   const handleRespondToEngagement = async (
-    engagementId: string,
+    engagement: { id: string; tenant?: { username?: string } },
     action: "approve" | "decline"
   ) => {
     try {
-      await respondToEngagement({ id: engagementId, action }).unwrap();
+      await respondToEngagement({ id: engagement.id, action }).unwrap();
       await refetchIncomingEngagements();
+      if (action === "approve") {
+        dispatch(
+          deductTokens({
+            amount: 5,
+            label: `Approved engagement — ${
+              engagement.tenant?.username || "Tenant"
+            }`,
+          })
+        );
+      }
       setToast({
         message:
           action === "approve" ? "Engagement approved" : "Engagement declined",
@@ -343,7 +358,7 @@ const LandlordDashboard = () => {
                       size="small"
                       disabled={isRespondingToEngagement}
                       onClick={() =>
-                        handleRespondToEngagement(engagement.id, "approve")
+                        handleRespondToEngagement(engagement, "approve")
                       }
                       sx={{
                         background: "#1F4D3A",
@@ -359,7 +374,7 @@ const LandlordDashboard = () => {
                       color="error"
                       disabled={isRespondingToEngagement}
                       onClick={() =>
-                        handleRespondToEngagement(engagement.id, "decline")
+                        handleRespondToEngagement(engagement, "decline")
                       }
                     >
                       Decline
@@ -369,6 +384,14 @@ const LandlordDashboard = () => {
               </Box>
             ))
           )}
+        </AppCard>
+
+        <AppCard sx={{ mb: 3, p: { xs: 2, md: 2.5 } }}>
+          <WalletCard />
+          <Box sx={{ mt: 2 }}>
+            <Heading sx={{ fontSize: "20px", mb: 2 }}>Transactions</Heading>
+            <TransactionList maxItems={5} />
+          </Box>
         </AppCard>
 
         <Box

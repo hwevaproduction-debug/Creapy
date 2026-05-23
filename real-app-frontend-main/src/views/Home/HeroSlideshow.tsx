@@ -87,7 +87,7 @@ const HeroSlideshow = ({ images }: HeroSlideshowProps) => {
           inset: 0,
           zIndex: 1,
           background:
-            "linear-gradient(to top, rgba(15,20,30,0.78) 0%, rgba(15,20,30,0.28) 55%, rgba(15,20,30,0.08) 100%)",
+            "linear-gradient(to top, rgba(15,20,30,0.88) 0%, rgba(15,20,30,0.28) 55%, rgba(15,20,30,0.12) 100%)",
         }}
       />
       {/* Layer 2 - green brand overlay */}
@@ -97,7 +97,7 @@ const HeroSlideshow = ({ images }: HeroSlideshowProps) => {
           inset: 0,
           zIndex: 2,
           background:
-            "linear-gradient(135deg, rgba(31,77,58,0.40) 0%, rgba(31,77,58,0.18) 55%, rgba(31,77,58,0) 100%)",
+            "linear-gradient(135deg, rgba(31,77,58,0.50) 0%, rgba(31,77,58,0.22) 55%, rgba(31,77,58,0) 100%)",
           opacity: greenFade ? 1 : 0.65,
           transition: "opacity 2s ease",
         }}

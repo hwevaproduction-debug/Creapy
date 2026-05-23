@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Box,
   Chip,
@@ -12,7 +13,12 @@ import {
 import { CheckCircle2, X } from "lucide-react";
 import AppButton from "../ui/AppButton";
 import ToastAlert from "../ToastAlert/ToastAlert";
+import TokenPurchaseModal from "../wallet/TokenPurchaseModal";
 import { useCreateEngagementMutation } from "../../redux/api/engagementApiSlice";
+import {
+  deductTokens,
+  selectTokenBalance,
+} from "../../redux/wallet/walletSlice";
 
 interface ContactModalProps {
   open: boolean;
@@ -26,8 +32,12 @@ interface ContactModalProps {
 }
 
 const ContactModal = ({ open, onClose, listing }: ContactModalProps) => {
+  const dispatch = useDispatch();
+  const tokenBalance = useSelector(selectTokenBalance);
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [purchaseOpen, setPurchaseOpen] = useState(false);
+  const [insufficientTokens, setInsufficientTokens] = useState(false);
   const [toast, setToast] = useState({
     message: "",
     appearence: false,
@@ -44,6 +54,7 @@ const ContactModal = ({ open, onClose, listing }: ContactModalProps) => {
     if (!open) {
       setMessage("");
       setSubmitted(false);
+      setInsufficientTokens(false);
     }
   }, [open]);
 
@@ -52,11 +63,22 @@ const ContactModal = ({ open, onClose, listing }: ContactModalProps) => {
   };
 
   const handleSubmit = async () => {
+    if (tokenBalance < 5) {
+      setInsufficientTokens(true);
+      return;
+    }
+
     try {
       await createEngagement({
         listingId: listing.id,
         message,
       }).unwrap();
+      dispatch(
+        deductTokens({
+          amount: 5,
+          label: `Contacted landlord — ${listing.name}`,
+        })
+      );
       setSubmitted(true);
     } catch (error: any) {
       setToast({
@@ -83,7 +105,7 @@ const ContactModal = ({ open, onClose, listing }: ContactModalProps) => {
           <Box>Reach Out to Landlord</Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <Chip
-              label="FREE"
+              label="5 TR"
               size="small"
               sx={{ background: "#D1EAE0", color: "#1F4D3A", fontWeight: 800 }}
             />
@@ -192,6 +214,28 @@ const ContactModal = ({ open, onClose, listing }: ContactModalProps) => {
                 Your contact details are kept private. Address and contact are
                 shared only after the landlord approves your request.
               </Box>
+              {insufficientTokens ? (
+                <Box
+                  sx={{
+                    color: "#991B1B",
+                    background: "#FEE2E2",
+                    borderRadius: "10px",
+                    p: "12px",
+                    fontSize: "13px",
+                    mt: 1.5,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 1,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <Box>You need at least 5 TR Tokens to contact a landlord.</Box>
+                  <AppButton size="small" onClick={() => setPurchaseOpen(true)}>
+                    Buy Tokens
+                  </AppButton>
+                </Box>
+              ) : null}
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3 }}>
               <AppButton
@@ -211,6 +255,10 @@ const ContactModal = ({ open, onClose, listing }: ContactModalProps) => {
         type={toast.type}
         message={toast.message}
         handleClose={handleCloseToast}
+      />
+      <TokenPurchaseModal
+        open={purchaseOpen}
+        onClose={() => setPurchaseOpen(false)}
       />
     </>
   );

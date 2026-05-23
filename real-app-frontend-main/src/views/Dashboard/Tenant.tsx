@@ -30,6 +30,8 @@ import PrimaryInput from "../../components/PrimaryInput/PrimaryInput";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import { Heading, SubHeading } from "../../components/Heading";
 import DotLoader from "../../components/Spinner/dotLoader";
+import WalletCard from "../../components/wallet/WalletCard";
+import TransactionList from "../../components/wallet/TransactionList";
 
 const getEngagementStatusBadge = (status: string) => {
   const styles =
@@ -253,7 +255,16 @@ const TenantDashboard = () => {
             { label: "Pending", value: pendingEngagements.length },
             { label: "Properties Viewed", value: recentlyViewed.length },
           ].map((stat) => (
-            <AppCard key={stat.label} sx={{ p: 2, textAlign: "center" }}>
+            <AppCard
+              key={stat.label}
+              sx={{
+                p: 2,
+                textAlign: "center",
+                borderLeft: "3px solid #1F4D3A",
+                transition: "box-shadow 0.2s ease",
+                "&:hover": { boxShadow: "0 8px 24px rgba(31,77,58,0.15)" },
+              }}
+            >
               <Box sx={{ color: "#1F4D3A", fontSize: "28px", fontWeight: 800 }}>
                 {stat.value}
               </Box>
@@ -363,6 +374,14 @@ const TenantDashboard = () => {
               ) : null}
             </Box>
           ) : null}
+        </AppCard>
+
+        <AppCard sx={{ mt: "20px", p: { xs: 2, md: 2.5 } }}>
+          <WalletCard />
+          <Box sx={{ mt: 2 }}>
+            <Heading sx={{ fontSize: "20px", mb: 2 }}>Transactions</Heading>
+            <TransactionList maxItems={5} />
+          </Box>
         </AppCard>
 
         <AppCard sx={{ mt: "20px", p: { xs: 2, md: 2.5 } }}>
