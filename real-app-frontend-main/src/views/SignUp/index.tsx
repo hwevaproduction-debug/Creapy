@@ -33,6 +33,27 @@ const FALLBACK_HERO_IMAGES = [
   "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1920&q=80",
 ];
 
+const authCardSx = {
+  width: { xs: "calc(100% - 32px)", sm: "480px", md: "min(480px, 38vw)" },
+  minWidth: { md: "420px" },
+  maxHeight: "calc(100vh - 64px)",
+  overflowY: "auto",
+  p: { xs: 3, md: "48px 52px" },
+  borderRadius: "28px",
+  background: "rgba(15,20,30,0.72)",
+  backdropFilter: "blur(28px)",
+  border: "1px solid rgba(255,255,255,0.09)",
+  boxShadow:
+    "0 48px 120px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)",
+  position: "relative",
+  zIndex: 2,
+  scrollbarWidth: "thin",
+  scrollbarColor: "#B8975A transparent",
+  "&::-webkit-scrollbar": { width: "4px" },
+  "&::-webkit-scrollbar-track": { background: "transparent" },
+  "&::-webkit-scrollbar-thumb": { background: "#B8975A", borderRadius: "4px" },
+};
+
 interface ISSignUpForm {
   userName: string;
   email: string;
@@ -169,20 +190,7 @@ const SignUp = () => {
       }}
     >
       <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
-      <AppCard
-        sx={{
-          width: { xs: "calc(100% - 32px)", sm: "480px", md: "min(560px, 33vw)" },
-          maxHeight: "calc(100vh - 64px)",
-          overflowY: "auto",
-          p: { xs: 3, md: "52px 52px" },
-          borderRadius: "28px",
-          boxShadow:
-            "0 40px 100px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)",
-          backdropFilter: "blur(24px)",
-          position: "relative",
-          zIndex: 2,
-        }}
-      >
+      <AppCard sx={authCardSx}>
               <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
                 <Box
                   component="img"

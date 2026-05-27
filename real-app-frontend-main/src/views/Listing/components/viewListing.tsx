@@ -170,9 +170,9 @@ const ViewListing = () => {
               bottom: 0,
               left: 0,
               right: 0,
-              height: "35%",
+              height: "50%",
               background:
-                "linear-gradient(to top, rgba(31,41,55,0.55), transparent)",
+                "linear-gradient(to top, rgba(31,41,55,0.65), transparent)",
               pointerEvents: "none",
             }}
           />
@@ -422,17 +422,10 @@ const ViewListing = () => {
               </Grid>
               <Grid item xs={12} md={4} lg={4}>
                 <AppCard sx={{ p: { xs: 2.5, md: 3 } }}>
-                  <Heading
-                    sx={{
-                      margin: "0 0 8px 0",
-                      fontSize: "18px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                    }}
-                  >
-                    Contact Landlord
-                  </Heading>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: "8px" }}>
+                    <Heading sx={{ margin: 0, fontSize: "18px" }}>Contact Landlord</Heading>
+                    <Box sx={{ background: "#D1EAE0", color: "#1F4D3A", borderRadius: "999px", padding: "3px 10px", fontSize: "12px", fontWeight: 800 }}>5 TR</Box>
+                  </Box>
                   <Divider />
                   {!isLoggedIn ? (
                     <Box

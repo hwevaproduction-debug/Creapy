@@ -14,24 +14,34 @@ import {
 import { setUser } from "../../redux/auth/authSlice";
 import HeroSlideshow from "../Home/HeroSlideshow";
 
-const roleDashboardPath = (role?: string) => {
-  if (role === "landlord") return "/dashboard/landlord";
-  if (role === "tenant") return "/dashboard/tenant";
-  if (role === "provider") return "/dashboard/provider";
-  if (role === "admin" || role === "super_admin") return "/dashboard/admin";
-  return "/";
-};
+const FALLBACK_HERO_IMAGES = [
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1920&q=80",
+];
 
 const cardSx = {
-  width: { xs: "calc(100% - 32px)", sm: 480 },
-  p: { xs: 3, md: 5 },
+  width: { xs: "calc(100% - 32px)", sm: "480px", md: "min(480px, 38vw)" },
+  minWidth: { md: "420px" },
+  maxHeight: "calc(100vh - 64px)",
+  overflowY: "auto",
+  p: { xs: 3, md: "48px 52px" },
   borderRadius: "28px",
-  backdropFilter: "blur(24px)",
+  background: "rgba(15,20,30,0.72)",
+  backdropFilter: "blur(28px)",
+  border: "1px solid rgba(255,255,255,0.09)",
   boxShadow:
-    "0 40px 100px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)",
+    "0 48px 120px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)",
   textAlign: "center",
   position: "relative",
   zIndex: 2,
+  scrollbarWidth: "thin",
+  scrollbarColor: "#B8975A transparent",
+  "&::-webkit-scrollbar": { width: "4px" },
+  "&::-webkit-scrollbar-track": { background: "transparent" },
+  "&::-webkit-scrollbar-thumb": { background: "#B8975A", borderRadius: "4px" },
 };
 
 const VerifyEmail = () => {
@@ -59,7 +69,13 @@ const VerifyEmail = () => {
     localStorage.setItem("user", JSON.stringify(data));
 
     const timeout = window.setTimeout(() => {
-      navigate(roleDashboardPath(data?.data?.user?.role), { replace: true });
+      navigate("/onboarding", {
+        replace: true,
+        state: {
+          role: data?.data?.user?.role,
+          userName: data?.data?.user?.username,
+        },
+      });
     }, 1500);
 
     return () => window.clearTimeout(timeout);
@@ -95,7 +111,7 @@ const VerifyEmail = () => {
         py: 4,
       }}
     >
-      <HeroSlideshow />
+      <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
       <AppCard sx={cardSx}>
         {state === "loading" || isLoading ? (
           <>

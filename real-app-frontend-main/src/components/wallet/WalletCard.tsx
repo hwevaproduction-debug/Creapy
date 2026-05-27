@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Box, Collapse, Stack } from "@mui/material";
+import { Box, Collapse, IconButton, Stack, Tooltip } from "@mui/material";
 import { useSelector } from "react-redux";
 import AppButton from "../ui/AppButton";
+import TokenExplainerModal from "./TokenExplainerModal";
 import TokenPurchaseModal from "./TokenPurchaseModal";
 import TransactionList from "./TransactionList";
 import {
@@ -17,6 +18,7 @@ const WalletCard = ({ compact = false }: WalletCardProps) => {
   const tokenBalance = useSelector(selectTokenBalance);
   const transactions = useSelector(selectTransactions);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
+  const [explainerOpen, setExplainerOpen] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
 
   return (
@@ -32,6 +34,9 @@ const WalletCard = ({ compact = false }: WalletCardProps) => {
       >
         <Box
           sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 0.75,
             color: "rgba(255,255,255,0.68)",
             fontSize: "11px",
             fontWeight: 800,
@@ -40,6 +45,20 @@ const WalletCard = ({ compact = false }: WalletCardProps) => {
           }}
         >
           TR TOKEN BALANCE
+          <Tooltip title="How TR Tokens work">
+            <IconButton
+              size="small"
+              onClick={() => setExplainerOpen(true)}
+              sx={{
+                width: 22,
+                height: 22,
+                color: "#B8975A",
+                border: "1px solid rgba(184,151,90,0.55)",
+              }}
+            >
+              ?
+            </IconButton>
+          </Tooltip>
         </Box>
         <Box
           sx={{
@@ -84,6 +103,25 @@ const WalletCard = ({ compact = false }: WalletCardProps) => {
             Transactions ↓
           </AppButton>
         </Stack>
+        <Box
+          sx={{
+            mt: 2,
+            p: 1.5,
+            borderRadius: "14px",
+            background: "rgba(255,255,255,0.06)",
+            color: "rgba(255,255,255,0.65)",
+            fontSize: "12px",
+            lineHeight: 1.8,
+          }}
+        >
+          <Box sx={{ color: "#fff", fontWeight: 800, mb: 0.5 }}>
+            TR Tokens unlock:
+          </Box>
+          <Box><Box component="span" sx={{ color: "#B8975A", fontWeight: 800 }}>{"\u2713"}</Box> Contact landlords - 5 TR</Box>
+          <Box><Box component="span" sx={{ color: "#B8975A", fontWeight: 800 }}>{"\u2713"}</Box> Approve tenant requests - 5 TR</Box>
+          <Box><Box component="span" sx={{ color: "rgba(255,255,255,0.35)", fontWeight: 800 }}>{"\u25F7"}</Box> Featured listings - coming soon</Box>
+          <Box><Box component="span" sx={{ color: "rgba(255,255,255,0.35)", fontWeight: 800 }}>{"\u25F7"}</Box> Premium visibility boosts - coming soon</Box>
+        </Box>
         <Collapse in={showTransactions}>
           <Box
             sx={{
@@ -101,6 +139,10 @@ const WalletCard = ({ compact = false }: WalletCardProps) => {
       <TokenPurchaseModal
         open={purchaseOpen}
         onClose={() => setPurchaseOpen(false)}
+      />
+      <TokenExplainerModal
+        open={explainerOpen}
+        onClose={() => setExplainerOpen(false)}
       />
     </>
   );

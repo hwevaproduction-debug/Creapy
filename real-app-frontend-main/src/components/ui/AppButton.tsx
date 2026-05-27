@@ -20,10 +20,11 @@ const AppButton = ({
   const brandVariantSx =
     isBrandColor && variant === "contained"
       ? {
-          background: "#B8975A",
+          background: "linear-gradient(135deg, #B8975A, #9E7E45)",
           color: "#FFFFFF",
+          boxShadow: "0 4px 16px rgba(184,151,90,0.25)",
           "&:hover": {
-            background: "#9E7E45",
+            background: "linear-gradient(135deg, #C9A86A, #B8975A)",
             boxShadow: "0 4px 12px rgba(184,151,90,0.35)",
             transform: "translateY(-1px)",
           },

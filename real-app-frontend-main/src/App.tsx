@@ -24,6 +24,7 @@ import ListingPayment from "./views/Dashboard/Payment";
 import AdminDashboard from "./views/Dashboard/Admin";
 import VerifyEmail from "./views/VerifyEmail";
 import VerifyPhone from "./views/VerifyPhone";
+import Onboarding from "./views/Onboarding";
 import Stays from "./views/Stays";
 import StayRoomDetail from "./views/Stays/RoomDetail";
 import BookingConfirmation from "./views/Stays/BookingConfirmation";
@@ -35,6 +36,12 @@ import LandlordTerms from "./views/Legal/LandlordTerms";
 import RefundPolicy from "./views/Legal/RefundPolicy";
 import CommunityGuidelines from "./views/Legal/CommunityGuidelines";
 import TrustSafety from "./views/Legal/TrustSafety";
+import DocsHub from "./views/Docs";
+import ReleaseNotes from "./views/Docs/ReleaseNotes";
+import TRTokens from "./views/Docs/TRTokens";
+import TenantGuide from "./views/Docs/TenantGuide";
+import LandlordGuide from "./views/Docs/LandlordGuide";
+import Roadmap from "./views/Docs/Roadmap";
 import Footer from "./components/Footer";
 import { createAppTheme } from "./theme";
 
@@ -48,6 +55,7 @@ const AUTH_FOOTER_PATHS = [
   "/provider-signup",
   "/verify-email",
   "/verify-phone",
+  "/onboarding",
 ];
 
 const AppFooter = () => {
@@ -133,6 +141,7 @@ function App() {
             />
             <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/verify-phone" element={<VerifyPhone />} />
+            <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
             <Route path="/terms" element={<TermsOfUse />} />
@@ -141,6 +150,12 @@ function App() {
             <Route path="/refund-policy" element={<RefundPolicy />} />
             <Route path="/community-guidelines" element={<CommunityGuidelines />} />
             <Route path="/trust-safety" element={<TrustSafety />} />
+            <Route path="/docs" element={<DocsHub />} />
+            <Route path="/docs/release-notes" element={<ReleaseNotes />} />
+            <Route path="/docs/tr-tokens" element={<TRTokens />} />
+            <Route path="/docs/tenant-guide" element={<TenantGuide />} />
+            <Route path="/docs/landlord-guide" element={<LandlordGuide />} />
+            <Route path="/docs/roadmap" element={<Roadmap />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/stays" element={<Stays />} />
             <Route path="/stays/rooms/:roomId" element={<StayRoomDetail />} />

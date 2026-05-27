@@ -1,7 +1,7 @@
 import { Card, CardProps } from "@mui/material";
 
 interface AppCardProps extends Omit<CardProps, "elevation" | "variant"> {
-  elevation?: "flat" | "raised" | "floating";
+  elevation?: "flat" | "raised" | "floating" | "premium";
   interactive?: boolean;
   variant?: "default" | "glass";
 }
@@ -17,12 +17,16 @@ const elevationStyles = {
   floating: {
     boxShadow: "0 12px 40px rgba(31,41,55,0.14)",
   },
+  premium: {
+    boxShadow: "0 20px 60px rgba(0,0,0,0.22), 0 4px 16px rgba(0,0,0,0.12)",
+  },
 };
 
 const nextElevation = {
   flat: "raised",
   raised: "floating",
   floating: "floating",
+  premium: "premium",
 } as const;
 
 const AppCard = ({
@@ -39,7 +43,7 @@ const AppCard = ({
           backgroundColor: "background.paper",
           color: "text.primary",
           borderRadius: "16px",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.12)",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
           border: "1px solid rgba(255,255,255,0.07)",
         },
         elevationStyles[elevation],
@@ -62,7 +66,7 @@ const AppCard = ({
               cursor: "pointer",
               transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
               "&:hover": {
-                transform: "translateY(-2px)",
+                transform: "translateY(-3px)",
                 boxShadow: elevationStyles[nextElevation[elevation]].boxShadow,
               },
             }

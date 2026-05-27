@@ -230,14 +230,14 @@ const Header = () => {
           zIndex: 1100,
           background:
             isHeroPage && !scrolled
-              ? "rgba(31,77,58,0.18)"
+              ? "rgba(15,20,30,0.42)"
               : theme.palette.mode === "dark"
               ? "rgba(13,17,23,0.94)"
               : "rgba(245,240,235,0.94)",
-          backdropFilter: isHeroPage && !scrolled ? "blur(4px)" : "blur(16px)",
+          backdropFilter: isHeroPage && !scrolled ? "blur(12px)" : "blur(16px)",
           borderBottom:
             isHeroPage && !scrolled
-              ? "none"
+              ? "1px solid rgba(255,255,255,0.08)"
               : "1px solid rgba(184,151,90,0.18)",
           transition: "background 0.35s ease, backdrop-filter 0.35s ease, border-color 0.35s ease",
         }}
@@ -280,6 +280,10 @@ const Header = () => {
                     width: "auto",
                     objectFit: "contain",
                     display: "block",
+                    filter:
+                      isHeroPage && !scrolled
+                        ? "drop-shadow(0 2px 8px rgba(0,0,0,0.5))"
+                        : undefined,
                   }}
                 />
               </Box>
@@ -326,7 +330,12 @@ const Header = () => {
                     key={item.path}
                     sx={{
                       ...getActiveMenuStyle(isActive(item.path)),
-                      ...(isHeroPage && !scrolled ? { color: "#fff" } : {}),
+                      ...(isHeroPage && !scrolled
+                        ? {
+                            color: "#fff",
+                            textShadow: "0 1px 8px rgba(0,0,0,0.6)",
+                          }
+                        : {}),
                     }}
                     onClick={() => navigate(item.path)}
                   >

@@ -33,6 +33,11 @@ import { Heading, SubHeading } from "../../components/Heading";
 import DotLoader from "../../components/Spinner/dotLoader";
 import WalletCard from "../../components/wallet/WalletCard";
 import TransactionList from "../../components/wallet/TransactionList";
+import useTokenNotifications from "../../hooks/useTokenNotifications";
+import OnboardingChecklist from "./components/OnboardingChecklist";
+import QuickActionsBar from "./components/QuickActionsBar";
+import TRTokenOnboarding from "./components/TRTokenOnboarding";
+import VerificationStatusCard from "./components/VerificationStatusCard";
 
 const getEngagementStatusBadge = (status: string) => {
   const styles =
@@ -65,6 +70,8 @@ const TenantDashboard = () => {
   const premiumExpiry = useTypedSelector(selectedUserPremiumExpiry);
   const userName = useTypedSelector(selectedUserName);
   const authUser = useTypedSelector((state) => state.auth?.user);
+  const { toast: tokenToast, handleCloseToast: handleCloseTokenToast } =
+    useTokenNotifications();
   const [recentlyViewed, setRecentlyViewed] = useState<
     Array<{ id: string; name: string }>
   >([]);
@@ -242,7 +249,11 @@ const TenantDashboard = () => {
         </Box>
       </Box>
       <AppContainer sx={{ pb: { xs: 4, md: 6 } }}>
+        <TRTokenOnboarding />
+        <QuickActionsBar role="tenant" />
 
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 340px" }, gap: 3, alignItems: "start" }}>
+          <Box>
         <Box
           sx={{
             display: "grid",
@@ -376,14 +387,6 @@ const TenantDashboard = () => {
               ) : null}
             </Box>
           ) : null}
-        </AppCard>
-
-        <AppCard sx={{ mt: "20px", p: { xs: 2, md: 2.5 } }}>
-          <WalletCard />
-          <Box sx={{ mt: 2 }}>
-            <Heading sx={{ fontSize: "20px", mb: 2 }}>Transactions</Heading>
-            <TransactionList maxItems={5} />
-          </Box>
         </AppCard>
 
         <AppCard sx={{ mt: "20px", p: { xs: 2, md: 2.5 } }}>
@@ -552,6 +555,19 @@ const TenantDashboard = () => {
             </Box>
           </AppCard>
         ) : null}
+          </Box>
+          <Box sx={{ display: "grid", gap: 2 }}>
+            <AppCard sx={{ p: { xs: 2, md: 2.5 } }}>
+              <WalletCard />
+              <Box sx={{ mt: 2 }}>
+                <Heading sx={{ fontSize: "20px", mb: 2 }}>Transactions</Heading>
+                <TransactionList maxItems={5} />
+              </Box>
+            </AppCard>
+            <VerificationStatusCard />
+            <OnboardingChecklist />
+          </Box>
+        </Box>
       </AppContainer>
 
       <ToastAlert
@@ -559,6 +575,12 @@ const TenantDashboard = () => {
         type={toast.type}
         message={toast.message}
         handleClose={handleCloseToast}
+      />
+      <ToastAlert
+        appearence={tokenToast.appearence}
+        type={tokenToast.type}
+        message={tokenToast.message}
+        handleClose={handleCloseTokenToast}
       />
     </Box>
   );

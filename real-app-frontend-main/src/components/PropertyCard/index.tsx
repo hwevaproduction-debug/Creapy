@@ -159,16 +159,34 @@ const PropertyCard = ({ item, onClick }: PropertyCardProps) => {
             bottom: 0,
             left: 0,
             right: 0,
-            height: "40%",
+            height: "55%",
             background: (theme) =>
               `linear-gradient(to top, ${alpha(
                 theme.palette.common.black,
-                theme.palette.mode === "dark" ? 0.65 : 0.5,
+                theme.palette.mode === "dark" ? 0.75 : 0.6,
               )}, transparent)`,
             pointerEvents: "none",
           }}
         />
         {renderPropertyBadges(item)}
+        {item?.isVerified || item?.status === "active" ? (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 52,
+              right: 12,
+              background: "rgba(31,77,58,0.9)",
+              color: "#fff",
+              borderRadius: "999px",
+              padding: "3px 8px",
+              fontSize: "11px",
+              fontWeight: 700,
+              zIndex: 1,
+            }}
+          >
+            {"\u2713"} Verified
+          </Box>
+        ) : null}
         <Box
           component="button"
           type="button"

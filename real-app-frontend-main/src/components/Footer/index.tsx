@@ -25,6 +25,15 @@ const groups = [
       { label: "Contact", to: "mailto:support@townruins.com", external: true },
     ],
   },
+  {
+    title: "Platform",
+    links: [
+      { label: "Documentation", to: "/docs" },
+      { label: "Release Notes", to: "/docs/release-notes" },
+      { label: "TR Token Guide", to: "/docs/tr-tokens" },
+      { label: "Roadmap", to: "/docs/roadmap" },
+    ],
+  },
 ];
 
 const Footer = () => {
@@ -41,7 +50,7 @@ const Footer = () => {
     >
       <Grid container spacing={4}>
         {groups.map((group) => (
-          <Grid item xs={12} md={4} key={group.title}>
+          <Grid item xs={12} md={3} key={group.title}>
             <Box sx={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#B8975A", mb: 2 }}>
               {group.title}
             </Box>
@@ -65,8 +74,11 @@ const Footer = () => {
           </Grid>
         ))}
       </Grid>
-      <Box sx={{ borderTop: "1px solid rgba(255,255,255,0.08)", mt: 4, pt: 3, textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: 12 }}>
+      <Box sx={{ borderTop: "1px solid rgba(184,151,90,0.2)", mt: 4, pt: 3, textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: 12 }}>
         © 2026 Town Ruins. All rights reserved.
+        <Box sx={{ color: "#B8975A", fontSize: 11, mt: 0.75 }}>
+          Powered by TR Tokens
+        </Box>
       </Box>
     </Box>
   );

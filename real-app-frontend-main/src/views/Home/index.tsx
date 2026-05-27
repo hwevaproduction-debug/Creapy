@@ -273,12 +273,12 @@ const Home = () => {
           backgroundColor: "#0F141E",
           display: "flex",
           alignItems: "center",
-          pt: { xs: 12, md: 14 },
+          pt: 0,
           pb: { xs: 6, md: 8 },
         }}
       >
         <HeroSlideshow images={heroImages} />
-        <Box sx={{ position: "relative", zIndex: 1, width: "100%" }}>
+        <Box sx={{ position: "relative", zIndex: 1, width: "100%", pt: { xs: "80px", md: "96px" } }}>
           <AppContainer>
             <Box
               sx={{
@@ -296,6 +296,7 @@ const Home = () => {
                 color: "#B8975A",
                 textTransform: "uppercase",
                 marginBottom: 2,
+                textShadow: "0 1px 8px rgba(0,0,0,0.5)",
               }}
             >
               ZIMBABWE&apos;S PREMIER PROPERTY PLATFORM
@@ -310,6 +311,8 @@ const Home = () => {
                 margin: 0,
                 marginBottom: 2.5,
                 lineHeight: 1.05,
+                textShadow:
+                  "0 2px 16px rgba(0,0,0,0.7), 0 1px 4px rgba(0,0,0,0.5)",
               }}
             >
               Find Your Perfect Home in Zimbabwe
@@ -320,6 +323,7 @@ const Home = () => {
                 opacity: 0.82,
                 marginBottom: 4,
                 lineHeight: 1.6,
+                textShadow: "0 1px 8px rgba(0,0,0,0.4)",
               }}
             >
               Explore thousands of verified rentals, student accommodation, and

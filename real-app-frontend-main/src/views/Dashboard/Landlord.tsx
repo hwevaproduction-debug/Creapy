@@ -18,7 +18,7 @@ import { ClipboardList, GraduationCap, Pencil, Trash2 } from "lucide-react";
 // Hook Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
-import { selectedUserId } from "../../redux/auth/authSlice";
+import { selectedUserId, selectedUserName } from "../../redux/auth/authSlice";
 import { deductTokens } from "../../redux/wallet/walletSlice";
 import {
   useDeleteListingMutation,
@@ -44,6 +44,12 @@ import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import { studentAccommodationBadgeSx } from "../../styles/listingBadges";
 import WalletCard from "../../components/wallet/WalletCard";
 import TransactionList from "../../components/wallet/TransactionList";
+import { getGreeting } from "../../utils/greeting";
+import useTokenNotifications from "../../hooks/useTokenNotifications";
+import OnboardingChecklist from "./components/OnboardingChecklist";
+import QuickActionsBar from "./components/QuickActionsBar";
+import TRTokenOnboarding from "./components/TRTokenOnboarding";
+import VerificationStatusCard from "./components/VerificationStatusCard";
 
 const getListingStatusBadge = (status: string) => {
   if (status === "pending_payment") {
@@ -205,8 +211,11 @@ const formatDraftTimestamp = (value?: string) => {
 
 const LandlordDashboard = () => {
   const userId = useTypedSelector(selectedUserId);
+  const userName = useTypedSelector(selectedUserName);
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { toast: tokenToast, handleCloseToast: handleCloseTokenToast } =
+    useTokenNotifications();
   const [toast, setToast] = useState({
     message: "",
     appearence: false,
@@ -289,12 +298,16 @@ const LandlordDashboard = () => {
       <Box sx={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)", pt: { xs: 8, md: 10 }, pb: { xs: 8, md: 10 }, px: 3, mb: -6 }}>
         <Box sx={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 20% 50%, rgba(31,77,58,0.3) 0%, transparent 60%)", pointerEvents: "none" }} />
         <Box sx={{ maxWidth: 900, mx: "auto" }}>
-          <Box sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, fontWeight: 800, color: "#fff" }}>My Dashboard</Box>
+          <Box sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, fontWeight: 800, color: "#fff" }}>{getGreeting(userName)}</Box>
           <Box sx={{ color: "rgba(255,255,255,0.7)", fontSize: "1rem", mt: 1 }}>Manage your listings and track engagement</Box>
         </Box>
       </Box>
       <AppContainer sx={{ pb: { xs: 4, md: 6 } }}>
+        <TRTokenOnboarding />
+        <QuickActionsBar role="landlord" />
 
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 340px" }, gap: 3, alignItems: "start" }}>
+          <Box>
         <AppCard sx={{ mb: 6, p: { xs: 2, md: 2.5 }, boxShadow: "0 4px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.07)", "&:hover": { transform: "translateY(-2px)", transition: "transform 0.2s ease" } }}>
           <Heading sx={{ fontSize: "20px", mb: 2 }}>
             Incoming Engagement Requests
@@ -387,14 +400,6 @@ const LandlordDashboard = () => {
               </Box>
             ))
           )}
-        </AppCard>
-
-        <AppCard sx={{ mb: 6, p: { xs: 2, md: 2.5 }, boxShadow: "0 4px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.07)", "&:hover": { transform: "translateY(-2px)", transition: "transform 0.2s ease" } }}>
-          <WalletCard />
-          <Box sx={{ mt: 2 }}>
-            <Heading sx={{ fontSize: "20px", mb: 2 }}>Transactions</Heading>
-            <TransactionList maxItems={5} />
-          </Box>
         </AppCard>
 
         <Box
@@ -700,12 +705,31 @@ const LandlordDashboard = () => {
             </TableContainer>
           </AppCard>
         )}
+          </Box>
+          <Box sx={{ display: "grid", gap: 2 }}>
+            <AppCard sx={{ p: { xs: 2, md: 2.5 } }}>
+              <WalletCard />
+              <Box sx={{ mt: 2 }}>
+                <Heading sx={{ fontSize: "20px", mb: 2 }}>Transactions</Heading>
+                <TransactionList maxItems={5} />
+              </Box>
+            </AppCard>
+            <VerificationStatusCard />
+            <OnboardingChecklist />
+          </Box>
+        </Box>
       </AppContainer>
       <ToastAlert
         appearence={toast.appearence}
         type={toast.type}
         message={toast.message}
         handleClose={handleCloseToast}
+      />
+      <ToastAlert
+        appearence={tokenToast.appearence}
+        type={tokenToast.type}
+        message={tokenToast.message}
+        handleClose={handleCloseTokenToast}
       />
     </Box>
   );

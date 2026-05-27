@@ -206,3 +206,8 @@ html[data-color-scheme="dark"] *::-webkit-scrollbar-thumb {
 html[data-color-scheme="dark"] *::-webkit-scrollbar-thumb:hover {
   background: rgba(43,106,80,0.75);
 }
+
+html { scroll-behavior: smooth; }
+::selection { background: rgba(184,151,90,0.3); color: inherit; }
+:focus-visible { outline: 2px solid rgba(184,151,90,0.6); outline-offset: 2px; }
+* { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
