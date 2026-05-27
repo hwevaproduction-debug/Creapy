@@ -1,23 +1,28 @@
 import { useEffect, useState } from "react";
 import { Box } from "@mui/material";
-import { useSelector } from "react-redux";
+import useTypedSelector from "../../../hooks/useTypedSelector";
 import AppButton from "../../../components/ui/AppButton";
 import TokenExplainerModal from "../../../components/wallet/TokenExplainerModal";
 import { selectTokenBalance } from "../../../redux/wallet/walletSlice";
+import { getAuthUserId } from "../../../redux/auth/authSlice";
 
 const STORAGE_KEY = "tr_token_onboarding_seen";
 
 const TRTokenOnboarding = () => {
-  const tokenBalance = useSelector(selectTokenBalance);
+  const tokenBalance = useTypedSelector(selectTokenBalance);
+  const userId = useTypedSelector((state) => getAuthUserId(state.auth?.user));
   const [visible, setVisible] = useState(false);
   const [explainerOpen, setExplainerOpen] = useState(false);
+  const storageKey = userId ? `${STORAGE_KEY}:${userId}` : null;
 
   useEffect(() => {
-    setVisible(localStorage.getItem(STORAGE_KEY) !== "true");
-  }, []);
+    setVisible(storageKey ? localStorage.getItem(storageKey) !== "true" : false);
+  }, [storageKey]);
 
   const handleDismiss = () => {
-    localStorage.setItem(STORAGE_KEY, "true");
+    if (storageKey) {
+      localStorage.setItem(storageKey, "true");
+    }
     setVisible(false);
   };
 

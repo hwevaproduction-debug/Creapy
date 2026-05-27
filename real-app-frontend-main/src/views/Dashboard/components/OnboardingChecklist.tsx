@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Box, LinearProgress } from "@mui/material";
 import useTypedSelector from "../../../hooks/useTypedSelector";
-import { selectedIsEmailVerified } from "../../../redux/auth/authSlice";
+import {
+  selectedIsEmailVerified,
+  selectedUserAvatar,
+  selectedUserEmail,
+  selectedUserName,
+  selectedUserRole,
+} from "../../../redux/auth/authSlice";
 import { selectTransactions } from "../../../redux/wallet/walletSlice";
 import AppButton from "../../../components/ui/AppButton";
 import AppCard from "../../../components/ui/AppCard";
@@ -20,15 +26,17 @@ const readJsonArray = (key: string) => {
 
 const OnboardingChecklist = () => {
   const isEmailVerified = useTypedSelector(selectedIsEmailVerified);
+  const userRole = useTypedSelector(selectedUserRole);
+  const userName = useTypedSelector(selectedUserName);
+  const userEmail = useTypedSelector(selectedUserEmail);
+  const userAvatar = useTypedSelector(selectedUserAvatar);
   const transactions = useTypedSelector(selectTransactions);
   const [dismissed, setDismissed] = useState(false);
-  const [profileCompleted, setProfileCompleted] = useState(false);
   const [hasRecentlyViewed, setHasRecentlyViewed] = useState(false);
   const [storedCompleted, setStoredCompleted] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setDismissed(localStorage.getItem(DISMISS_KEY) === "true");
-    setProfileCompleted(localStorage.getItem("tr_profile_completed") === "true");
     setHasRecentlyViewed(readJsonArray("tr_recently_viewed").length > 0);
     try {
       const parsed = JSON.parse(localStorage.getItem(CHECKLIST_KEY) || "{}");
@@ -40,20 +48,46 @@ const OnboardingChecklist = () => {
     }
   }, []);
 
+  const hasCompletedProfile = Boolean(userName?.trim() && userEmail?.trim() && userAvatar);
+  const isLandlord = userRole === "landlord";
   const steps = useMemo(
-    () => [
-      { label: "Create account", complete: storedCompleted.createAccount ?? true },
-      { label: "Verify email", complete: isEmailVerified },
-      { label: "Complete profile", complete: storedCompleted.completeProfile ?? profileCompleted },
-      { label: "Browse first listing", complete: storedCompleted.browseFirstListing ?? hasRecentlyViewed },
-      {
-        label: "Contact a landlord",
-        complete: transactions.some((transaction) =>
-          transaction.label.startsWith("Contacted landlord")
-        ),
-      },
-    ],
-    [hasRecentlyViewed, isEmailVerified, profileCompleted, storedCompleted, transactions]
+    () => {
+      const finalStep = isLandlord
+        ? {
+            label: "Approve an engagement",
+            complete: transactions.some((transaction) =>
+              transaction.label.startsWith("Approved engagement")
+            ),
+          }
+        : {
+            label: "Contact a landlord",
+            complete: transactions.some((transaction) =>
+              transaction.label.startsWith("Contacted landlord")
+            ),
+          };
+
+      return [
+        { label: "Create account", complete: storedCompleted.createAccount ?? true },
+        { label: "Verify email", complete: isEmailVerified },
+        {
+          label: "Complete profile",
+          complete: storedCompleted.completeProfile ?? hasCompletedProfile,
+        },
+        {
+          label: "Browse first listing",
+          complete: storedCompleted.browseFirstListing ?? hasRecentlyViewed,
+        },
+        finalStep,
+      ];
+    },
+    [
+      hasCompletedProfile,
+      hasRecentlyViewed,
+      isEmailVerified,
+      isLandlord,
+      storedCompleted,
+      transactions,
+    ]
   );
   const completedCount = steps.filter((step) => step.complete).length;
   const allComplete = completedCount === steps.length;

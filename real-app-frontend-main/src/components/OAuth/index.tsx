@@ -36,16 +36,16 @@ const GoogleOAuth = ({ role }: { role?: string }) => {
       const user: any = await google(payload);
       dispatch(setUser(user.data));
       localStorage.setItem("user", JSON.stringify(user.data));
-      const role = user?.data?.data?.user?.role;
-      if (role === "landlord") {
+      const userRole = user?.data?.data?.user?.role;
+      if (userRole === "landlord") {
         navigate("/dashboard/landlord");
-        } else if (role === "tenant") {
-          navigate("/dashboard/tenant");
-        } else if (role === "admin") {
-          navigate("/dashboard/admin");
-        } else {
-          navigate("/");
-        }
+      } else if (userRole === "tenant") {
+        navigate("/dashboard/tenant");
+      } else if (userRole === "admin") {
+        navigate("/dashboard/admin");
+      } else {
+        navigate("/");
+      }
     } catch (error) {
       console.error("Google GoogleOAuth Error: ", error);
     }
