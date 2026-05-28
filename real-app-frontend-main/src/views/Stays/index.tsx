@@ -36,11 +36,6 @@ import {
   useStayFilters,
 } from "../../hooks/useStayFilters";
 import { useSearchStaysQuery } from "../../redux/api/stayApiSlice";
-import useTypedSelector from "../../hooks/useTypedSelector";
-import {
-  selectedUserRole,
-  selectedUserToken,
-} from "../../redux/auth/authSlice";
 import HeroSlideshow from "../Home/HeroSlideshow";
 
 const STAY_HERO_IMAGES = [
@@ -113,9 +108,6 @@ const Stays = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-  const token = useTypedSelector(selectedUserToken);
-  const userRole = useTypedSelector(selectedUserRole);
-  const isAuthenticated = Boolean(token);
   const {
     filters,
     appliedFilters,
@@ -389,13 +381,7 @@ const Stays = () => {
             </Box>
             <AppButton
               variant="outlined"
-              onClick={() =>
-                navigate(
-                  isAuthenticated && userRole === "provider"
-                    ? "/dashboard/provider"
-                    : "/provider-signup"
-                )
-              }
+              onClick={() => navigate("/provider-signup")}
               sx={{
                 color: "#fff",
                 borderColor: "rgba(255,255,255,0.6)",

@@ -145,6 +145,16 @@ const normalizeListingPayload = (body) => {
   if (payload.regularPrice != null && payload.monthlyRent == null) {
     payload.monthlyRent = payload.regularPrice;
   }
+  delete payload.regularPrice;
+  delete payload.discountedPrice;
+  delete payload.id;
+  delete payload.user;
+  delete payload.userRef;
+  delete payload.userId;
+  delete payload.createdAt;
+  delete payload.updatedAt;
+  delete payload.payments;
+  delete payload.engagements;
 
   if (payload.parking != null) {
     payload.amenities = payload.amenities || {};
@@ -667,5 +677,6 @@ exports.getHomeGroupedByLocation = catchAsync(async (req, res, next) => {
 
 exports.__testables = {
   matchesSavedSearch,
+  normalizeListingPayload,
   sanitizeListingForPublic,
 };

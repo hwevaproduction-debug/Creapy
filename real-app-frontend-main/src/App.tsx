@@ -133,11 +133,7 @@ function App() {
             />
             <Route
               path="/provider-signup"
-              element={
-                <PublicRoutes>
-                  <ProviderSignUp />
-                </PublicRoutes>
-              }
+              element={<ProviderSignUp />}
             />
             <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/verify-phone" element={<VerifyPhone />} />

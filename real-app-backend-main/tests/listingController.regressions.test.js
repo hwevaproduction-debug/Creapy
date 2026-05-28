@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const listingController = require("../controllers/listingController");
 const prisma = require("../utils/prisma");
+const { normalizeListingPayload } = listingController.__testables;
 
 const originalListing = {
   ...prisma.listing,
@@ -72,6 +73,36 @@ test("getListing hides pending payment listings from non-owners", async () => {
 
   assert.equal(result.error.statusCode, 404);
   assert.equal(result.error.message, "No listing found with that ID");
+});
+
+test("normalizeListingPayload maps legacy price and strips non-Prisma fields", () => {
+  const payload = normalizeListingPayload({
+    name: "Legacy listing",
+    regularPrice: 25000,
+    discountedPrice: 0,
+    user: "user_1",
+    userRef: "user_1",
+    userId: "user_1",
+    location: {
+      province: "Mashonaland East",
+      city: "Marondera",
+      addressLine: "12 Main Road",
+      coordinates: { lat: -18.18, lng: 31.55 },
+    },
+  });
+
+  assert.equal(payload.monthlyRent, 25000);
+  assert.equal(Object.prototype.hasOwnProperty.call(payload, "regularPrice"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(payload, "discountedPrice"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(payload, "user"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(payload, "userRef"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(payload, "userId"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(payload, "location"), false);
+  assert.equal(payload.province, "Mashonaland East");
+  assert.equal(payload.city, "Marondera");
+  assert.equal(payload.addressLine, "12 Main Road");
+  assert.equal(payload.lat, -18.18);
+  assert.equal(payload.lng, 31.55);
 });
 
 test("getListing hides early access listings from non-premium users and preserves location shape", async () => {
