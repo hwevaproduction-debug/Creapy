@@ -9,8 +9,19 @@ const createListingValidators = [
     .equals("rent")
     .withMessage("Only rental listings are supported"),
   body("monthlyRent")
+    .optional({ nullable: true })
     .isFloat({ gt: 0 })
     .withMessage("monthlyRent must be a number greater than 0"),
+  body("regularPrice")
+    .optional({ nullable: true })
+    .isFloat({ gt: 0 })
+    .withMessage("regularPrice must be a number greater than 0"),
+  body().custom((_, { req }) => {
+    if (req.body.monthlyRent == null && req.body.regularPrice == null) {
+      throw new Error("monthlyRent is required");
+    }
+    return true;
+  }),
   body("bedrooms")
     .optional({ nullable: true })
     .isInt({ min: 1 })

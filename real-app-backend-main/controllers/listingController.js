@@ -195,6 +195,33 @@ const normalizeListingPayload = (body) => {
   return payload;
 };
 
+const buildListingCreateData = (body) => {
+  const payload = normalizeListingPayload(body);
+
+  return {
+    name: payload.name,
+    description: payload.description,
+    address: payload.address,
+    phoneNumber: payload.phoneNumber,
+    monthlyRent:
+      payload.monthlyRent != null ? Number(payload.monthlyRent) : payload.monthlyRent,
+    province: payload.province || "",
+    city: payload.city || "",
+    addressLine: payload.addressLine || "",
+    lat: payload.lat ?? null,
+    lng: payload.lng ?? null,
+    amenities: payload.amenities || {},
+    bathrooms: Number(payload.bathrooms),
+    bedrooms: payload.bedrooms == null ? null : Number(payload.bedrooms),
+    totalRooms: Number(payload.totalRooms),
+    furnished: Boolean(payload.furnished),
+    type: payload.type || "rent",
+    offer: Boolean(payload.offer),
+    studentAccommodation: Boolean(payload.studentAccommodation),
+    imageUrls: payload.imageUrls || [],
+  };
+};
+
 const matchesSavedSearch = (search, listing) => {
   const c = search.criteria || {};
   const loc = (c.location || "").trim().toLowerCase();
@@ -251,7 +278,7 @@ exports.createListing = catchAsync(async (req, res, next) => {
   }
 
   const data = {
-    ...normalizeListingPayload(req.body),
+    ...buildListingCreateData(req.body),
     userId: req.user.id,
     status: "active",
     publishedAt: new Date(),
@@ -677,6 +704,7 @@ exports.getHomeGroupedByLocation = catchAsync(async (req, res, next) => {
 
 exports.__testables = {
   matchesSavedSearch,
+  buildListingCreateData,
   normalizeListingPayload,
   sanitizeListingForPublic,
 };

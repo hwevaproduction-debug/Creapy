@@ -8,6 +8,9 @@ const { normalizeListingPayload } = listingController.__testables;
 const originalListing = {
   ...prisma.listing,
 };
+const originalSavedSearch = {
+  ...prisma.savedSearch,
+};
 
 const assertPublicContactFieldsAbsent = (listing) => {
   assert.equal(Object.prototype.hasOwnProperty.call(listing, "phoneNumber"), false);
@@ -50,10 +53,14 @@ const invokeController = (handler, req) =>
   });
 
 test.afterEach(() => {
+  prisma.listing.count = originalListing.count;
+  prisma.listing.create = originalListing.create;
   prisma.listing.findUnique = originalListing.findUnique;
   prisma.listing.findMany = originalListing.findMany;
   prisma.listing.update = originalListing.update;
   prisma.listing.updateMany = originalListing.updateMany;
+  prisma.savedSearch.findMany = originalSavedSearch.findMany;
+  prisma.savedSearch.update = originalSavedSearch.update;
 });
 
 test("getListing hides pending payment listings from non-owners", async () => {
@@ -103,6 +110,94 @@ test("normalizeListingPayload maps legacy price and strips non-Prisma fields", (
   assert.equal(payload.addressLine, "12 Main Road");
   assert.equal(payload.lat, -18.18);
   assert.equal(payload.lng, 31.55);
+});
+
+test("buildListingCreateData strips legacy price aliases before Prisma create", () => {
+  const { buildListingCreateData } = listingController.__testables;
+
+  const data = buildListingCreateData({
+    name: "Legacy listing",
+    description: "A nice place",
+    address: "12 Main Road",
+    phoneNumber: "+263771234567",
+    regularPrice: "25000",
+    discountedPrice: 0,
+    user: "user_1",
+    userRef: "user_1",
+    userId: "user_1",
+    bathrooms: "1",
+    totalRooms: "2",
+    furnished: false,
+    type: "rent",
+    offer: false,
+    studentAccommodation: true,
+    imageUrls: ["https://example.com/listing.jpg"],
+    location: {
+      province: "Mashonaland East",
+      city: "Marondera",
+      addressLine: "12 Main Road",
+      coordinates: { lat: -18.18, lng: 31.55 },
+    },
+  });
+
+  assert.equal(data.monthlyRent, 25000);
+  assert.equal(Object.prototype.hasOwnProperty.call(data, "regularPrice"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(data, "discountedPrice"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(data, "user"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(data, "userRef"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(data, "userId"), false);
+  assert.equal(data.province, "Mashonaland East");
+  assert.equal(data.city, "Marondera");
+  assert.equal(data.addressLine, "12 Main Road");
+  assert.equal(data.lat, -18.18);
+  assert.equal(data.lng, 31.55);
+});
+
+test("createListing only sends Prisma-safe fields", async () => {
+  prisma.listing.count = async () => 0;
+
+  let receivedData;
+  prisma.listing.create = async ({ data }) => {
+    receivedData = data;
+    return {
+      id: "listing_6",
+      ...data,
+    };
+  };
+
+  prisma.savedSearch.findMany = async () => [];
+
+  const result = await invokeController(listingController.createListing, {
+    user: { id: "user_1" },
+    body: {
+      name: "Legacy listing",
+      description: "A nice place",
+      address: "12 Main Road",
+      phoneNumber: "+263771234567",
+      regularPrice: 25000,
+      monthlyRent: 25000,
+      bathrooms: 1,
+      bedrooms: null,
+      totalRooms: 2,
+      furnished: false,
+      type: "rent",
+      offer: false,
+      studentAccommodation: true,
+      imageUrls: ["https://example.com/listing.jpg"],
+      location: {
+        province: "Mashonaland East",
+        city: "Marondera",
+        addressLine: "12 Main Road",
+        coordinates: { lat: -18.18, lng: 31.55 },
+      },
+    },
+  });
+
+  assert.equal(result.statusCode, 201);
+  assert.equal(receivedData.userId, "user_1");
+  assert.equal(receivedData.status, "active");
+  assert.equal(receivedData.monthlyRent, 25000);
+  assert.equal(Object.prototype.hasOwnProperty.call(receivedData, "regularPrice"), false);
 });
 
 test("getListing hides early access listings from non-premium users and preserves location shape", async () => {
