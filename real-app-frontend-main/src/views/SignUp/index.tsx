@@ -24,7 +24,7 @@ import GoogleOAuth from "../../components/OAuth";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
 import HeroSlideshow from "../../views/Home/HeroSlideshow";
-import { FALLBACK_HERO_IMAGES, AUTH_CARD_SX } from "../auth/authShared";
+import { FALLBACK_HERO_IMAGES, AUTH_CARD_SX, AUTH_PAGE_WRAPPER_SX } from "../auth/authShared";
 
 
 interface ISSignUpForm {
@@ -151,18 +151,7 @@ const SignUp = () => {
   };
 
   return (
-    <Box
-      sx={{
-        position: "relative",
-        minHeight: "100vh",
-        display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          py: 4,
-          pt: "72px",
-          background: "#0F141E",
-        }}
-      >
+    <Box sx={AUTH_PAGE_WRAPPER_SX}>
       <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
       <AppCard sx={AUTH_CARD_SX}>
               <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
