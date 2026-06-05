@@ -66,6 +66,14 @@ const AppFooter = () => {
   return <Footer />;
 };
 
+const AppHeader = () => {
+  const location = useLocation();
+  if (AUTH_FOOTER_PATHS.some((path) => location.pathname.startsWith(path))) {
+    return null;
+  }
+  return <Header />;
+};
+
 const getInitialColorMode = (): "light" | "dark" => {
   const storedMode = localStorage.getItem("colorMode");
 
@@ -97,7 +105,7 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Router>
-          <Header />
+          <AppHeader />
           <Routes>
             <Route
               path="/signup"
