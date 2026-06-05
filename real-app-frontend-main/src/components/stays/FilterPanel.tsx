@@ -55,7 +55,7 @@ const sectionTitleSx = {
   fontWeight: 700,
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-  color: "#94A3B8",
+  color: "text.secondary",
   mb: 1.25,
 };
 
@@ -65,7 +65,8 @@ const toggleGroupSx = {
   gap: 0.5,
   "& .MuiToggleButtonGroup-grouped": {
     m: 0,
-    border: "1px solid #E2E8F0",
+    border: "1px solid",
+    borderColor: "divider",
   },
 };
 

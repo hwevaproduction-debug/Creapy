@@ -23,35 +23,8 @@ import GoogleOAuth from "../../components/OAuth";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
 import HeroSlideshow from "../../views/Home/HeroSlideshow";
+import { FALLBACK_HERO_IMAGES, AUTH_CARD_SX } from "../auth/authShared";
 
-const FALLBACK_HERO_IMAGES = [
-  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=80",
-  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=80",
-  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1920&q=80",
-  "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1920&q=80",
-  "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1920&q=80",
-];
-
-const authCardSx = {
-  width: { xs: "calc(100% - 32px)", sm: "480px", md: "min(480px, 38vw)" },
-  minWidth: { md: "420px" },
-  maxHeight: "calc(100vh - 64px)",
-  overflowY: "auto",
-  p: { xs: 3, md: "48px 52px" },
-  borderRadius: "28px",
-  background: "rgba(15,20,30,0.72)",
-  backdropFilter: "blur(28px)",
-  border: "1px solid rgba(255,255,255,0.09)",
-  boxShadow:
-    "0 48px 120px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)",
-  position: "relative",
-  zIndex: 2,
-  scrollbarWidth: "thin",
-  scrollbarColor: "#B8975A transparent",
-  "&::-webkit-scrollbar": { width: "4px" },
-  "&::-webkit-scrollbar-track": { background: "transparent" },
-  "&::-webkit-scrollbar-thumb": { background: "#B8975A", borderRadius: "4px" },
-};
 
 interface ISLoginForm {
   email: string;
@@ -135,14 +108,15 @@ const Login = () => {
         position: "relative",
         minHeight: "100vh",
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        py: 4,
-        background: "#0F141E",
-      }}
-    >
+          alignItems: "center",
+          justifyContent: "center",
+          py: 4,
+          pt: "72px",
+          background: "#0F141E",
+        }}
+      >
       <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
-      <AppCard sx={authCardSx}>
+      <AppCard sx={AUTH_CARD_SX}>
               <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
                 <Box
                   component="img"
@@ -243,7 +217,7 @@ const Login = () => {
                       >
                         <Box
                           sx={{
-                            color: "#1F4D3A",
+                            color: "#B8975A",
                             cursor: "pointer",
                             fontSize: "14px",
                             fontWeight: 600,
@@ -307,7 +281,7 @@ const Login = () => {
                         Don't Have an account?
                         <Box
                           sx={{
-                            color: "#1F4D3A",
+                            color: "#B8975A",
                             fontWeight: 600,
                             cursor: "pointer",
                             "&:hover": {

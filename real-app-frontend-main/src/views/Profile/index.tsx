@@ -677,7 +677,7 @@ const Profile = () => {
                       elevation="flat"
                       sx={{ borderLeft: "4px solid #B8975A", p: 2 }}
                     >
-                      <Box sx={{ fontWeight: 800, color: "#1F2937", mb: 0.75 }}>
+                      <Box sx={{ fontWeight: 800, color: "text.primary", mb: 0.75 }}>
                         Identity Verification Required
                       </Box>
                       <SubHeading sx={{ color: "text.secondary", mb: 1.5 }}>

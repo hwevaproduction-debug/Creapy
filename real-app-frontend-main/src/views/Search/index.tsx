@@ -1,5 +1,5 @@
 // React Imports
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 // MUI Imports
@@ -84,9 +84,9 @@ const sectionTitleSx = {
   fontWeight: 700,
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-  color: "#94A3B8",
+  color: "text.secondary",
   mb: 1.25,
-} as const;
+};
 
 const toggleGroupSx = {
   display: "flex",
@@ -94,9 +94,10 @@ const toggleGroupSx = {
   gap: 0.5,
   "& .MuiToggleButtonGroup-grouped": {
     m: 0,
-    border: "1px solid #E2E8F0",
+    border: "1px solid",
+    borderColor: "divider",
   },
-} as const;
+};
 
 const toggleButtonSx = {
   borderRadius: "999px !important",
@@ -113,7 +114,7 @@ const toggleButtonSx = {
 
 type FilterFormProps = {
   sideBarData: any;
-  setSideBarData: (data: any) => void;
+  setSideBarData: (data: any, source?: "searchTerm" | "other") => void;
   handleSubmit: (e: any) => void;
   isMobile: boolean;
   searchText: string;
@@ -202,7 +203,8 @@ const FilterForm = ({
             sx={{
               width: 34,
               height: 34,
-              border: "1px solid #E2E8F0",
+    border: "1px solid",
+    borderColor: "divider",
               color: "#64748B",
             }}
           >
@@ -269,7 +271,7 @@ const FilterForm = ({
               });
             }}
           />
-          <Box sx={{ fontSize: "13px", fontWeight: 700, color: "#334155" }}>
+          <Box sx={{ fontSize: "13px", fontWeight: 700, color: "text.primary" }}>
             ${rentRange[0]} &ndash; ${rentRange[1]}
           </Box>
         </Box>
@@ -399,9 +401,11 @@ const FilterForm = ({
           </Box>
         </Box>
 
-        <AppButton sx={{ width: "100%", marginTop: "16px" }} type="submit">
-          {isMobile ? "Apply Filters" : "Search"}
-        </AppButton>
+        {isMobile && (
+          <AppButton sx={{ width: "100%", marginTop: "16px" }} type="submit">
+            Apply Filters
+          </AppButton>
+        )}
       </form>
     </AppCard>
   );
@@ -426,6 +430,9 @@ const SearchPage = () => {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(true);
   const [filterCollapsed, setFilterCollapsed] = useState(false);
   const locationSearch = location.search;
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastChangedFilterRef = useRef<"searchTerm" | "other">("other");
+  const isFirstRender = useRef(true);
 
   const normalizeType = (value: string | null) => {
     if (value === "rent" || value === "all") {
@@ -501,9 +508,17 @@ const SearchPage = () => {
     navigate(`/search?${buildSearchQuery(filters)}`);
   };
 
+  const updateSideBarData = (
+    nextSideBarData: any,
+    source: "searchTerm" | "other" = "other"
+  ) => {
+    lastChangedFilterRef.current = source;
+    setSideBarData(nextSideBarData);
+  };
+
   const handleSearch = (event: any) => {
     let value = event.target.value.toLowerCase();
-    setSideBarData({ ...sideBarData, searchTerm: value });
+    updateSideBarData({ ...sideBarData, searchTerm: value }, "searchTerm");
     dispatch(setSearchText(value));
   };
 
@@ -588,6 +603,39 @@ const SearchPage = () => {
     fetchListings();
   }, [apiBase, locationSearch, token]);
 
+  useEffect(() => {
+    // Skip the very first render - the URL-param useEffect handles initial load
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    if (isMobile) {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      return;
+    }
+
+    const delay =
+      lastChangedFilterRef.current === "searchTerm" ? 600 : 400;
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      applySearchQuery(sideBarData);
+    }, delay);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobile, sideBarData]);
+
   const handleSubmit = (e: any) => {
     e.preventDefault();
     applySearchQuery(sideBarData);
@@ -610,6 +658,14 @@ const SearchPage = () => {
     }
     setListings([...listings, ...data?.data]);
   };
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <Box sx={{ mt: { xs: 4, md: 4.5 } }}>
@@ -657,7 +713,7 @@ const SearchPage = () => {
             ) : (
               <FilterForm
                 sideBarData={sideBarData}
-                setSideBarData={setSideBarData}
+                setSideBarData={updateSideBarData}
                 handleSubmit={handleSubmit}
                 isMobile={isMobile}
                 searchText={searchText}
@@ -691,7 +747,7 @@ const SearchPage = () => {
                       sort: event.target.value,
                     };
 
-                    setSideBarData(nextSideBarData);
+                    updateSideBarData(nextSideBarData);
                     applySearchQuery(nextSideBarData);
                   }}
                   options={sortTypes.map((copyType) => ({
@@ -754,7 +810,7 @@ const SearchPage = () => {
             />
             <FilterForm
               sideBarData={sideBarData}
-              setSideBarData={setSideBarData}
+              setSideBarData={updateSideBarData}
               handleSubmit={handleSubmit}
               isMobile={isMobile}
               searchText={searchText}

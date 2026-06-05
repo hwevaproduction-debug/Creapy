@@ -125,7 +125,7 @@ const WalletCard = ({ compact = false }: WalletCardProps) => {
         <Collapse in={showTransactions}>
           <Box
             sx={{
-              background: "rgba(255,255,255,0.92)",
+              background: "background.paper",
               borderRadius: "14px",
               color: "text.primary",
               mt: 2,

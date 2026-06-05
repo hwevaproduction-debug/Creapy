@@ -61,7 +61,7 @@ const TransactionList = ({ maxItems = 10 }: TransactionListProps) => {
             </Box>
             <Box
               sx={{
-                color: isCredit ? "#1F4D3A" : "#991B1B",
+                color: isCredit ? "var(--success-text)" : "var(--error-text)",
                 fontWeight: 800,
                 fontSize: "14px",
                 whiteSpace: "nowrap",
