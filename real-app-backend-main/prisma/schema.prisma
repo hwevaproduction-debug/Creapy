@@ -206,6 +206,9 @@ model User {
   verificationSelfieUrl    String?
   verificationSubmittedAt  DateTime?
   consentAcceptedAt        DateTime?
+  tokenBalance             Int                 @default(0)
+  walletInitialized        Boolean             @default(false)
+  walletTransactions       WalletTransaction[]
   tenantEngagements        Engagement[]        @relation("TenantEngagements")
   landlordEngagements      Engagement[]        @relation("LandlordEngagements")
   pushSubscription         UserPushSubscription?
@@ -242,9 +245,24 @@ model Listing {
   payments             Payment[]
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
+  expiresAt            DateTime?
   engagements          Engagement[]
 
   @@index([userId, status])
+}
+
+model WalletTransaction {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String
+  amount       Int
+  label        String
+  reason       String
+  balanceAfter Int
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model ListingDraft {

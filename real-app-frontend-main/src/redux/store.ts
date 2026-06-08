@@ -3,7 +3,7 @@ import { configureStore, createListenerMiddleware } from "@reduxjs/toolkit";
 // Custom Imports
 import authReducer, { getAuthUserId, setUser } from "./auth/authSlice";
 import globalReducer from "./global/globalSlice";
-import walletReducer, { setActiveWalletUser } from "./wallet/walletSlice";
+import walletReducer, { setActiveWalletUser, syncWalletFromServer } from "./wallet/walletSlice";
 import { apiSlice } from "./api/apiSlice";
 
 const authListenerMiddleware = createListenerMiddleware();
@@ -12,6 +12,10 @@ authListenerMiddleware.startListening({
   actionCreator: setUser,
   effect: (action, listenerApi) => {
     listenerApi.dispatch(setActiveWalletUser(getAuthUserId(action.payload)));
+    const serverBalance = action.payload?.data?.user?.tokenBalance;
+    if (typeof serverBalance === "number") {
+      listenerApi.dispatch(syncWalletFromServer({ tokenBalance: serverBalance }));
+    }
   },
 });
 

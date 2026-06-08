@@ -1,6 +1,7 @@
-import React, { useLayoutEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { CssBaseline, ThemeProvider } from "@mui/material";
+import { useDispatch } from "react-redux";
 import Home from "./views/Home";
 import NotFound from "./views/NotFound";
 import Login from "./views/Login";
@@ -44,6 +45,11 @@ import LandlordGuide from "./views/Docs/LandlordGuide";
 import Roadmap from "./views/Docs/Roadmap";
 import Footer from "./components/Footer";
 import { createAppTheme } from "./theme";
+import FloatingNotificationBubble from "./components/notifications/FloatingNotificationBubble";
+import useTypedSelector from "./hooks/useTypedSelector";
+import { selectedUserToken } from "./redux/auth/authSlice";
+import { useGetWalletBalanceQuery } from "./redux/api/walletApiSlice";
+import { syncWalletFromServer } from "./redux/wallet/walletSlice";
 
 export const ColorModeContext = React.createContext({ toggleColorMode: () => {} });
 
@@ -66,6 +72,12 @@ const AppFooter = () => {
   return <Footer />;
 };
 
+const AuthenticatedBubble = () => {
+  const token = useTypedSelector(selectedUserToken);
+  if (!token) return null;
+  return <FloatingNotificationBubble />;
+};
+
 const getInitialColorMode = (): "light" | "dark" => {
   const storedMode = localStorage.getItem("colorMode");
 
@@ -74,6 +86,12 @@ const getInitialColorMode = (): "light" | "dark" => {
 
 function App() {
   const [mode, setMode] = useState<"light" | "dark">(getInitialColorMode);
+  const dispatch = useDispatch();
+  const token = useTypedSelector(selectedUserToken);
+  const { data: walletBalanceData } = useGetWalletBalanceQuery(undefined, {
+    skip: !token,
+    refetchOnMountOrArgChange: true,
+  });
   const colorModeValue = useMemo(
     () => ({
       toggleColorMode: () => {
@@ -92,12 +110,22 @@ function App() {
     document.documentElement.setAttribute("data-color-scheme", mode);
   }, [mode]);
 
+  useEffect(() => {
+    if (!token) return;
+
+    const serverBalance = walletBalanceData?.data?.tokenBalance;
+    if (typeof serverBalance === "number") {
+      dispatch(syncWalletFromServer({ tokenBalance: serverBalance }));
+    }
+  }, [dispatch, token, walletBalanceData]);
+
   return (
     <ColorModeContext.Provider value={colorModeValue}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Router>
           <Header />
+          <AuthenticatedBubble />
           <Routes>
             <Route
               path="/signup"

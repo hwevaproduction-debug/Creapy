@@ -10,6 +10,7 @@ const { comparePassword } = require("../utils/auth");
 const { isPremiumTenant } = require("../utils/monetization");
 const { sendEmail, buildBrandedEmail } = require("../utils/email");
 const { sendSms } = require("../utils/sms");
+const walletService = require("../utils/walletService");
 
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -113,6 +114,7 @@ const buildAuthUserPayload = (user) => ({
   isPhoneVerified: Boolean(user.isPhoneVerified),
   verificationStatus: user.verificationStatus || "UNVERIFIED",
   premiumExpiry: user.premiumExpiry || null,
+  tokenBalance: user.tokenBalance ?? 0,
   createdAt: user.createdAt || null,
   updatedAt: user.updatedAt || null,
 });
@@ -346,11 +348,13 @@ exports.signup = catchAsync(async (req, res, next) => {
     return next(new AppError("Invalid role. Role must be tenant or landlord", 400));
   }
 
+  const normalizedEmail = email.toLowerCase().trim();
+  const normalizedUsername = username.trim();
   const verification = createEmailVerificationToken();
   const newUser = await prisma.user.create({
     data: {
-      username,
-      email,
+      username: normalizedUsername,
+      email: normalizedEmail,
       password: await bcrypt.hash(password, 12),
       ...(role ? { role } : {}),
       consentAcceptedAt: consentAcceptedAt ? new Date(consentAcceptedAt) : undefined,
@@ -365,6 +369,15 @@ exports.signup = catchAsync(async (req, res, next) => {
       where: { id: newUser.id },
       data: { isEmailVerified: true },
     });
+    if (!verifiedUser.walletInitialized) {
+      await prisma.$transaction(async (tx) => {
+        await walletService.grantTokens(verifiedUser.id, 100, "welcome_bonus", "Welcome bonus — 100 TR", tx);
+        await tx.user.update({ where: { id: verifiedUser.id }, data: { walletInitialized: true } });
+      });
+      const refreshed = await prisma.user.findUnique({ where: { id: verifiedUser.id } });
+      createSendToken(refreshed, 201, res);
+      return;
+    }
     createSendToken(verifiedUser, 201, res);
     return;
   }
@@ -397,7 +410,7 @@ exports.login = catchAsync(async (req, res, next) => {
   }
 
   // 2) Check if user exists
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
   if (!user) return next(new AppError("User not found", 404));
 
   // 3) Check if password is correct
@@ -443,7 +456,16 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
     },
   });
 
-  createSendToken(verifiedUser, 200, res);
+  if (!user.walletInitialized) {
+    await prisma.$transaction(async (tx) => {
+      await walletService.grantTokens(verifiedUser.id, 100, "welcome_bonus", "Welcome bonus — 100 TR", tx);
+      await tx.user.update({ where: { id: verifiedUser.id }, data: { walletInitialized: true } });
+    });
+    const refreshed = await prisma.user.findUnique({ where: { id: verifiedUser.id } });
+    createSendToken(refreshed, 200, res);
+  } else {
+    createSendToken(verifiedUser, 200, res);
+  }
 });
 
 exports.getUserByListingId = catchAsync(async (req, res, next) => {
@@ -557,7 +579,8 @@ exports.delete = catchAsync(async (req, res, next) => {
 exports.google = catchAsync(async (req, res, next) => {
   const { name, email, photo, role } = req.body;
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
   if (user) {
     let currentUser = user;
@@ -567,13 +590,12 @@ exports.google = catchAsync(async (req, res, next) => {
         data: { isEmailVerified: true, isPhoneVerified: true },
       });
     }
-    // just return the user
     createSendToken(currentUser, 200, res);
   } else {
     const newUser = await prisma.user.create({
       data: {
         username: name,
-        email,
+        email: normalizedEmail,
         password: await bcrypt.hash(Math.random().toString(), 12),
         avatar: photo,
         role: ["tenant", "landlord"].includes(role) ? role : "tenant",
@@ -582,7 +604,12 @@ exports.google = catchAsync(async (req, res, next) => {
       },
     });
 
-    createSendToken(newUser, 201, res);
+    await prisma.$transaction(async (tx) => {
+      await walletService.grantTokens(newUser.id, 100, "welcome_bonus", "Welcome bonus — 100 TR", tx);
+      await tx.user.update({ where: { id: newUser.id }, data: { walletInitialized: true } });
+    });
+    const refreshedNewUser = await prisma.user.findUnique({ where: { id: newUser.id } });
+    createSendToken(refreshedNewUser, 201, res);
   }
 });
 
@@ -807,6 +834,25 @@ exports.resendVerification = catchAsync(async (req, res, next) => {
   res
     .status(200)
     .json({ status: "success", message: "Verification email resent." });
+});
+
+exports.checkAvailability = catchAsync(async (req, res, next) => {
+  const { email, username } = req.query;
+  const result = {};
+
+  if (email && typeof email === "string") {
+    const normalized = email.toLowerCase().trim();
+    const existing = await prisma.user.findUnique({ where: { email: normalized }, select: { id: true } });
+    result.emailAvailable = !existing;
+  }
+
+  if (username && typeof username === "string") {
+    const normalized = username.trim();
+    const existing = await prisma.user.findUnique({ where: { username: normalized }, select: { id: true } });
+    result.usernameAvailable = !existing;
+  }
+
+  res.status(200).json({ status: "success", data: result });
 });
 
 exports.submitVerification = catchAsync(async (req, res, next) => {

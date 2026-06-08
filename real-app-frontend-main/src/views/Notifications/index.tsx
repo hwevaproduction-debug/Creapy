@@ -41,6 +41,7 @@ const groupedNotifications = (notifications: AppNotification[]) =>
   }, {});
 
 const Notifications = () => {
+  const [activeFilter, setActiveFilter] = useState<"all" | "tokens" | "listings" | "engagements">("all");
   const { data, isLoading } = useGetNotificationsQuery({ page: 1, limit: 50 });
   const { data: preferencesData } = useGetNotificationPreferencesQuery();
   const [markAllAsRead, { isLoading: markingAllRead }] =
@@ -48,8 +49,14 @@ const Notifications = () => {
   const [savePushSubscription] = useSavePushSubscriptionMutation();
   const [updatePreferences] = useUpdateNotificationPreferencesMutation();
   const notifications = data?.data || [];
-  const groups = groupedNotifications(notifications);
-  const hasUnread = notifications.some((notification) => !notification.isRead);
+  const filteredNotifications = notifications.filter((n) => {
+    if (activeFilter === "tokens") return n.event.startsWith("wallet.") || n.event === "engagement.approved";
+    if (activeFilter === "listings") return n.event.startsWith("listing.");
+    if (activeFilter === "engagements") return n.event.startsWith("engagement.");
+    return true;
+  });
+  const groups = groupedNotifications(filteredNotifications);
+  const hasUnread = filteredNotifications.some((notification) => !notification.isRead);
   const preferences = preferencesData?.data;
   const [pushMessage, setPushMessage] = useState("");
 
@@ -173,6 +180,30 @@ const Notifications = () => {
           </AppButton>
         </Box>
 
+        <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+          {(["all", "tokens", "listings", "engagements"] as const).map((filter) => (
+            <Box
+              key={filter}
+              component="button"
+              onClick={() => setActiveFilter(filter)}
+              sx={{
+                fontSize: "12px",
+                padding: "4px 14px",
+                borderRadius: "999px",
+                border: "1.5px solid",
+                borderColor: activeFilter === filter ? "#1F4D3A" : "divider",
+                background: activeFilter === filter ? "#1F4D3A" : "transparent",
+                color: activeFilter === filter ? "#fff" : "text.secondary",
+                cursor: "pointer",
+                fontWeight: 700,
+                font: "inherit",
+              }}
+            >
+              {filter.charAt(0).toUpperCase() + filter.slice(1)}
+            </Box>
+          ))}
+        </Box>
+
         {isLoading ? (
           Array.from({ length: 3 }).map((_, index) => (
             <AppCard key={index} sx={{ mb: 1.5, p: "16px 20px" }}>
@@ -181,7 +212,7 @@ const Notifications = () => {
               <Skeleton width="25%" />
             </AppCard>
           ))
-        ) : notifications.length === 0 ? (
+        ) : filteredNotifications.length === 0 ? (
           <Box sx={{ minHeight: 300, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
             <Box>
               <Bell size={44} color="#B8975A" />

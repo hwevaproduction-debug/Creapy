@@ -4,6 +4,7 @@ const AppError = require("../utils/appError");
 const prisma = require("../utils/prisma");
 const { sendEmail } = require("../utils/email");
 const { isPremiumTenant } = require("../utils/monetization");
+const walletService = require("../utils/walletService");
 
 const SINGLE_ACTIVE_LISTING_MESSAGE =
   "You already have an active listing. You can only have one listing at a time.";
@@ -80,19 +81,10 @@ const applyListingLifecycle = async () => {
 
   await prisma.listing.updateMany({
     where: {
-      paymentDeadline: { lt: now },
-      status: { in: ["active", "pending_payment"] },
-    },
-    data: { status: "inactive" },
-  });
-
-  await prisma.listing.updateMany({
-    where: {
-      publishedAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-      paymentDeadline: { gt: now },
       status: "active",
+      expiresAt: { lt: now },
     },
-    data: { status: "pending_payment" },
+    data: { status: "expired" },
   });
 };
 
@@ -282,7 +274,7 @@ exports.createListing = catchAsync(async (req, res, next) => {
     userId: req.user.id,
     status: "active",
     publishedAt: new Date(),
-    paymentDeadline: new Date(Date.now() + 48 * 60 * 60 * 1000),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
   };
 
   let newListing;
@@ -367,6 +359,10 @@ exports.getListing = catchAsync(async (req, res, next) => {
   }
 
   if (listing.status === "pending_payment") {
+    return next(new AppError("No listing found with that ID", 404));
+  }
+
+  if (listing.status === "expired") {
     return next(new AppError("No listing found with that ID", 404));
   }
 
@@ -613,6 +609,54 @@ exports.getListings = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.restoreListing = catchAsync(async (req, res, next) => {
+  const listing = await prisma.listing.findUnique({ where: { id: req.params.id } });
+
+  if (!listing) {
+    return next(new AppError("No listing found with that ID", 404));
+  }
+
+  if (listing.userId !== req.user.id) {
+    return next(new AppError("You do not own this listing", 403));
+  }
+
+  if (listing.status !== "expired") {
+    return next(new AppError("Only expired listings can be restored", 400));
+  }
+
+  const days = parseInt(req.body.days, 10);
+  if (!days || days < 1 || days > 30) {
+    return next(new AppError("Days must be between 1 and 30", 400));
+  }
+
+  let updatedListing;
+  try {
+    await prisma.$transaction(async (tx) => {
+      await walletService.deductTokens(
+        req.user.id,
+        days,
+        "listing_renewal",
+        `Listing restored — ${days} day${days === 1 ? "" : "s"}`,
+        tx
+      );
+      updatedListing = await tx.listing.update({
+        where: { id: req.params.id },
+        data: {
+          status: "active",
+          expiresAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+        },
+      });
+    });
+  } catch (err) {
+    if (err.statusCode === 402) {
+      return next(new AppError("Insufficient TR token balance to restore this listing", 402));
+    }
+    throw err;
+  }
+
+  res.status(200).json({ status: "success", data: { listing: mapListingId(updatedListing) } });
+});
+
 exports.getHomeHighlighted = catchAsync(async (req, res, next) => {
   await applyListingLifecycle();
 
@@ -707,4 +751,5 @@ exports.__testables = {
   buildListingCreateData,
   normalizeListingPayload,
   sanitizeListingForPublic,
+  applyListingLifecycle,
 };

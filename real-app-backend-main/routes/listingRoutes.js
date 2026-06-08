@@ -55,4 +55,10 @@ router.put(
   authController.requireRole("landlord"),
   listingController.updateListing
 );
+
+router.post(
+  "/:id/restore",
+  authController.requireRole("landlord"),
+  listingController.restoreListing
+);
 module.exports = router;

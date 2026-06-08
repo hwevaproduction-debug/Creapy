@@ -67,6 +67,14 @@ export const listingApiSlice = apiSlice.injectEndpoints({
       },
       invalidatesTags: ["Listing"],
     }),
+    restoreListing: builder.mutation({
+      query: ({ id, days }: { id: string; days: number }) => ({
+        url: `listings/${id}/restore`,
+        method: "POST",
+        body: { days },
+      }),
+      invalidatesTags: ["Listing"],
+    }),
     searchListings: builder.query({
       query: (searchTerm) => {
         return {
@@ -154,6 +162,7 @@ export const {
   useGetListingQuery,
   useDeleteListingMutation,
   useUpdateListingMutation,
+  useRestoreListingMutation,
   useGetSingleListingQuery,
   useGetPublicStatsQuery,
   useSearchListingsQuery,

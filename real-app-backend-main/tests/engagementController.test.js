@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const engagementController = require("../controllers/engagementController");
 const prisma = require("../utils/prisma");
+const walletService = require("../utils/walletService");
 
 const originalPrisma = {
   listingFindUnique: prisma.listing.findUnique,
@@ -11,6 +12,7 @@ const originalPrisma = {
   engagementCreate: prisma.engagement.create,
   engagementUpdate: prisma.engagement.update,
   notificationCreate: prisma.notification.create,
+  transaction: prisma.$transaction,
 };
 
 const invokeController = (handler, req = {}) =>
@@ -45,6 +47,7 @@ test.afterEach(() => {
   prisma.engagement.create = originalPrisma.engagementCreate;
   prisma.engagement.update = originalPrisma.engagementUpdate;
   prisma.notification.create = originalPrisma.notificationCreate;
+  prisma.$transaction = originalPrisma.transaction;
 });
 
 test("createEngagement creates a fresh engagement after previous declined requests", async () => {
@@ -145,6 +148,66 @@ test("createEngagement still rejects duplicate non-declined engagements", async 
   assert(result.error);
   assert.equal(result.error.statusCode, 400);
   assert.equal(updateCalled, false);
+  assert.equal(notificationCalled, false);
+});
+
+test("respondToEngagement does not charge tokens for already approved engagements", async () => {
+  let deductCalled = false;
+  let notificationCalled = false;
+  const originalDeductTokens = walletService.deductTokens;
+
+  prisma.listing.findUnique = async () => ({
+    id: "listing-1",
+    userId: "landlord-1",
+    name: "Borrowdale Cottage",
+  });
+  prisma.engagement.findUnique = async () => ({
+    id: "engagement-1",
+    listingId: "listing-1",
+    tenantId: "tenant-1",
+    landlordId: "landlord-1",
+    status: "APPROVED",
+    listing: { id: "listing-1", name: "Borrowdale Cottage" },
+    tenant: { id: "tenant-1" },
+  });
+  prisma.$transaction = async (callback) =>
+    callback({
+      engagement: {
+        updateMany: async () => ({ count: 0 }),
+        findUnique: async () => ({
+          id: "engagement-1",
+          listingId: "listing-1",
+          tenantId: "tenant-1",
+          landlordId: "landlord-1",
+          status: "APPROVED",
+          listing: { id: "listing-1", name: "Borrowdale Cottage" },
+          tenant: { id: "tenant-1" },
+        }),
+      },
+      notification: {
+        create: async () => {
+          notificationCalled = true;
+        },
+      },
+    });
+  walletService.deductTokens = async () => {
+    deductCalled = true;
+    throw new Error("should not deduct tokens for a repeated approval");
+  };
+
+  let result;
+  try {
+    result = await invokeController(engagementController.respondToEngagement, {
+      params: { id: "engagement-1" },
+      user: { id: "landlord-1", role: "landlord" },
+      body: { action: "approve" },
+    });
+  } finally {
+    walletService.deductTokens = originalDeductTokens;
+  }
+
+  assert.equal(result.error.statusCode, 409);
+  assert.equal(deductCalled, false);
   assert.equal(notificationCalled, false);
 });
 

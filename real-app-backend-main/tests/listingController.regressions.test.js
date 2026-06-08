@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 
 const listingController = require("../controllers/listingController");
 const prisma = require("../utils/prisma");
-const { normalizeListingPayload } = listingController.__testables;
+const { applyListingLifecycle, normalizeListingPayload } = listingController.__testables;
 
 const originalListing = {
   ...prisma.listing,
@@ -151,6 +151,7 @@ test("buildListingCreateData strips legacy price aliases before Prisma create", 
   assert.equal(data.addressLine, "12 Main Road");
   assert.equal(data.lat, -18.18);
   assert.equal(data.lng, 31.55);
+  assert.equal(Object.prototype.hasOwnProperty.call(data, "paymentDeadline"), false);
 });
 
 test("createListing only sends Prisma-safe fields", async () => {
@@ -302,6 +303,25 @@ test("updateListing rejects lifecycle-managed fields", async () => {
     "Listing lifecycle fields cannot be updated from this endpoint."
   );
   assert.equal(updateCalled, false);
+});
+
+test("applyListingLifecycle only expires active listings based on expiresAt", async () => {
+  const calls = [];
+  prisma.listing.updateMany = async (args) => {
+    calls.push(args);
+    return { count: 0 };
+  };
+
+  await applyListingLifecycle();
+
+  assert.equal(
+    calls.some((call) => call.data?.status === "pending_payment"),
+    false
+  );
+  assert.deepEqual(
+    calls.map((call) => call.data?.status),
+    ["active", "expired"]
+  );
 });
 
 test("transitionListingToPendingPayment enforces active status and valid payment window", async () => {

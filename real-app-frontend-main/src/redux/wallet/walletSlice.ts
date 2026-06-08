@@ -8,6 +8,8 @@ export type WalletTransaction = {
   amount: number;
   label: string;
   timestamp: string;
+  reason?: string;
+  balanceAfter?: number;
 };
 
 type WalletState = {
@@ -62,8 +64,8 @@ const isWalletState = (value: unknown): value is PersistedWalletState => {
 
 const getDefaultWallet = (): WalletState => ({
   activeUserId: null,
-  tokenBalance: 100,
-  transactions: [createTransaction("CREDIT", 100, "Welcome bonus")],
+  tokenBalance: 0,
+  transactions: [],
 });
 
 const getEmptyWallet = (): WalletState => ({
@@ -148,10 +150,20 @@ const walletSlice = createSlice({
       );
       persistWallet(state);
     },
+    syncWalletFromServer(
+      state,
+      action: PayloadAction<{ tokenBalance: number; transactions?: WalletTransaction[] }>
+    ) {
+      state.tokenBalance = action.payload.tokenBalance;
+      if (action.payload.transactions && action.payload.transactions.length > 0) {
+        state.transactions = action.payload.transactions;
+      }
+      persistWallet(state);
+    },
   },
 });
 
-export const { initWallet, deductTokens, addTokens, setActiveWalletUser } =
+export const { initWallet, deductTokens, addTokens, setActiveWalletUser, syncWalletFromServer } =
   walletSlice.actions;
 export default walletSlice.reducer;
 

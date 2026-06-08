@@ -81,10 +81,12 @@ async function start() {
       const { startReconciliationJob } = require("./utils/reconciliationJob");
       const { startNotificationWorker } = require("./utils/notificationWorker");
       const { startReminderScanner } = require("./utils/reminderScanner");
+      const { startExpiryScanner } = require("./utils/listingExpiryScanner");
 
       startReconciliationJob();
       startNotificationWorker();
       startReminderScanner();
+      startExpiryScanner();
     }
   });
 

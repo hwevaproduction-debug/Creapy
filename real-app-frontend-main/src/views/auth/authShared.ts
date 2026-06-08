@@ -7,9 +7,11 @@ export const FALLBACK_HERO_IMAGES = [
 ];
 
 export const AUTH_CARD_SX = {
-  width: { xs: "calc(100% - 32px)", sm: "480px", md: "min(480px, 38vw)" },
-  minWidth: { md: "420px" },
-  maxHeight: "calc(100vh - 48px)",
+  width: { xs: "calc(100vw - 32px)", sm: "480px", md: "480px" },
+  maxWidth: "480px",
+  mx: "auto",
+  flexShrink: 0,
+  maxHeight: "calc(100vh - 104px)",
   overflowY: "auto",
   p: { xs: 3, md: "48px 52px" },
   borderRadius: "28px",
@@ -28,13 +30,16 @@ export const AUTH_CARD_SX = {
 
 export const AUTH_PAGE_WRAPPER_SX = {
   position: "fixed" as const,
-  inset: 0,
+  top: "72px",
+  right: 0,
+  bottom: 0,
+  left: 0,
   zIndex: 10,
   display: "flex",
+  flexDirection: "column" as const,
   alignItems: "center",
   justifyContent: "center",
-  px: 2,
-  py: 3,
+  px: "16px",
+  py: "16px",
   background: "#0F141E",
-  overflowY: "auto",
 };

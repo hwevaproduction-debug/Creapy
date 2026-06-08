@@ -19,7 +19,7 @@ import { ClipboardList, GraduationCap, Pencil, Trash2 } from "lucide-react";
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
 import { selectedUserId, selectedUserName } from "../../redux/auth/authSlice";
-import { deductTokens } from "../../redux/wallet/walletSlice";
+import { selectTokenBalance, syncWalletFromServer } from "../../redux/wallet/walletSlice";
 import {
   useDeleteListingMutation,
   useDeleteListingDraftMutation,
@@ -31,6 +31,7 @@ import {
   useGetIncomingEngagementsQuery,
   useRespondToEngagementMutation,
 } from "../../redux/api/engagementApiSlice";
+import { useGetWalletBalanceQuery } from "../../redux/api/walletApiSlice";
 // Utils Imports
 import { convertToFormattedDate } from "../../utils";
 // Component Imports
@@ -50,6 +51,7 @@ import OnboardingChecklist from "./components/OnboardingChecklist";
 import QuickActionsBar from "./components/QuickActionsBar";
 import TRTokenOnboarding from "./components/TRTokenOnboarding";
 import VerificationStatusCard from "./components/VerificationStatusCard";
+import ListingRestoreModal from "../../components/listing/ListingRestoreModal";
 
 const getListingStatusBadge = (status: string) => {
   if (status === "pending_payment") {
@@ -99,6 +101,14 @@ const getListingStatusBadge = (status: string) => {
         }}
       >
         Active
+      </Box>
+    );
+  }
+
+  if (status === "expired") {
+    return (
+      <Box sx={{ background: "#FEE2E2", color: "#991B1B", borderRadius: "999px", padding: "6px 12px", fontSize: "12px", display: "inline-block" }}>
+        Expired
       </Box>
     );
   }
@@ -212,6 +222,7 @@ const formatDraftTimestamp = (value?: string) => {
 const LandlordDashboard = () => {
   const userId = useTypedSelector(selectedUserId);
   const userName = useTypedSelector(selectedUserName);
+  const tokenBalance = useTypedSelector(selectTokenBalance);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { toast: tokenToast, handleCloseToast: handleCloseTokenToast } =
@@ -221,8 +232,13 @@ const LandlordDashboard = () => {
     appearence: false,
     type: "",
   });
+  const [restoreListingId, setRestoreListingId] = useState<string | null>(null);
 
-  const { data: listingsData, isLoading: listingsLoading } = useGetListingQuery(userId);
+  const {
+    data: listingsData,
+    isLoading: listingsLoading,
+    refetch: refetchListings,
+  } = useGetListingQuery(userId);
   const [deletingListingId, setDeletingListingId] = useState<string | null>(null);
   const [deleteListing] = useDeleteListingMutation();
   const { data: listingDraft } = useGetListingDraftQuery(undefined, {
@@ -244,6 +260,23 @@ const LandlordDashboard = () => {
   } = useGetIncomingEngagementsQuery(undefined);
   const [respondToEngagement, { isLoading: isRespondingToEngagement }] =
     useRespondToEngagementMutation();
+  const { refetch: refetchWalletBalance } = useGetWalletBalanceQuery(undefined, {
+    skip: !userId,
+  });
+
+  const listingItems = listingsData?.data || [];
+  const activeListingsCount = listingItems.filter((listing: any) => listing?.status === "active").length;
+  const expiringSoonCount = listingItems.filter((listing: any) => {
+    if (!listing?.expiresAt) return false;
+    const expiresAt = new Date(listing.expiresAt).getTime();
+    return expiresAt > Date.now() && expiresAt - Date.now() <= 24 * 60 * 60 * 1000;
+  }).length;
+  const pendingRequestsCount = (incomingEngagementsData?.data || []).filter(
+    (engagement: any) => engagement?.status === "PENDING"
+  ).length;
+  const restoreListing = restoreListingId
+    ? listingItems.find((listing: any) => listing?._id === restoreListingId || listing?.id === restoreListingId)
+    : null;
 
   const handleCloseToast = () => {
     setToast((prev) => ({ ...prev, appearence: false }));
@@ -268,14 +301,11 @@ const LandlordDashboard = () => {
       await respondToEngagement({ id: engagement.id, action }).unwrap();
       await refetchIncomingEngagements();
       if (action === "approve") {
-        dispatch(
-          deductTokens({
-            amount: 5,
-            label: `Approved engagement — ${
-              engagement.tenant?.username || "Tenant"
-            }`,
-          })
-        );
+        const refreshedWallet = await refetchWalletBalance();
+        const serverBalance = refreshedWallet.data?.data?.tokenBalance;
+        if (typeof serverBalance === "number") {
+          dispatch(syncWalletFromServer({ tokenBalance: serverBalance }));
+        }
       }
       setToast({
         message:
@@ -308,6 +338,37 @@ const LandlordDashboard = () => {
 
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 340px" }, gap: 3, alignItems: "start" }}>
           <Box>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", xl: "repeat(4, 1fr)" },
+            gap: 2,
+            mb: 3,
+          }}
+        >
+          {[
+            { label: "Active Listings", value: activeListingsCount },
+            { label: "Expiring Soon", value: expiringSoonCount },
+            { label: "Token Balance", value: tokenBalance },
+            { label: "Pending Requests", value: pendingRequestsCount },
+          ].map((item) => (
+            <AppCard
+              key={item.label}
+              sx={{
+                borderLeft: "3px solid #1F4D3A",
+                p: 2,
+                textAlign: "center",
+              }}
+            >
+              <Box sx={{ fontSize: "12px", color: "text.secondary", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                {item.label}
+              </Box>
+              <Box sx={{ fontSize: "28px", fontWeight: 800, color: "#1F4D3A", mt: 0.5 }}>
+                {item.value}
+              </Box>
+            </AppCard>
+          ))}
+        </Box>
         <AppCard sx={{ mb: 6, p: { xs: 2, md: 2.5 }, boxShadow: "0 4px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.07)", "&:hover": { transform: "translateY(-2px)", transition: "transform 0.2s ease" } }}>
           <Heading sx={{ fontSize: "20px", mb: 2 }}>
             Incoming Engagement Requests
@@ -581,7 +642,16 @@ const LandlordDashboard = () => {
                         : "—"}
                     </TableCell>
                     <TableCell>
-                      {item?.status === "pending_payment" ? (
+                      {item?.status === "expired" ? (
+                        <AppButton
+                          variant="contained"
+                          size="small"
+                          sx={{ background: "#B8975A", "&:hover": { background: "#9E7E45" } }}
+                          onClick={() => setRestoreListingId(item?._id || item?.id)}
+                        >
+                          Restore
+                        </AppButton>
+                      ) : item?.status === "pending_payment" ? (
                         <AppButton
                           variant="contained"
                           onClick={() => navigate(`/listings/${item?._id}/pay`)}
@@ -719,6 +789,20 @@ const LandlordDashboard = () => {
           </Box>
         </Box>
       </AppContainer>
+      <ListingRestoreModal
+        open={Boolean(restoreListingId)}
+        listingId={restoreListingId}
+        listingName={restoreListing?.name || ""}
+        onClose={() => setRestoreListingId(null)}
+        onSuccess={async () => {
+          refetchListings();
+          const refreshedWallet = await refetchWalletBalance();
+          const serverBalance = refreshedWallet.data?.data?.tokenBalance;
+          if (typeof serverBalance === "number") {
+            dispatch(syncWalletFromServer({ tokenBalance: serverBalance }));
+          }
+        }}
+      />
       <ToastAlert
         appearence={toast.appearence}
         type={toast.type}

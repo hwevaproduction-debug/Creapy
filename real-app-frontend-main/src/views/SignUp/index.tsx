@@ -10,6 +10,7 @@ import { Form, Formik, FormikProps } from "formik";
 import { onKeyDown } from "../../utils";
 // Redux Imports
 import {
+  useLazyCheckAvailabilityQuery,
   useResendVerificationMutation,
   useSignupMutation,
 } from "../../redux/api/authApiSlice";
@@ -61,9 +62,52 @@ const SignUp = () => {
     appearence: false,
     type: "",
   });
+  const [checkAvailability] = useLazyCheckAvailabilityQuery();
+  const [availabilityErrors, setAvailabilityErrors] = useState<{ email?: string; userName?: string }>({});
+  const [availabilityChecking, setAvailabilityChecking] = useState<{ email: boolean; userName: boolean }>({ email: false, userName: false });
 
   const hideShowPassword = () => {
     setShowPassword(!showPassword);
+  };
+
+  const handleEmailBlur = async (value: string) => {
+    if (!value || !value.includes("@")) return;
+    setAvailabilityChecking((prev) => ({ ...prev, email: true }));
+    try {
+      const result = await checkAvailability({ email: value }).unwrap();
+      if (result.data.emailAvailable === false) {
+        setAvailabilityErrors((prev) => ({
+          ...prev,
+          email: "This email is already registered. Try logging in instead.",
+        }));
+      } else {
+        setAvailabilityErrors((prev) => ({ ...prev, email: undefined }));
+      }
+    } catch {
+      // silently ignore network errors
+    } finally {
+      setAvailabilityChecking((prev) => ({ ...prev, email: false }));
+    }
+  };
+
+  const handleUsernameBlur = async (value: string) => {
+    if (!value || value.length < 2) return;
+    setAvailabilityChecking((prev) => ({ ...prev, userName: true }));
+    try {
+      const result = await checkAvailability({ username: value }).unwrap();
+      if (result.data.usernameAvailable === false) {
+        setAvailabilityErrors((prev) => ({
+          ...prev,
+          userName: "This username is already taken. Please choose another.",
+        }));
+      } else {
+        setAvailabilityErrors((prev) => ({ ...prev, userName: undefined }));
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      setAvailabilityChecking((prev) => ({ ...prev, userName: false }));
+    }
   };
 
   const handleCloseToast = () => {
@@ -256,15 +300,20 @@ const SignUp = () => {
                           placeholder="User Name"
                           value={values.userName}
                           helperText={
-                            errors.userName && touched.userName
+                            availabilityErrors.userName ||
+                            (errors.userName && touched.userName
                               ? errors.userName
-                              : ""
+                              : "")
                           }
-                          error={
-                            errors.userName && touched.userName ? true : false
-                          }
+                          error={Boolean(
+                            availabilityErrors.userName ||
+                              (errors.userName && touched.userName)
+                          )}
                           onChange={handleChange}
-                          onBlur={handleBlur}
+                          onBlur={(event) => {
+                            handleBlur(event);
+                            void handleUsernameBlur(values.userName);
+                          }}
                         />
                       </Box>
                       <Box sx={{ marginTop: "12px" }}>
@@ -278,11 +327,17 @@ const SignUp = () => {
                           placeholder="Email"
                           value={values.email}
                           helperText={
-                            errors.email && touched.email ? errors.email : ""
+                            availabilityErrors.email ||
+                            (errors.email && touched.email ? errors.email : "")
                           }
-                          error={errors.email && touched.email ? true : false}
+                          error={Boolean(
+                            availabilityErrors.email || (errors.email && touched.email)
+                          )}
                           onChange={handleChange}
-                          onBlur={handleBlur}
+                          onBlur={(event) => {
+                            handleBlur(event);
+                            void handleEmailBlur(values.email);
+                          }}
                         />
                       </Box>
                       <Box sx={{ marginTop: "12px" }}>
@@ -379,7 +434,13 @@ const SignUp = () => {
                           type="submit"
                           fullWidth
                           size="large"
-                          disabled={isLoading}
+                          disabled={Boolean(
+                            isLoading ||
+                              availabilityChecking.email ||
+                              availabilityChecking.userName ||
+                              availabilityErrors.email ||
+                              availabilityErrors.userName
+                          )}
                           sx={{ margin: "0 0 16px 0" }}
                         >
                           {isLoading ? (

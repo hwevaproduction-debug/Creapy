@@ -86,6 +86,17 @@ export const authApiSlice = apiSlice.injectEndpoints({
         headers: { "Content-Type": "application/json" },
       }),
     }),
+    checkAvailability: builder.query<
+      { status: string; data: { emailAvailable?: boolean; usernameAvailable?: boolean } },
+      { email?: string; username?: string }
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params.email) searchParams.set("email", params.email);
+        if (params.username) searchParams.set("username", params.username);
+        return { url: `users/check-availability?${searchParams.toString()}`, method: "GET" };
+      },
+    }),
     googleLogin: builder.mutation({
       query: (data) => {
         return {
@@ -111,5 +122,7 @@ export const {
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useResendVerificationMutation,
+  useCheckAvailabilityQuery,
+  useLazyCheckAvailabilityQuery,
   useGoogleLoginMutation,
 } = authApiSlice;

@@ -1,6 +1,7 @@
 const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
 const prisma = require("../utils/prisma");
+const walletService = require("../utils/walletService");
 
 const requireRole = (user, role) => user?.role === role;
 
@@ -137,26 +138,66 @@ exports.respondToEngagement = catchAsync(async (req, res, next) => {
     return next(new AppError("Not found", 404));
   }
 
-  const updated = await prisma.engagement.update({
-    where: { id: req.params.id },
-    data: { status: action === "approve" ? "APPROVED" : "DECLINED" },
-  });
+  let updated;
 
-  await prisma.notification.create({
-    data: {
-      userId: engagement.tenantId,
-      event: action === "approve" ? "engagement.approved" : "engagement.declined",
-      title: action === "approve" ? "Enquiry approved" : "Enquiry not approved",
-      body:
-        action === "approve"
-          ? `Your request for "${engagement.listing.name}" was approved. Contact details are now visible.`
-          : `Your request for "${engagement.listing.name}" was not approved.`,
-      metadata: {
-        engagementId: engagement.id,
-        listingId: engagement.listingId,
+  if (action === "approve") {
+    try {
+      await prisma.$transaction(async (tx) => {
+        const transition = await tx.engagement.updateMany({
+          where: {
+            id: req.params.id,
+            landlordId: req.user.id,
+            status: "PENDING",
+          },
+          data: { status: "APPROVED" },
+        });
+
+        if (transition.count === 0) {
+          throw new AppError("Engagement has already been responded to", 409);
+        }
+
+        await walletService.deductTokens(
+          engagement.tenantId,
+          walletService.ENGAGEMENT_FEE_TR,
+          "engagement_charge",
+          `Contact approved — ${engagement.listing.name}`,
+          tx
+        );
+        updated = await tx.engagement.findUnique({
+          where: { id: req.params.id },
+          include: { listing: true, tenant: true },
+        });
+        await tx.notification.create({
+          data: {
+            userId: engagement.tenantId,
+            event: "engagement.approved",
+            title: "Enquiry approved",
+            body: `Your request for "${engagement.listing.name}" was approved. Contact details are now visible. ${walletService.ENGAGEMENT_FEE_TR} TR tokens were deducted.`,
+            metadata: { engagementId: engagement.id, listingId: engagement.listingId, tokensDeducted: walletService.ENGAGEMENT_FEE_TR },
+          },
+        });
+      });
+    } catch (err) {
+      if (err.statusCode === 402) {
+        return next(new AppError(`Tenant has insufficient TR tokens. At least ${walletService.ENGAGEMENT_FEE_TR} TR required.`, 402));
+      }
+      throw err;
+    }
+  } else {
+    updated = await prisma.engagement.update({
+      where: { id: req.params.id },
+      data: { status: "DECLINED" },
+    });
+    await prisma.notification.create({
+      data: {
+        userId: engagement.tenantId,
+        event: "engagement.declined",
+        title: "Enquiry not approved",
+        body: `Your request for "${engagement.listing.name}" was not approved.`,
+        metadata: { engagementId: engagement.id, listingId: engagement.listingId },
       },
-    },
-  });
+    });
+  }
 
   res.status(200).json({ status: "success", data: { engagement: updated } });
 });
