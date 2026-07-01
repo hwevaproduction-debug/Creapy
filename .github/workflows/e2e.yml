@@ -85,9 +85,14 @@ jobs:
   e2e-deployed:
     runs-on: ubuntu-latest
     env:
-      PAYMENT_PROVIDER: mock
-      SEED_API_BASE: ${{ secrets.E2E_API_BASE_URL }}
-      SMS_PROVIDER: mock
+      SEED_API_BASE:           ${{ secrets.E2E_API_BASE_URL }}
+      DATABASE_URL:            ${{ secrets.E2E_DATABASE_URL }}
+      E2E_ADMIN_EMAIL:         ${{ secrets.E2E_ADMIN_EMAIL }}
+      E2E_ADMIN_PASSWORD:      ${{ secrets.E2E_ADMIN_PASSWORD }}
+      SKIP_EMAIL_VERIFICATION: "true"
+      SKIP_PHONE_VERIFICATION: "true"
+      PAYMENT_PROVIDER:        mock
+      SMS_PROVIDER:            mock
     defaults:
       run:
         working-directory: real-app-backend-main

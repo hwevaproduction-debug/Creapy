@@ -34,7 +34,7 @@ const AppButton = ({
           color: "#B8975A",
           borderColor: "#B8975A",
           "&:hover": {
-            background: "#FDF8F0",
+            background: "rgba(184,151,90,0.08)",
             borderColor: "#9E7E45",
           },
         }

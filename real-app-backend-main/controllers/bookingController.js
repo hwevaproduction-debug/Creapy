@@ -1550,3 +1550,76 @@ exports.initiateRefund = catchAsync(async (req, res, next) => {
     },
   });
 });
+
+exports.checkInBooking = catchAsync(async (req, res, next) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: req.params.id },
+    include: {
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true, timezone: true },
+          },
+        },
+      },
+      guest: {
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          phoneNumber: true,
+        },
+      },
+    },
+  });
+  if (!booking) {
+    return next(new AppError("Booking not found", 404));
+  }
+
+  ensureProviderOwnsBooking(booking, getUserId(req.user));
+
+  if (booking.status !== "CONFIRMED") {
+    return next(new AppError("Booking must be CONFIRMED to check in", 400));
+  }
+
+  const updatedBooking = await prisma.booking.update({
+    where: { id: booking.id },
+    data: {
+      status: "CHECKED_IN",
+    },
+    include: {
+      room: {
+        include: {
+          accommodation: {
+            select: { ownerId: true, timezone: true },
+          },
+        },
+      },
+      guest: {
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          phoneNumber: true,
+        },
+      },
+    },
+  });
+
+  mapBooking(updatedBooking);
+
+  const provider = await resolveProviderEmail(updatedBooking.room);
+  void notificationService.enqueue("booking.checked_in", {
+    booking: updatedBooking,
+    room: updatedBooking.room,
+    guest: updatedBooking.guest,
+    provider,
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      booking: updatedBooking,
+    },
+  });
+});

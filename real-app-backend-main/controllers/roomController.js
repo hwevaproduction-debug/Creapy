@@ -1076,3 +1076,61 @@ exports.upsertAccommodationTax = catchAsync(async (req, res) => {
     data: { taxRule },
   });
 });
+
+exports.getOccupancyPricingRule = catchAsync(async (req, res) => {
+  await ensureProviderOwnsRoom(req.params.id, getUserId(req.user));
+
+  const occupancyPricingRule = await prisma.occupancyPricingRule.findUnique({
+    where: { roomId: req.params.id },
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: { occupancyPricingRule: occupancyPricingRule || null },
+  });
+});
+
+exports.upsertOccupancyPricingRule = catchAsync(async (req, res, next) => {
+  await ensureProviderOwnsRoom(req.params.id, getUserId(req.user));
+
+  const baseGuestCount = Number(req.body.baseGuestCount);
+  const extraGuestFeePerNight = Number(req.body.extraGuestFeePerNight);
+
+  if (!Number.isInteger(baseGuestCount) || baseGuestCount < 1) {
+    return next(new AppError("baseGuestCount must be a positive integer", 400));
+  }
+
+  if (!Number.isFinite(extraGuestFeePerNight) || extraGuestFeePerNight < 0) {
+    return next(new AppError("extraGuestFeePerNight must be a positive number", 400));
+  }
+
+  const occupancyPricingRule = await prisma.occupancyPricingRule.upsert({
+    where: { roomId: req.params.id },
+    create: {
+      roomId: req.params.id,
+      baseGuestCount,
+      extraGuestFeePerNight,
+    },
+    update: {
+      baseGuestCount,
+      extraGuestFeePerNight,
+    },
+  });
+
+  mapId(occupancyPricingRule);
+
+  res.status(200).json({
+    status: "success",
+    data: { occupancyPricingRule },
+  });
+});
+
+exports.deleteOccupancyPricingRule = catchAsync(async (req, res) => {
+  await ensureProviderOwnsRoom(req.params.id, getUserId(req.user));
+
+  await prisma.occupancyPricingRule.deleteMany({
+    where: { roomId: req.params.id },
+  });
+
+  res.status(204).json({ status: "success", data: null });
+});

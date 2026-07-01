@@ -2,31 +2,176 @@ import { Box, Grid } from "@mui/material";
 import AppCard from "../../components/ui/AppCard";
 import AppContainer from "../../components/ui/AppContainer";
 
-const steps = [
-  ["Create Account", "Sign up as a landlord"],
-  ["Create Listing", "Use the listing wizard"],
-  ["Receive Requests", "Tenants send engagement requests"],
-  ["Approve Tenants", "Review and approve for 5 TR"],
-  ["Manage Listings", "Track status in your dashboard"],
-];
-
 const LandlordGuide = () => (
   <Box>
     <Box sx={{ background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)", pt: { xs: 12, md: 14 }, pb: { xs: 6, md: 8 }, textAlign: "center", px: 2 }}>
       <Box sx={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.15em", color: "#B8975A", textTransform: "uppercase", mb: 2 }}>Landlord Guide</Box>
-      <Box component="h1" sx={{ fontSize: { xs: "2rem", md: "3rem" }, fontWeight: 800, color: "#fff", m: 0 }}>Manage Rentals with Confidence</Box>
+      <Box component="h1" sx={{ fontSize: { xs: "2rem", md: "3rem" }, fontWeight: 800, color: "#fff", m: 0 }}>List Your Property. Reach Tenants.</Box>
+      <Box sx={{ color: "rgba(255,255,255,0.8)", mt: 2, maxWidth: 600, mx: "auto", fontSize: { xs: "1rem", md: "1.125rem" } }}>Create listings, manage engagement requests, and earn TR Tokens — all from your dashboard.</Box>
     </Box>
+
     <AppContainer sx={{ py: { xs: 6, md: 8 } }}>
       <Grid container spacing={3}>
-        {steps.map(([title, body], index) => (
-          <Grid item xs={12} md={index === 4 ? 12 : 6} key={title}>
-            <AppCard sx={{ p: 3, height: "100%" }}>
-              <Box sx={{ color: "#B8975A", fontWeight: 800, mb: 1 }}>Step {index + 1}</Box>
-              <Box sx={{ fontWeight: 800, fontSize: "20px" }}>{title}</Box>
-              <Box sx={{ color: "text.secondary", mt: 1 }}>{body}</Box>
-            </AppCard>
-          </Grid>
-        ))}
+        <Grid item xs={12}>
+          <AppCard sx={{ p: 3 }}>
+            <Box sx={{ fontWeight: 800, fontSize: "22px", mb: 1 }}>How It Works</Box>
+            <Box sx={{ color: "text.secondary", mb: 3 }}>Five simple steps to list your property and start earning.</Box>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={4}>
+                <Box sx={{ fontWeight: 800, color: "#B8975A", mb: 0.5 }}>Step 1</Box>
+                <Box sx={{ fontWeight: 700, mb: 0.5 }}>Create Account</Box>
+                <Box sx={{ color: "text.secondary" }}>Sign up as a landlord, verify your email and phone to unlock listing privileges.</Box>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Box sx={{ fontWeight: 800, color: "#B8975A", mb: 0.5 }}>Step 2</Box>
+                <Box sx={{ fontWeight: 700, mb: 0.5 }}>Verify Your Identity</Box>
+                <Box sx={{ color: "text.secondary" }}>Upload a government ID and selfie from your Profile page. Required before you can list.</Box>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Box sx={{ fontWeight: 800, color: "#B8975A", mb: 0.5 }}>Step 3</Box>
+                <Box sx={{ fontWeight: 700, mb: 0.5 }}>Create a Listing</Box>
+                <Box sx={{ color: "text.secondary" }}>Use the listing wizard to add property details, photos, amenities, and pricing.</Box>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Box sx={{ fontWeight: 800, color: "#B8975A", mb: 0.5 }}>Step 4</Box>
+                <Box sx={{ fontWeight: 700, mb: 0.5 }}>Submit & Go Live</Box>
+                <Box sx={{ color: "text.secondary" }}>Submit your listing details. Your listing is created active and visible to tenants immediately.</Box>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Box sx={{ fontWeight: 800, color: "#B8975A", mb: 0.5 }}>Step 5</Box>
+                <Box sx={{ fontWeight: 700, mb: 0.5 }}>Manage Requests</Box>
+                <Box sx={{ color: "text.secondary" }}>Approve or decline tenant engagement requests from your dashboard.</Box>
+              </Grid>
+            </Grid>
+          </AppCard>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <AppCard sx={{ p: 3, height: "100%" }}>
+            <Box sx={{ fontWeight: 800, fontSize: "20px", mb: 1 }}>Creating a Listing</Box>
+            <Box sx={{ color: "text.secondary" }}>
+              Navigate to /create-listing and fill in your property details: name, description, address, province, city, monthly rent, bathrooms, bedrooms, total rooms, furnished status, and amenities. Upload photos via our secure uploader. Your draft is saved in your browser session and can be restored if you leave the page. When ready, submit the listing — it is created with status "active" and visible to tenants immediately.
+            </Box>
+          </AppCard>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <AppCard sx={{ p: 3, height: "100%" }}>
+            <Box sx={{ fontWeight: 800, fontSize: "20px", mb: 1 }}>Listing Fee & Activation</Box>
+            <Box sx={{ color: "text.secondary" }}>
+              Listings are created active and visible to tenants immediately. No payment is required at creation time.
+            </Box>
+          </AppCard>
+        </Grid>
+
+        <Grid item xs={12}>
+          <AppCard sx={{ p: 3 }}>
+            <Box sx={{ fontWeight: 800, fontSize: "20px", mb: 2 }}>Listing Lifecycle</Box>
+            <Box sx={{ overflowX: "auto" }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" }, gap: 1, "& > div": { py: 1.5, px: 2, borderBottom: "1px solid", borderColor: "divider" } }}>
+                <Box sx={{ fontWeight: 700 }}>Status</Box>
+                <Box sx={{ fontWeight: 700 }}>What it means</Box>
+                <Box sx={{ fontWeight: 700 }}>What you can do</Box>
+
+                <Box>Active</Box>
+                <Box sx={{ color: "text.secondary" }}>Fully public</Box>
+                <Box sx={{ color: "text.secondary" }}>Edit, Delete</Box>
+
+                <Box>Expired</Box>
+                <Box sx={{ color: "text.secondary" }}>Past expiry date</Box>
+                <Box sx={{ color: "text.secondary" }}>Restore (costs TR Tokens)</Box>
+
+                <Box>Inactive</Box>
+                <Box sx={{ color: "text.secondary" }}>Admin-deactivated</Box>
+                <Box sx={{ color: "text.secondary" }}>Revive (pay to restore)</Box>
+              </Box>
+              <Box sx={{ color: "text.secondary", fontSize: "13px", mt: 1.5 }}>
+                Note: Pending Payment and Early Access are transitional states used in specific payment configurations and are not part of the standard listing flow.
+              </Box>
+            </Box>
+          </AppCard>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <AppCard sx={{ p: 3, height: "100%" }}>
+            <Box sx={{ fontWeight: 800, fontSize: "20px", mb: 1 }}>Responding to Engagement Requests</Box>
+            <Box sx={{ color: "text.secondary" }}>
+              Tenants send you a message via the listing page when they want to contact you. You receive a notification and can review their message in your dashboard under "Incoming Engagement Requests". Click Approve — the tenant will see your phone number and address in their dashboard. You can also Decline the request if it does not suit your needs.
+            </Box>
+          </AppCard>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <AppCard sx={{ p: 3, height: "100%" }}>
+            <Box sx={{ fontWeight: 800, fontSize: "20px", mb: 1 }}>Managing TR Tokens</Box>
+            <Box sx={{ color: "text.secondary" }}>
+              TR Tokens are used to restore expired listings. View your balance and transaction history in the dashboard sidebar. Visit /docs/tr-tokens for the full token economics guide.
+            </Box>
+          </AppCard>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <AppCard sx={{ p: 3, height: "100%" }}>
+            <Box sx={{ fontWeight: 800, fontSize: "20px", mb: 1 }}>Restoring Expired Listings</Box>
+            <Box sx={{ color: "text.secondary" }}>
+              When a listing expires it shows "Expired" status. Click Restore and choose how many days to extend. The cost in TR Tokens is shown before you confirm. Once confirmed the listing is reactivated and tokens are deducted from your wallet.
+            </Box>
+          </AppCard>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <AppCard sx={{ p: 3, height: "100%" }}>
+            <Box sx={{ fontWeight: 800, fontSize: "20px", mb: 1 }}>Identity Verification</Box>
+            <Box sx={{ color: "text.secondary" }}>
+              Identity verification is required for all landlords before listing. Go to /profile and click "Start Verification". Upload a clear government ID photo and a selfie. Your submission is reviewed by our admin team within 24–48 hours. You will be notified of the outcome. If rejected, you can resubmit with updated documents.
+            </Box>
+          </AppCard>
+        </Grid>
+
+        <Grid item xs={12}>
+          <AppCard sx={{ p: 3 }}>
+            <Box sx={{ fontWeight: 800, fontSize: "20px", mb: 1 }}>Dashboard Overview</Box>
+            <Box sx={{ color: "text.secondary" }}>
+              Your landlord dashboard shows 4 KPI cards at the top: Active Listings, Expiring Soon, Token Balance, and Pending Requests. Below that, a listings table with status chips and actions (edit, delete, pay). The payment history table tracks all your transactions. A wallet card displays your current TR Token balance and recent transactions.
+            </Box>
+          </AppCard>
+        </Grid>
+
+        <Grid item xs={12}>
+          <AppCard sx={{ p: 3 }}>
+            <Box sx={{ fontWeight: 800, fontSize: "22px", mb: 2 }}>Frequently Asked Questions</Box>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ fontWeight: 700, mb: 0.5 }}>How much does it cost to list a property?</Box>
+                <Box sx={{ color: "text.secondary" }}>The listing fee is shown on the payment page. It is a one-time fee per listing period.</Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ fontWeight: 700, mb: 0.5 }}>How long does a listing stay active?</Box>
+                <Box sx={{ color: "text.secondary" }}>Listings have an expiry date. You can restore expired listings using TR Tokens.</Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ fontWeight: 700, mb: 0.5 }}>What happens if I don't pay the listing fee?</Box>
+                 <Box sx={{ color: "text.secondary" }}>Listings are created active immediately. If a listing is later transitioned to pending payment status, it will not be visible to tenants until payment is completed.</Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ fontWeight: 700, mb: 0.5 }}>Can I edit my listing after it's active?</Box>
+                <Box sx={{ color: "text.secondary" }}>Yes, use the edit (pencil) icon in your listings table.</Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ fontWeight: 700, mb: 0.5 }}>What do tenants see when I approve their request?</Box>
+                <Box sx={{ color: "text.secondary" }}>They see your phone number and property address in their dashboard.</Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ fontWeight: 700, mb: 0.5 }}>How do I get verified?</Box>
+                <Box sx={{ color: "text.secondary" }}>Go to your Profile page and click "Start Verification". Upload your ID and a selfie.</Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ fontWeight: 700, mb: 0.5 }}>Can I have multiple listings?</Box>
+                <Box sx={{ color: "text.secondary" }}>No, you can only have one active listing at a time.</Box>
+              </Grid>
+            </Grid>
+          </AppCard>
+        </Grid>
       </Grid>
     </AppContainer>
   </Box>

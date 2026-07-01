@@ -9,7 +9,8 @@ interface AppCardProps extends Omit<CardProps, "elevation" | "variant"> {
 const elevationStyles = {
   flat: {
     boxShadow: "none",
-    border: "1px solid #E2E8F0",
+    border: "1px solid",
+    borderColor: "divider",
   },
   raised: {
     boxShadow: "0 4px 16px rgba(31,41,55,0.08)",

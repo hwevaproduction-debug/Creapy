@@ -1,4 +1,6 @@
+import { Box, CircularProgress } from "@mui/material";
 import LegalPageLayout from "../../components/LegalPageLayout";
+import { useGetPublicLegalDocQuery } from "../../redux/api/legalApiSlice";
 
 const sections = [
   { id: "overview", title: "Overview", content: "This policy explains how cancellation and refund requests are handled for Town Ruins payments, premium access, temporary stays, and platform services." },
@@ -11,5 +13,14 @@ const sections = [
 ];
 
 export default function RefundPolicy() {
-  return <LegalPageLayout title="Refund & Cancellation Policy" lastUpdated="May 2026" sections={sections} />;
+  const { data, isLoading } = useGetPublicLegalDocQuery("refund-policy");
+  const apiSections = data?.data?.content ? (() => { try { return JSON.parse(data.data.content); } catch { return null; } })() : null;
+  const resolvedSections = apiSections ?? sections;
+  const lastUpdated = data?.data?.updatedAt ? new Date(data.data.updatedAt).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "May 2026";
+
+  if (isLoading) {
+    return <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}><CircularProgress /></Box>;
+  }
+
+  return <LegalPageLayout title="Refund & Cancellation Policy" lastUpdated={lastUpdated} sections={resolvedSections} />;
 }

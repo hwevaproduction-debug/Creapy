@@ -4,14 +4,15 @@ import { useNavigate } from "react-router-dom";
 import useTypedSelector from "../../../hooks/useTypedSelector";
 import { selectedIsEmailVerified } from "../../../redux/auth/authSlice";
 import AppCard from "../../../components/ui/AppCard";
+import { FEATURE_FLAGS } from "../../../config/featureFlags";
 
 const VerificationStatusCard = () => {
   const navigate = useNavigate();
   const isEmailVerified = useTypedSelector(selectedIsEmailVerified);
   const items = [
     { label: "Email", complete: isEmailVerified },
-    { label: "Phone", complete: false },
-    { label: "ID", complete: false },
+    ...(FEATURE_FLAGS.PHONE_VERIFICATION ? [{ label: "Phone", complete: false }] : []),
+    ...(FEATURE_FLAGS.ID_VERIFICATION ? [{ label: "ID", complete: false }] : []),
   ];
 
   return (

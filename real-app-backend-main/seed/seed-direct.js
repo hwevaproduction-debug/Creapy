@@ -627,8 +627,8 @@ async function ensureBooking({ roomId, providerId, guestId, checkIn, checkOut, s
   };
 }
 
-async function ensureBlockedDate(roomId, providerId, startDate, endDate) {
-  const existing = await prisma.blockedDate.findFirst({
+async function ensureBlockedDate(roomId, startDate, endDate) {
+  const existing = await prisma.availabilityBlock.findFirst({
     where: { roomId, startDate, endDate },
   });
 
@@ -636,10 +636,10 @@ async function ensureBlockedDate(roomId, providerId, startDate, endDate) {
     return false;
   }
 
-  await prisma.blockedDate.create({
+  await prisma.availabilityBlock.create({
     data: {
       roomId,
-      providerId,
+      blockType: 'MAINTENANCE',
       startDate,
       endDate,
       reason: 'Maintenance',
@@ -772,7 +772,7 @@ async function seed() {
       continue;
     }
 
-    const created = await ensureBlockedDate(room.id, entry.provider.id, blockStart, blockEnd);
+    const created = await ensureBlockedDate(room.id, blockStart, blockEnd);
     if (created) createdBlockedDates += 1;
   }
 

@@ -1,4 +1,6 @@
+import { Box, CircularProgress } from "@mui/material";
 import LegalPageLayout from "../../components/LegalPageLayout";
+import { useGetPublicLegalDocQuery } from "../../redux/api/legalApiSlice";
 
 const sections = [
   { id: "commitment", title: "Our Commitment", content: "Town Ruins combines verification, reporting tools, payment records, and moderation workflows to reduce fraud and improve confidence in property discovery." },
@@ -10,5 +12,14 @@ const sections = [
 ];
 
 export default function TrustSafety() {
-  return <LegalPageLayout title="Trust & Safety" lastUpdated="May 2026" sections={sections} />;
+  const { data, isLoading } = useGetPublicLegalDocQuery("trust-safety");
+  const apiSections = data?.data?.content ? (() => { try { return JSON.parse(data.data.content); } catch { return null; } })() : null;
+  const resolvedSections = apiSections ?? sections;
+  const lastUpdated = data?.data?.updatedAt ? new Date(data.data.updatedAt).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "May 2026";
+
+  if (isLoading) {
+    return <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}><CircularProgress /></Box>;
+  }
+
+  return <LegalPageLayout title="Trust & Safety" lastUpdated={lastUpdated} sections={resolvedSections} />;
 }

@@ -42,9 +42,11 @@ import ReleaseNotes from "./views/Docs/ReleaseNotes";
 import TRTokens from "./views/Docs/TRTokens";
 import TenantGuide from "./views/Docs/TenantGuide";
 import LandlordGuide from "./views/Docs/LandlordGuide";
+import ProviderGuide from "./views/Docs/ProviderGuide";
 import Roadmap from "./views/Docs/Roadmap";
 import Footer from "./components/Footer";
 import { createAppTheme } from "./theme";
+import { FEATURE_FLAGS } from "./config/featureFlags";
 import FloatingNotificationBubble from "./components/notifications/FloatingNotificationBubble";
 import useTypedSelector from "./hooks/useTypedSelector";
 import { selectedUserToken } from "./redux/auth/authSlice";
@@ -179,7 +181,11 @@ function App() {
             <Route path="/docs/tr-tokens" element={<TRTokens />} />
             <Route path="/docs/tenant-guide" element={<TenantGuide />} />
             <Route path="/docs/landlord-guide" element={<LandlordGuide />} />
-            <Route path="/docs/roadmap" element={<Roadmap />} />
+            <Route
+              path="/docs/roadmap"
+              element={FEATURE_FLAGS.PUBLIC_ROADMAP ? <Roadmap /> : <Navigate to="/docs" replace />}
+            />
+            <Route path="/docs/provider-guide" element={<ProviderGuide />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/stays" element={<Stays />} />
             <Route path="/stays/rooms/:roomId" element={<StayRoomDetail />} />

@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Box,
-  Button,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   MenuItem,
-  Paper,
   Stack,
   TextField,
   Typography,
@@ -19,6 +17,8 @@ import {
   useGetRoomCalendarQuery,
   useListRoomBlocksQuery,
 } from "../../../../redux/api/providerApiSlice";
+import AppButton from "../../../../components/ui/AppButton";
+import AppCard from "../../../../components/ui/AppCard";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 type CalendarTabProps = {
@@ -88,9 +88,9 @@ const CalendarTab = ({ rooms }: CalendarTabProps) => {
         <TextField select label="Room" value={selectedRoomId} onChange={(event) => setSelectedRoomId(event.target.value)} sx={{ minWidth: 260 }}>
           {rooms.map((room) => <MenuItem key={getRoomId(room)} value={getRoomId(room)}>{room?.name}</MenuItem>)}
         </TextField>
-        <Button onClick={() => moveMonth(-1)}>Previous</Button>
+        <AppButton variant="outlined" size="small" onClick={() => moveMonth(-1)}>Previous</AppButton>
         <Typography variant="h6">{year}-{String(month).padStart(2, "0")}</Typography>
-        <Button onClick={() => moveMonth(1)}>Next</Button>
+        <AppButton variant="outlined" size="small" onClick={() => moveMonth(1)}>Next</AppButton>
       </Stack>
 
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 1 }}>
@@ -102,11 +102,10 @@ const CalendarTab = ({ rooms }: CalendarTabProps) => {
           const block = blockedDates.get(date);
           const unavailable = unavailableDates.has(date);
           const selected = dragStart && (date === dragStart || (dragEnd && date >= [dragStart, dragEnd].sort()[0] && date <= [dragStart, dragEnd].sort()[1]));
-          const background = block ? "#fde7e7" : unavailable ? "#e8eaf6" : selected ? "#bbdefb" : "#f8fafc";
           return (
-            <Paper
+            <AppCard
               key={date}
-              variant="outlined"
+              elevation="flat"
               onClick={() => {
                 if (block) {
                   setBlockToDelete(block);
@@ -123,20 +122,20 @@ const CalendarTab = ({ rooms }: CalendarTabProps) => {
                 setDragEnd(date);
                 setBlockDialogOpen(true);
               }}
-              sx={{ p: 1, minHeight: 86, cursor: block || !unavailable ? "pointer" : "default", background }}
+              sx={{ p: 1, minHeight: 86, cursor: block || !unavailable ? "pointer" : "default", bgcolor: block ? "rgba(253, 231, 231, 0.6)" : unavailable ? "rgba(232, 234, 246, 0.4)" : selected ? "rgba(187, 222, 251, 0.4)" : "background.paper" }}
             >
               <Typography fontWeight={700}>{day}</Typography>
               {!unavailable ? <Typography variant="caption">${calendar?.pricingByDate?.[date] || ""}</Typography> : null}
               {block ? <Typography variant="caption" display="block">Blocked</Typography> : unavailable ? <Typography variant="caption" display="block">Booked</Typography> : null}
-            </Paper>
+            </AppCard>
           );
         })}
       </Box>
 
       <Stack direction="row" spacing={2}>
-        <Typography><Box component="span" sx={{ display: "inline-block", width: 12, height: 12, bgcolor: "#f8fafc", border: "1px solid #ccc", mr: 0.75 }} />Available</Typography>
-        <Typography><Box component="span" sx={{ display: "inline-block", width: 12, height: 12, bgcolor: "#e8eaf6", mr: 0.75 }} />Booked</Typography>
-        <Typography><Box component="span" sx={{ display: "inline-block", width: 12, height: 12, bgcolor: "#fde7e7", mr: 0.75 }} />Blocked</Typography>
+        <Typography><Box component="span" sx={{ display: "inline-block", width: 12, height: 12, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", mr: 0.75 }} />Available</Typography>
+        <Typography><Box component="span" sx={{ display: "inline-block", width: 12, height: 12, bgcolor: "rgba(232, 234, 246, 0.4)", mr: 0.75 }} />Booked</Typography>
+        <Typography><Box component="span" sx={{ display: "inline-block", width: 12, height: 12, bgcolor: "rgba(253, 231, 231, 0.6)", mr: 0.75 }} />Blocked</Typography>
       </Stack>
 
       <Dialog open={blockDialogOpen} onClose={resetBlockSelection} fullWidth maxWidth="xs">
@@ -146,8 +145,8 @@ const CalendarTab = ({ rooms }: CalendarTabProps) => {
           <TextField fullWidth label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={resetBlockSelection}>Cancel</Button>
-          <Button
+          <AppButton onClick={resetBlockSelection}>Cancel</AppButton>
+          <AppButton
             variant="contained"
             onClick={async () => {
               const [startDate, endDate] = [dragStart, dragEnd].sort();
@@ -158,7 +157,7 @@ const CalendarTab = ({ rooms }: CalendarTabProps) => {
             }}
           >
             Block
-          </Button>
+          </AppButton>
         </DialogActions>
       </Dialog>
 

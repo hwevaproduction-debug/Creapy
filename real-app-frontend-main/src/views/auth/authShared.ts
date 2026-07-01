@@ -15,7 +15,7 @@ export const AUTH_CARD_SX = {
   overflowY: "auto",
   p: { xs: 3, md: "48px 52px" },
   borderRadius: "28px",
-  background: "rgba(15,20,30,0.72)",
+  background: "rgba(252, 253, 253, 0.72)",
   backdropFilter: "blur(28px)",
   border: "1px solid rgba(255,255,255,0.09)",
   boxShadow: "0 48px 120px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)",
@@ -41,5 +41,5 @@ export const AUTH_PAGE_WRAPPER_SX = {
   justifyContent: "center",
   px: "16px",
   py: "16px",
-  background: "#0F141E",
+  background: "#ffffff",
 };

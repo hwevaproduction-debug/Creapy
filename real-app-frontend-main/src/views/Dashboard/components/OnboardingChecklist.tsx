@@ -120,7 +120,7 @@ const OnboardingChecklist = () => {
               fontSize: "14px",
             }}
           >
-            <Box sx={{ color: step.complete ? "#B8975A" : "rgba(255,255,255,0.4)", fontWeight: 800 }}>
+            <Box sx={{ color: step.complete ? "#B8975A" : "text.disabled", fontWeight: 800 }}>
               {step.complete ? "\u2713" : "\u25CB"}
             </Box>
             {step.label}

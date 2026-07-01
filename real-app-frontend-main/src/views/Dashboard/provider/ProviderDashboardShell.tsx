@@ -30,8 +30,11 @@ const PricingTab = React.lazy(() => import("./tabs/PricingTab"));
 const AnalyticsTab = React.lazy(() => import("./tabs/AnalyticsTab"));
 const PolicyTab = React.lazy(() => import("./tabs/PolicyTab"));
 const PayoutsTab = React.lazy(() => import("./tabs/PayoutsTab"));
+const AvailabilityTab = React.lazy(() => import("./tabs/AvailabilityTab"));
+const PromotionsTab = React.lazy(() => import("./tabs/PromotionsTab"));
+const ReviewsTab = React.lazy(() => import("./tabs/ReviewsTab"));
 
-const tabs = ["Rooms", "Bookings", "Calendar", "Pricing", "Analytics", "Policies", "Payouts"];
+const tabs = ["Rooms", "Bookings", "Calendar", "Pricing", "Analytics", "Policies", "Payouts", "Availability", "Promotions", "Reviews"];
 const formatCurrency = (value: any) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value || 0));
 
@@ -108,7 +111,7 @@ const ProviderDashboardShell = () => {
                 color: "#64748B",
                 borderRadius: "10px",
                 minHeight: 44,
-                "&:hover": { background: "#F7EDDA" },
+                "&:hover": { background: "rgba(184,151,90,0.08)" },
                 "&.Mui-selected": { color: "text.primary" },
               },
             }}
@@ -130,8 +133,14 @@ const ProviderDashboardShell = () => {
             <AnalyticsTab rooms={rooms} accommodationId={accommodationId} />
           ) : activeTab === 5 ? (
             <PolicyTab accommodationId={accommodationId} />
-          ) : (
+          ) : activeTab === 6 ? (
             <PayoutsTab bookings={bookings} />
+          ) : activeTab === 7 ? (
+            <AvailabilityTab rooms={rooms} />
+          ) : activeTab === 8 ? (
+            <PromotionsTab accommodationId={accommodationId} rooms={rooms} />
+          ) : (
+            <ReviewsTab accommodationId={accommodationId} />
           )}
         </Suspense>
       </AppContainer>

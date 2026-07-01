@@ -24,9 +24,12 @@ import {
   useDeleteRoomFeeMutation,
   useDeleteSeasonalRateMutation,
   useGetAccommodationTaxQuery,
+  useGetOccupancyPricingRuleQuery,
   useListRoomFeesQuery,
   useListSeasonalRatesQuery,
   useUpsertAccommodationTaxMutation,
+  useUpsertOccupancyPricingRuleMutation,
+  useDeleteOccupancyPricingRuleMutation,
 } from "../../../../redux/api/providerApiSlice";
 
 type PricingTabProps = {
@@ -73,11 +76,16 @@ const PricingTab = ({ rooms, accommodationId, initialValues = {}, onDataChange }
   const [rateForm, setRateForm] = useState<RateForm>(initialValues.rateForm || defaultRateForm);
   const [feeForm, setFeeForm] = useState<FeeForm>(initialValues.feeForm || defaultFeeForm);
   const [taxForm, setTaxForm] = useState<TaxForm>(initialValues.taxForm || defaultTaxForm);
+  const [occupancyForm, setOccupancyForm] = useState({ baseGuestCount: "", extraGuestFeePerNight: "" });
   const hydratedInitialValues = useRef(false);
   const hasUserEdited = useRef(false);
+  const hasUserEditedOccupancy = useRef(false);
   const { data: ratesResponse } = useListSeasonalRatesQuery(selectedRoomId, { skip: !selectedRoomId });
   const { data: feesResponse } = useListRoomFeesQuery(selectedRoomId, { skip: !selectedRoomId });
   const { data: taxResponse } = useGetAccommodationTaxQuery(accommodationId, { skip: !accommodationId });
+  const { data: occupancyRuleResponse } = useGetOccupancyPricingRuleQuery(selectedRoomId, { skip: !selectedRoomId });
+  const [upsertOccupancyPricingRule, { isLoading: savingOccupancyRule }] = useUpsertOccupancyPricingRuleMutation();
+  const [deleteOccupancyPricingRule, { isLoading: deletingOccupancyRule }] = useDeleteOccupancyPricingRuleMutation();
   const [createRate] = useCreateSeasonalRateMutation();
   const [deleteRate] = useDeleteSeasonalRateMutation();
   const [createFee] = useCreateRoomFeeMutation();
@@ -119,6 +127,21 @@ const PricingTab = ({ rooms, accommodationId, initialValues = {}, onDataChange }
       });
     }
   }, [taxResponse]);
+
+  useEffect(() => {
+    setOccupancyForm({ baseGuestCount: "", extraGuestFeePerNight: "" });
+    hasUserEditedOccupancy.current = false;
+  }, [selectedRoomId]);
+
+  useEffect(() => {
+    const occupancyRule = toEntityObject(occupancyRuleResponse, ["occupancyPricingRule", "data"]);
+    if (occupancyRule && !hasUserEditedOccupancy.current) {
+      setOccupancyForm({
+        baseGuestCount: String(occupancyRule.baseGuestCount ?? ""),
+        extraGuestFeePerNight: String(occupancyRule.extraGuestFeePerNight ?? ""),
+      });
+    }
+  }, [occupancyRuleResponse]);
 
   return (
     <Stack spacing={3}>
@@ -177,6 +200,65 @@ const PricingTab = ({ rooms, accommodationId, initialValues = {}, onDataChange }
           <Grid item xs={12} md={3}><FormControlLabel control={<Switch checked={taxForm.isInclusive} onChange={(event) => { markUserEdited(); setTaxForm({ ...taxForm, isInclusive: event.target.checked }); }} />} label="Inclusive" /></Grid>
         </Grid>
         <Button sx={{ mt: 2 }} variant="contained" onClick={() => upsertTax({ accommodationId, payload: { ...taxForm, percentage: Number(taxForm.percentage || 0) } })}>Save Tax Rule</Button>
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>Occupancy Pricing (Extra Guest Fee)</Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={3}>
+            <TextField
+              fullWidth
+              type="number"
+              label="Base Guest Count"
+              value={occupancyForm.baseGuestCount}
+              onChange={(event) => {
+                hasUserEditedOccupancy.current = true;
+                setOccupancyForm({ ...occupancyForm, baseGuestCount: event.target.value });
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField
+              fullWidth
+              type="number"
+              label="Extra Guest Fee / Night ($)"
+              value={occupancyForm.extraGuestFeePerNight}
+              onChange={(event) => {
+                hasUserEditedOccupancy.current = true;
+                setOccupancyForm({ ...occupancyForm, extraGuestFeePerNight: event.target.value });
+              }}
+            />
+          </Grid>
+        </Grid>
+        <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+          <Button
+            variant="contained"
+            disabled={!selectedRoomId || savingOccupancyRule}
+            onClick={() =>
+              upsertOccupancyPricingRule({
+                roomId: selectedRoomId,
+                payload: {
+                  baseGuestCount: Number(occupancyForm.baseGuestCount),
+                  extraGuestFeePerNight: Number(occupancyForm.extraGuestFeePerNight),
+                },
+              })
+            }
+          >
+            Save Rule
+          </Button>
+          {(occupancyRuleResponse?.data?.occupancyPricingRule || occupancyRuleResponse?.occupancyPricingRule) && (
+            <Button
+              color="error"
+              disabled={deletingOccupancyRule}
+              onClick={() => {
+                deleteOccupancyPricingRule(selectedRoomId);
+                setOccupancyForm({ baseGuestCount: "", extraGuestFeePerNight: "" });
+              }}
+            >
+              Remove Rule
+            </Button>
+          )}
+        </Stack>
       </Paper>
     </Stack>
   );

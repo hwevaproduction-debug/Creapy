@@ -14,7 +14,7 @@ const StatCard = ({ label, value, sub }: StatCardProps) => (
       height: "100%",
       borderLeft: "3px solid #B8975A",
       borderRadius: "16px",
-      padding: "20px 24px",
+      p: { xs: 2, md: 2.5 },
       boxShadow: "0 2px 12px rgba(31,41,55,0.07)",
     }}
   >

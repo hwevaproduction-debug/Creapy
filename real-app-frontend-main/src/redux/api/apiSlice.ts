@@ -42,6 +42,10 @@ export const apiSlice = createApi({
     "Report",
     "AuditLog",
     "Engagement",
+    "Promotion",
+    "OccupancyPricingRule",
+    "ProviderReview",
+    "LegalDoc",
   ],
   endpoints: (builder) => ({}),
 });

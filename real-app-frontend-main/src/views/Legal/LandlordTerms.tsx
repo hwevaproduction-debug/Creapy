@@ -1,4 +1,6 @@
+import { Box, CircularProgress } from "@mui/material";
 import LegalPageLayout from "../../components/LegalPageLayout";
+import { useGetPublicLegalDocQuery } from "../../redux/api/legalApiSlice";
 
 const sections = [
   { id: "eligibility", title: "Eligibility", content: "Landlords and hosts must be legally entitled to list the property and must provide valid identification, contact details, and ownership or authority information when requested." },
@@ -12,5 +14,14 @@ const sections = [
 ];
 
 export default function LandlordTerms() {
-  return <LegalPageLayout title="Host & Landlord Agreement" lastUpdated="May 2026" sections={sections} />;
+  const { data, isLoading } = useGetPublicLegalDocQuery("landlord-terms");
+  const apiSections = data?.data?.content ? (() => { try { return JSON.parse(data.data.content); } catch { return null; } })() : null;
+  const resolvedSections = apiSections ?? sections;
+  const lastUpdated = data?.data?.updatedAt ? new Date(data.data.updatedAt).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "May 2026";
+
+  if (isLoading) {
+    return <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}><CircularProgress /></Box>;
+  }
+
+  return <LegalPageLayout title="Host & Landlord Agreement" lastUpdated={lastUpdated} sections={resolvedSections} />;
 }

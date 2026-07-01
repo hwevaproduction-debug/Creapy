@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Box, Chip, Grid } from "@mui/material";
-import { CheckCircle2, Home } from "lucide-react";
+import { CheckCircle2, Home, Mail } from "lucide-react";
 import { Form, Formik, FormikProps } from "formik";
 import * as Yup from "yup";
 import { onKeyDown } from "../../utils";
-import { useSubmitPropertyInterestMutation } from "../../redux/api/userApiSlice";
+import { useRegisterProviderMutation } from "../../redux/api/providerApiSlice";
 import DotLoader from "../../components/Spinner/dotLoader";
 import PrimaryInput from "../../components/PrimaryInput/PrimaryInput";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
@@ -15,15 +15,22 @@ import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
 import AppSelect from "../../components/ui/AppSelect";
 import HeroSlideshow from "../../views/Home/HeroSlideshow";
+import { providerSignUpSchema } from "./components/validationSchema";
+import { ZIMBABWE_PROVINCES } from "../../config/zimbabweProvinces";
 
-interface IPropertyInterestForm {
-  fullName: string;
+interface IProviderRegistrationForm {
+  userName: string;
   email: string;
-  phone: string;
-  propertyType: string;
-  location: string;
-  description: string;
-  referral: string;
+  password: string;
+  confirmPassword: string;
+  businessName: string;
+  businessType: string;
+  province: string;
+  city: string;
+  address: string;
+  contactPhone: string;
+  registrationNumber?: string;
+  description?: string;
 }
 
 const FALLBACK_HERO_IMAGES = [
@@ -34,39 +41,35 @@ const FALLBACK_HERO_IMAGES = [
   "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1920&q=80",
 ];
 
-const initialValues: IPropertyInterestForm = {
-  fullName: "",
-  email: "",
-  phone: "",
-  propertyType: "",
-  location: "",
-  description: "",
-  referral: "",
-};
-
-const propertyInterestSchema = Yup.object().shape({
-  fullName: Yup.string().required("Full name is required"),
-  email: Yup.string()
-    .email("Invalid email address")
-    .required("Email is required"),
-  phone: Yup.string().nullable(),
-  propertyType: Yup.string().required("Property type is required"),
-  location: Yup.string().required("Location is required"),
-  description: Yup.string()
-    .min(20, "Description must be at least 20 characters")
-    .required("Description is required"),
-  referral: Yup.string().nullable(),
-});
-
-const propertyTypeOptions = [
-  { label: "House", value: "House" },
-  { label: "Flat", value: "Flat" },
-  { label: "Room", value: "Room" },
-  { label: "Student Accommodation", value: "Student Accommodation" },
-  { label: "Other", value: "Other" },
+const BUSINESS_TYPE_OPTIONS = [
+  { label: "Hotel", value: "hotel" },
+  { label: "Lodge", value: "lodge" },
+  { label: "Bed & Breakfast", value: "bnb" },
+  { label: "Guesthouse", value: "guesthouse" },
+  { label: "Motel", value: "motel" },
+  { label: "Backpackers", value: "backpackers" },
 ];
 
-const trustSignals = ["Curated Listings", "Verified Tenants", "Dedicated Support"];
+const TRUST_SIGNALS = [
+  "Verified Properties",
+  "Secure Payments",
+  "24/7 Support",
+];
+
+const initialValues: IProviderRegistrationForm = {
+  userName: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  businessName: "",
+  businessType: "",
+  province: "",
+  city: "",
+  address: "",
+  contactPhone: "",
+  registrationNumber: "",
+  description: "",
+};
 
 const ProviderSignUp = () => {
   const navigate = useNavigate();
@@ -77,23 +80,39 @@ const ProviderSignUp = () => {
     type: "",
   });
 
-  const [submitPropertyInterest, { isLoading }] =
-    useSubmitPropertyInterestMutation();
+  const [registerProvider, { isLoading }] = useRegisterProviderMutation();
 
   const handleCloseToast = () => {
     setToast((prev) => ({ ...prev, appearence: false }));
   };
 
-  const handleSubmit = async (data: IPropertyInterestForm) => {
+  const handleSubmit = async (data: IProviderRegistrationForm) => {
     try {
-      await submitPropertyInterest(data).unwrap();
+      // Transform the data to match the API expected format
+      const apiData = {
+        userName: data.userName,
+        email: data.email,
+        password: data.password,
+        businessName: data.businessName,
+        businessType: data.businessType,
+        location: {
+          province: data.province,
+          city: data.city,
+        },
+        address: data.address,
+        contactPhone: data.contactPhone,
+        registrationNumber: data.registrationNumber || undefined,
+        description: data.description || undefined,
+      };
+
+      await registerProvider(apiData).unwrap();
       setSubmitted(true);
     } catch (error: any) {
       setToast({
         message:
           error?.data?.message ||
           error?.message ||
-          "Unable to submit interest right now.",
+          "Unable to register provider right now.",
         appearence: true,
         type: "error",
       });
@@ -150,13 +169,12 @@ const ProviderSignUp = () => {
                       gap: 1.5,
                     }}
                   >
-                    <CheckCircle2 size={58} color="#1F4D3A" />
+                    <Mail size={58} color="#1F4D3A" />
                     <Heading sx={{ fontSize: "30px" }}>
-                      Thank you for your interest!
+                      Registration Submitted
                     </Heading>
                     <SubHeading sx={{ color: "text.secondary", maxWidth: 420 }}>
-                      Our team will be in touch within 48 hours to guide you
-                      through the listing process.
+                      Please verify your email to complete registration. Your account will be reviewed for approval before you can access the provider dashboard.
                     </SubHeading>
                     <Box
                       sx={{
@@ -167,11 +185,11 @@ const ProviderSignUp = () => {
                         mt: 1,
                       }}
                     >
-                      <AppButton onClick={() => navigate("/search")}>
-                        Browse Listings
-                      </AppButton>
                       <AppButton variant="outlined" onClick={() => navigate("/")}>
                         Back to Home
+                      </AppButton>
+                      <AppButton onClick={() => navigate("/stays")}>
+                        View Stays
                       </AppButton>
                     </Box>
                   </Box>
@@ -196,7 +214,7 @@ const ProviderSignUp = () => {
                         mt: 2,
                       }}
                     >
-                      {trustSignals.map((signal) => (
+                      {TRUST_SIGNALS.map((signal) => (
                         <Chip
                           key={signal}
                           label={signal}
@@ -213,9 +231,9 @@ const ProviderSignUp = () => {
                       <Formik
                         initialValues={initialValues}
                         onSubmit={handleSubmit}
-                        validationSchema={propertyInterestSchema}
+                        validationSchema={providerSignUpSchema}
                       >
-                        {(props: FormikProps<IPropertyInterestForm>) => {
+                        {(props: FormikProps<IProviderRegistrationForm>) => {
                           const {
                             values,
                             touched,
@@ -228,17 +246,17 @@ const ProviderSignUp = () => {
                             <Form onKeyDown={onKeyDown}>
                               <Box sx={{ display: "grid", gap: 1.5 }}>
                                 <PrimaryInput
-                                  label="Full name"
-                                  name="fullName"
-                                  placeholder="Full name"
-                                  value={values.fullName}
+                                  label="Username"
+                                  name="userName"
+                                  placeholder="Choose a username"
+                                  value={values.userName}
                                   helperText={
-                                    errors.fullName && touched.fullName
-                                      ? errors.fullName
+                                    errors.userName && touched.userName
+                                      ? errors.userName
                                       : ""
                                   }
                                   error={Boolean(
-                                    errors.fullName && touched.fullName
+                                    errors.userName && touched.userName
                                   )}
                                   onChange={handleChange}
                                   onBlur={handleBlur}
@@ -246,76 +264,173 @@ const ProviderSignUp = () => {
                                 <PrimaryInput
                                   label="Email"
                                   name="email"
-                                  placeholder="Email"
+                                  placeholder="you@example.com"
                                   value={values.email}
                                   helperText={
-                                    errors.email && touched.email ? errors.email : ""
+                                    errors.email && touched.email
+                                      ? errors.email
+                                      : ""
                                   }
                                   error={Boolean(errors.email && touched.email)}
                                   onChange={handleChange}
                                   onBlur={handleBlur}
                                 />
                                 <PrimaryInput
-                                  label="Phone"
-                                  name="phone"
-                                  placeholder="+263 77 123 4567"
-                                  value={values.phone}
+                                  label="Password"
+                                  name="password"
+                                  type="password"
+                                  placeholder="••••••••"
+                                  value={values.password}
+                                  helperText={
+                                    errors.password && touched.password
+                                      ? errors.password
+                                      : ""
+                                  }
+                                  error={Boolean(
+                                    errors.password && touched.password
+                                  )}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                />
+                                <PrimaryInput
+                                  label="Confirm Password"
+                                  name="confirmPassword"
+                                  type="password"
+                                  placeholder="••••••••"
+                                  value={values.confirmPassword}
+                                  helperText={
+                                    errors.confirmPassword &&
+                                    touched.confirmPassword
+                                      ? errors.confirmPassword
+                                      : ""
+                                  }
+                                  error={Boolean(
+                                    errors.confirmPassword &&
+                                    touched.confirmPassword
+                                  )}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                />
+                                <PrimaryInput
+                                  label="Business Name"
+                                  name="businessName"
+                                  placeholder="Your business name"
+                                  value={values.businessName}
+                                  helperText={
+                                    errors.businessName &&
+                                    touched.businessName
+                                      ? errors.businessName
+                                      : ""
+                                  }
+                                  error={Boolean(
+                                    errors.businessName &&
+                                    touched.businessName
+                                  )}
                                   onChange={handleChange}
                                   onBlur={handleBlur}
                                 />
                                 <AppSelect
-                                  label="Property type"
-                                  name="propertyType"
-                                  value={values.propertyType}
+                                  label="Business Type"
+                                  name="businessType"
+                                  value={values.businessType}
                                   onChange={handleChange}
                                   onBlur={handleBlur}
-                                  options={propertyTypeOptions}
+                                  options={BUSINESS_TYPE_OPTIONS}
                                 />
-                                {errors.propertyType && touched.propertyType ? (
+                                {errors.businessType && touched.businessType ? (
                                   <Box sx={{ color: "#d32f2f", fontSize: "12px" }}>
-                                    {errors.propertyType}
+                                    {errors.businessType}
+                                  </Box>
+                                ) : null}
+                                <AppSelect
+                                  label="Province"
+                                  name="province"
+                                  value={values.province}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                  options={ZIMBABWE_PROVINCES}
+                                />
+                                {errors.province && touched.province ? (
+                                  <Box sx={{ color: "#d32f2f", fontSize: "12px" }}>
+                                    {errors.province}
                                   </Box>
                                 ) : null}
                                 <PrimaryInput
-                                  label="Location"
-                                  name="location"
-                                  placeholder="Neighborhood or area"
-                                  value={values.location}
+                                  label="City"
+                                  name="city"
+                                  placeholder="City or town"
+                                  value={values.city}
                                   helperText={
-                                    errors.location && touched.location
-                                      ? errors.location
+                                    errors.city && touched.city
+                                      ? errors.city
                                       : ""
                                   }
-                                  error={Boolean(errors.location && touched.location)}
+                                  error={Boolean(errors.city && touched.city)}
                                   onChange={handleChange}
                                   onBlur={handleBlur}
                                 />
                                 <PrimaryInput
-                                  label="Description"
+                                  label="Address"
+                                  name="address"
+                                  placeholder="Street address"
+                                  value={values.address}
+                                  helperText={
+                                    errors.address && touched.address
+                                      ? errors.address
+                                      : ""
+                                  }
+                                  error={Boolean(
+                                    errors.address && touched.address
+                                  )}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                />
+                                <PrimaryInput
+                                  label="Contact Phone"
+                                  name="contactPhone"
+                                  placeholder="+263 77 123 4567"
+                                  value={values.contactPhone}
+                                  helperText={
+                                    errors.contactPhone &&
+                                    touched.contactPhone
+                                      ? errors.contactPhone
+                                      : ""
+                                  }
+                                  error={Boolean(
+                                    errors.contactPhone &&
+                                    touched.contactPhone
+                                  )}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                />
+                                <PrimaryInput
+                                  label="Registration Number (Optional)"
+                                  name="registrationNumber"
+                                  placeholder="Business registration number"
+                                  value={values.registrationNumber}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                />
+                                <PrimaryInput
+                                  label="Description (Optional)"
                                   name="description"
-                                  placeholder="Tell us about the property"
+                                  placeholder="Tell us about your property"
                                   value={values.description}
                                   helperText={
-                                    errors.description && touched.description
+                                    errors.description &&
+                                    touched.description
                                       ? errors.description
                                       : ""
                                   }
                                   error={Boolean(
-                                    errors.description && touched.description
+                                    errors.description &&
+                                    touched.description
                                   )}
                                   onChange={handleChange}
                                   onBlur={handleBlur}
                                   multiline
                                   minRows={4}
                                   maxRows={6}
-                                />
-                                <PrimaryInput
-                                  label="How did you hear about us?"
-                                  name="referral"
-                                  placeholder="Optional"
-                                  value={values.referral}
-                                  onChange={handleChange}
-                                  onBlur={handleBlur}
                                 />
                               </Box>
                               <AppButton
@@ -327,7 +442,7 @@ const ProviderSignUp = () => {
                                 {isLoading ? (
                                   <DotLoader color="#fff" size={12} />
                                 ) : (
-                                  "Submit Interest"
+                                  "Register Provider"
                                 )}
                               </AppButton>
                             </Form>

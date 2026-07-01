@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { Button, Grid, MenuItem, Paper, Stack, TextField, Typography } from "@mui/material";
+import { Grid, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import AppButton from "../../../../components/ui/AppButton";
+import AppCard from "../../../../components/ui/AppCard";
 import {
   toEntityArray,
   useBlockRoomDatesMutation,
@@ -30,7 +32,7 @@ const AvailabilityTab = ({ rooms }: AvailabilityTabProps) => {
   return (
     <Grid container spacing={3}>
       <Grid item xs={12} md={5}>
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        <AppCard elevation="flat" sx={{ p: 2 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Block Dates</Typography>
           <Stack spacing={2}>
             <TextField select label="Room" value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })}>
@@ -39,18 +41,18 @@ const AvailabilityTab = ({ rooms }: AvailabilityTabProps) => {
             <TextField type="date" label="Start" value={form.startDate} onChange={(event) => setForm({ ...form, startDate: event.target.value })} InputLabelProps={{ shrink: true }} />
             <TextField type="date" label="End" value={form.endDate} onChange={(event) => setForm({ ...form, endDate: event.target.value })} InputLabelProps={{ shrink: true }} />
             <TextField label="Reason" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
-            <Button
+            <AppButton
               variant="contained"
               disabled={isLoading || !form.roomId || !form.startDate || !form.endDate}
               onClick={() => blockRoomDates({ roomId: form.roomId, payload: { startDate: form.startDate, endDate: form.endDate, reason: form.reason } })}
             >
               {isLoading ? "Saving..." : "Block Dates"}
-            </Button>
+            </AppButton>
           </Stack>
-        </Paper>
+        </AppCard>
       </Grid>
       <Grid item xs={12} md={7}>
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        <AppCard elevation="flat" sx={{ p: 2 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Availability Checker</Typography>
           <Stack spacing={2}>
             <TextField select label="Room" value={check.roomId} onChange={(event) => setCheck({ ...check, roomId: event.target.value })}>
@@ -69,7 +71,7 @@ const AvailabilityTab = ({ rooms }: AvailabilityTabProps) => {
               Booked ranges: {toEntityArray(availability, ["bookedRanges"]).length} · Blocked ranges: {toEntityArray(availability, ["blockedRanges"]).length}
             </Typography>
           </Stack>
-        </Paper>
+        </AppCard>
       </Grid>
     </Grid>
   );

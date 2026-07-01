@@ -413,6 +413,111 @@ export const providerApiSlice = apiSlice.injectEndpoints({
         { type: "AccommodationTax", id: accommodationId },
       ],
     }),
+    checkInBooking: builder.mutation({
+      query: (bookingId) => ({
+        url: `bookings/${bookingId}/check-in`,
+        method: "POST",
+      }),
+      invalidatesTags: (result, error, bookingId) => [
+        { type: "ProviderBooking", id: bookingId },
+        { type: "ProviderBooking", id: "LIST" },
+      ],
+    }),
+    createPromotion: builder.mutation({
+      query: (data) => ({
+        url: "promotions",
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: [{ type: "Promotion", id: "LIST" }],
+    }),
+    updatePromotion: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `promotions/${id}`,
+        method: "PUT",
+        body: payload,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Promotion", id },
+        { type: "Promotion", id: "LIST" },
+      ],
+    }),
+    deactivatePromotion: builder.mutation({
+      query: (id) => ({
+        url: `promotions/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: "Promotion", id },
+        { type: "Promotion", id: "LIST" },
+      ],
+    }),
+    listPromotionCoupons: builder.query({
+      query: (promotionId) => ({
+        url: `promotions/${promotionId}/coupons`,
+        method: "GET",
+      }),
+      providesTags: (result, error, promotionId) => [
+        { type: "Promotion", id: promotionId, relation: "coupons" },
+      ],
+    }),
+    generateCoupons: builder.mutation({
+      query: ({ promotionId, payload }) => ({
+        url: `promotions/${promotionId}/coupons`,
+        method: "POST",
+        body: payload,
+      }),
+      invalidatesTags: (result, error, { promotionId }) => [
+        { type: "Promotion", id: promotionId, relation: "coupons" },
+      ],
+    }),
+    getOccupancyPricingRule: builder.query({
+      query: (roomId) => ({
+        url: `rooms/${roomId}/occupancy-pricing`,
+        method: "GET",
+      }),
+      providesTags: (result, error, roomId) => [{ type: "OccupancyPricingRule", id: roomId }],
+    }),
+    upsertOccupancyPricingRule: builder.mutation({
+      query: ({ roomId, payload }) => ({
+        url: `rooms/${roomId}/occupancy-pricing`,
+        method: "PUT",
+        body: payload,
+      }),
+      invalidatesTags: (result, error, { roomId }) => [
+        { type: "OccupancyPricingRule", id: roomId },
+      ],
+    }),
+    deleteOccupancyPricingRule: builder.mutation({
+      query: (roomId) => ({
+        url: `rooms/${roomId}/occupancy-pricing`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, roomId) => [
+        { type: "OccupancyPricingRule", id: roomId },
+      ],
+    }),
+    getProviderReviews: builder.query({
+      query: (args: any = {}) => {
+        const { accommodationId } = args;
+        const params = new URLSearchParams();
+        if (accommodationId) params.set("accommodationId", accommodationId);
+        const query = params.toString();
+        return {
+          url: query ? `reviews/provider?${query}` : "reviews/provider",
+          method: "GET",
+        };
+      },
+      providesTags: [{ type: "ProviderReview", id: "LIST" }],
+    }),
+    respondToReview: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `reviews/${id}/response`,
+        method: "POST",
+        body: payload,
+      }),
+      invalidatesTags: [{ type: "ProviderReview", id: "LIST" }],
+    }),
   }),
 });
 
@@ -429,6 +534,7 @@ export const {
   useConfirmBookingMutation,
   useDeclineBookingMutation,
   useCancelBookingMutation,
+  useCheckInBookingMutation,
   useGetProviderProfileQuery,
   useUpdateProviderProfileMutation,
   useGetProviderSettlementsSummaryQuery,
@@ -455,6 +561,16 @@ export const {
   useDeleteRoomFeeMutation,
   useGetAccommodationTaxQuery,
   useUpsertAccommodationTaxMutation,
+  useCreatePromotionMutation,
+  useUpdatePromotionMutation,
+  useDeactivatePromotionMutation,
+  useListPromotionCouponsQuery,
+  useGenerateCouponsMutation,
+  useGetOccupancyPricingRuleQuery,
+  useUpsertOccupancyPricingRuleMutation,
+  useDeleteOccupancyPricingRuleMutation,
+  useGetProviderReviewsQuery,
+  useRespondToReviewMutation,
 } = providerApiSlice;
 
 export { toEntityArray, toEntityObject };

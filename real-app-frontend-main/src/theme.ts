@@ -126,13 +126,13 @@ export const createAppTheme = (mode: "light" | "dark") => {
             color: "#B8975A",
             "&:hover": {
               borderColor: "#9E7E45",
-              backgroundColor: "#FDF8F0",
+              backgroundColor: isDark ? "rgba(184,151,90,0.08)" : "#FDF8F0",
             },
           },
           textPrimary: {
             color: "#1F4D3A",
             "&:hover": {
-              backgroundColor: "#F0F7F4",
+              backgroundColor: isDark ? "rgba(31,77,58,0.08)" : "#F0F7F4",
             },
           },
           outlinedSecondary: {
@@ -140,7 +140,7 @@ export const createAppTheme = (mode: "light" | "dark") => {
             color: "#1F4D3A",
             "&:hover": {
               borderColor: "#17382B",
-              backgroundColor: "#F0F7F4",
+              backgroundColor: isDark ? "rgba(31,77,58,0.08)" : "#F0F7F4",
             },
           },
         },

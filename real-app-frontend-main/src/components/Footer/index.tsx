@@ -1,5 +1,13 @@
 import { Box, Grid, Link, useTheme } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
+import { FEATURE_FLAGS } from "../../config/featureFlags";
+
+const platformLinks = [
+  { label: "Documentation", to: "/docs" },
+  { label: "Release Notes", to: "/docs/release-notes" },
+  { label: "TR Token Guide", to: "/docs/tr-tokens" },
+  ...(FEATURE_FLAGS.PUBLIC_ROADMAP ? [{ label: "Roadmap", to: "/docs/roadmap" }] : []),
+];
 
 const groups = [
   {
@@ -27,12 +35,7 @@ const groups = [
   },
   {
     title: "Platform",
-    links: [
-      { label: "Documentation", to: "/docs" },
-      { label: "Release Notes", to: "/docs/release-notes" },
-      { label: "TR Token Guide", to: "/docs/tr-tokens" },
-      { label: "Roadmap", to: "/docs/roadmap" },
-    ],
+    links: platformLinks,
   },
 ];
 

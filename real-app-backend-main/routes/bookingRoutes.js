@@ -54,6 +54,7 @@ router.get(
 );
 router.post("/:id/confirm", bookingController.confirmBooking);
 router.post("/:id/decline", bookingController.declineBooking);
+router.post("/:id/check-in", bookingController.checkInBooking);
 router.put(
   "/:id/settle",
   authController.requireRole("admin"),

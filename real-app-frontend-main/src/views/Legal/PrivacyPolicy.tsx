@@ -1,4 +1,6 @@
+import { Box, CircularProgress } from "@mui/material";
 import LegalPageLayout from "../../components/LegalPageLayout";
+import { useGetPublicLegalDocQuery } from "../../redux/api/legalApiSlice";
 
 const sections = [
   { id: "information", title: "Information We Collect", content: "We collect account details, contact information, listing and booking activity, verification documents where required, payment references, device data, and messages or support requests submitted through Town Ruins." },
@@ -11,5 +13,14 @@ const sections = [
 ];
 
 export default function PrivacyPolicy() {
-  return <LegalPageLayout title="Privacy Policy" lastUpdated="May 2026" sections={sections} />;
+  const { data, isLoading } = useGetPublicLegalDocQuery("privacy-policy");
+  const apiSections = data?.data?.content ? (() => { try { return JSON.parse(data.data.content); } catch { return null; } })() : null;
+  const resolvedSections = apiSections ?? sections;
+  const lastUpdated = data?.data?.updatedAt ? new Date(data.data.updatedAt).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "May 2026";
+
+  if (isLoading) {
+    return <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}><CircularProgress /></Box>;
+  }
+
+  return <LegalPageLayout title="Privacy Policy" lastUpdated={lastUpdated} sections={resolvedSections} />;
 }

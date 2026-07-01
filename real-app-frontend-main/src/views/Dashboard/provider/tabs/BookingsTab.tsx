@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Chip, Stack, Typography } from "@mui/material";
 import {
   useCancelBookingMutation,
+  useCheckInBookingMutation,
   useConfirmBookingMutation,
   useDeclineBookingMutation,
 } from "../../../../redux/api/providerApiSlice";
@@ -45,6 +46,7 @@ const BookingsTab = ({ bookings }: BookingsTabProps) => {
   const [confirmBooking, { isLoading: confirming }] = useConfirmBookingMutation();
   const [declineBooking, { isLoading: decliningBooking }] = useDeclineBookingMutation();
   const [cancelBooking, { isLoading: canceling }] = useCancelBookingMutation();
+  const [checkInBooking, { isLoading: checkingIn }] = useCheckInBookingMutation();
 
   const filteredBookings = useMemo(
     () =>
@@ -103,14 +105,26 @@ const BookingsTab = ({ bookings }: BookingsTabProps) => {
                 </>
               ) : null}
               {["PENDING_CONFIRMATION", "CONFIRMED"].includes(booking?.status) ? (
-                <AppButton
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  onClick={() => cancelBooking({ id: getBookingId(booking), body: { reason: "Canceled by provider" } })}
-                >
-                  Cancel
-                </AppButton>
+                <>
+                  {booking?.status === "CONFIRMED" ? (
+                    <AppButton
+                      size="small"
+                      variant="outlined"
+                      sx={{ borderColor: "#1F4D3A", color: "#1F4D3A" }}
+                      onClick={() => checkInBooking(getBookingId(booking))}
+                    >
+                      Check In
+                    </AppButton>
+                  ) : null}
+                  <AppButton
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    onClick={() => cancelBooking({ id: getBookingId(booking), body: { reason: "Canceled by provider" } })}
+                  >
+                    Cancel
+                  </AppButton>
+                </>
               ) : null}
             </Stack>
           </Stack>

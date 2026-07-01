@@ -119,8 +119,6 @@ const WalletCard = ({ compact = false }: WalletCardProps) => {
           </Box>
           <Box><Box component="span" sx={{ color: "#B8975A", fontWeight: 800 }}>{"\u2713"}</Box> Contact landlords - 5 TR</Box>
           <Box><Box component="span" sx={{ color: "#B8975A", fontWeight: 800 }}>{"\u2713"}</Box> Landlord approves contact - 5 TR (charged to tenant)</Box>
-          <Box><Box component="span" sx={{ color: "rgba(255,255,255,0.35)", fontWeight: 800 }}>{"\u25F7"}</Box> Featured listings - coming soon</Box>
-          <Box><Box component="span" sx={{ color: "rgba(255,255,255,0.35)", fontWeight: 800 }}>{"\u25F7"}</Box> Premium visibility boosts - coming soon</Box>
         </Box>
         <Collapse in={showTransactions}>
           <Box

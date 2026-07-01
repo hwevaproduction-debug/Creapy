@@ -67,3 +67,39 @@ services:
       - key: CORS_ALLOWED_ORIGINS
         # Optional comma-separated origins for API and S3 upload CORS.
         sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: SMS_ENABLED
+        sync: false
+      - key: AT_API_KEY
+        sync: false
+      - key: AT_USERNAME
+        sync: false
+      - key: AT_SENDER_ID
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      - key: NOTIFICATION_WORKER_CRON
+        sync: false
+      - key: NOTIFICATION_BATCH_SIZE
+        sync: false
+      - key: MAX_NOTIFICATION_RETRIES
+        sync: false
+      - key: RECONCILIATION_INTERVAL_CRON
+        sync: false
+      - key: RECONCILIATION_STALE_MINUTES
+        sync: false
+      - key: MAX_PAYMENT_RETRIES
+        sync: false
+      - key: REMINDER_SCAN_CRON
+        sync: false
+      - key: EXPIRY_SCAN_CRON
+        sync: false
+      - key: SKIP_PRISMA_GENERATE_ON_START
+        sync: false

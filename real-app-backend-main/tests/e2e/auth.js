@@ -183,6 +183,67 @@ async function run(state, api, assert, test) {
     assert(status === 401, `expected 401, got ${status}`);
   });
 
+  await test("GET /users/check-availability with unused email", async () => {
+    const uniqueEmail = `newunique_${Date.now()}@test.creapy.com`;
+    const { status, body } = await api(
+      "GET",
+      `/api/v1/users/check-availability?email=${encodeURIComponent(uniqueEmail)}`
+    );
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(
+      body?.data?.emailAvailable ?? body?.emailAvailable === true,
+      "expected email to be available"
+    );
+  });
+
+  await test("GET /users/check-availability with existing landlord email", async () => {
+    const { status, body } = await api(
+      "GET",
+      `/api/v1/users/check-availability?email=${encodeURIComponent(state.landlordEmail)}`
+    );
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(
+      body?.data?.emailAvailable ?? body?.emailAvailable === false,
+      "expected email to be unavailable"
+    );
+  });
+
+  await test("GET /users/check-availability with existing landlord username", async () => {
+    const { status, body } = await api(
+      "GET",
+      `/api/v1/users/check-availability?username=${encodeURIComponent(state.landlordUsername)}`
+    );
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(
+      body?.data?.usernameAvailable ?? body?.usernameAvailable === false,
+      "expected username to be unavailable"
+    );
+  });
+
+  await test("Landlord can request password reset", async () => {
+    const { status } = await api("POST", "/api/v1/users/forgot-password", {
+      email: state.landlordEmail,
+    });
+    assert(status === 200, `expected 200, got ${status}`);
+  });
+
+  await test("Forgot password does not reveal user existence", async () => {
+    const { status } = await api("POST", "/api/v1/users/forgot-password", {
+      email: "nonexistent_e2e@test.creapy.com",
+    });
+    assert(status === 200, `expected 200, got ${status}`);
+  });
+
+  await test("Landlord can resend email verification", async () => {
+    const { status } = await api(
+      "POST",
+      "/api/v1/users/resend-verification",
+      undefined,
+      state.landlordToken
+    );
+    assert(status === 200, `expected 200, got ${status}`);
+  });
+
   if (!state.landlordToken || !state.tenantToken) {
     throw new Error('Auth group: missing landlord or tenant token — cannot continue');
   }

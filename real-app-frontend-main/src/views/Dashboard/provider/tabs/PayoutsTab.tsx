@@ -3,7 +3,6 @@ import {
   Box,
   Chip,
   Grid,
-  Paper,
   Stack,
   Table,
   TableBody,
@@ -12,6 +11,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import AppCard from "../../../../components/ui/AppCard";
 
 const formatCurrency = (value: any) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value || 0));
@@ -61,14 +61,14 @@ const PayoutsTab = ({ bookings = [] }: PayoutsTabProps) => {
         ["Next Payout", "Not scheduled"],
       ].map(([label, value]) => (
         <Grid item xs={12} md={4} key={label}>
-          <Paper variant="outlined" sx={{ p: 2 }}>
+          <AppCard elevation="flat" sx={{ p: 2 }}>
             <Typography variant="body2" color="text.secondary">{label}</Typography>
             <Typography variant="h5" fontWeight={700}>{value}</Typography>
-          </Paper>
+          </AppCard>
         </Grid>
       ))}
       <Grid item xs={12}>
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        <AppCard elevation="flat" sx={{ p: 2 }}>
           <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
             {["ALL", "PENDING", "SETTLED"].map((status) => (
               <Chip
@@ -115,7 +115,7 @@ const PayoutsTab = ({ bookings = [] }: PayoutsTabProps) => {
               ) : null}
             </TableBody>
           </Table>
-        </Paper>
+        </AppCard>
       </Grid>
     </Grid>
   );

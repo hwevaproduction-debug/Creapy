@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Box, Grid, MenuItem, Paper, Stack, TextField, Typography } from "@mui/material";
+import { Box, Grid, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import { useGetMyAnalyticsQuery } from "../../../../redux/api/providerApiSlice";
+import AppCard from "../../../../components/ui/AppCard";
 import StatCard from "../components/StatCard";
 
 type AnalyticsTabProps = {
@@ -24,9 +25,9 @@ const BarChart = ({ data, labelKey, valueKey, suffix = "" }: any) => {
         const y = 170 - height;
         return (
           <g key={`${item[labelKey]}-${index}`}>
-            <rect x={x} y={y} width={barWidth} height={height} fill="#1976d2" rx="3" />
-            <text x={x + barWidth / 2} y="194" textAnchor="middle" fontSize="10">{String(item[labelKey]).slice(0, 8)}</text>
-            <text x={x + barWidth / 2} y={Math.max(14, y - 6)} textAnchor="middle" fontSize="10">{Number(item[valueKey] || 0).toFixed(0)}{suffix}</text>
+            <rect x={x} y={y} width={barWidth} height={height} fill="#B8975A" rx="3" />
+            <text x={x + barWidth / 2} y="194" textAnchor="middle" fontSize="10" fill="currentColor">{String(item[labelKey]).slice(0, 8)}</text>
+            <text x={x + barWidth / 2} y={Math.max(14, y - 6)} textAnchor="middle" fontSize="10" fill="currentColor">{Number(item[valueKey] || 0).toFixed(0)}{suffix}</text>
           </g>
         );
       })}
@@ -61,16 +62,16 @@ const AnalyticsTab = ({ rooms }: AnalyticsTabProps) => {
       </Grid>
       <Grid container spacing={2}>
         <Grid item xs={12} md={6}>
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <Typography variant="h6">Revenue by Month</Typography>
+          <AppCard elevation="flat" sx={{ p: 2 }}>
+            <Typography variant="h6" fontWeight={700}>Revenue by Month</Typography>
             <BarChart data={analytics?.revenueByMonth || []} labelKey="month" valueKey="revenue" />
-          </Paper>
+          </AppCard>
         </Grid>
         <Grid item xs={12} md={6}>
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <Typography variant="h6">Occupancy by Room</Typography>
+          <AppCard elevation="flat" sx={{ p: 2 }}>
+            <Typography variant="h6" fontWeight={700}>Occupancy by Room</Typography>
             <BarChart data={analytics?.occupancyByRoom || []} labelKey="roomName" valueKey="occupancyRate" suffix="%" />
-          </Paper>
+          </AppCard>
         </Grid>
       </Grid>
     </Stack>

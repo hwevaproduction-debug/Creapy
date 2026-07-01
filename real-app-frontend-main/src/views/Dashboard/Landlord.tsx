@@ -75,8 +75,8 @@ const getListingStatusBadge = (status: string) => {
     return (
       <Box
         sx={{
-          background: "#F7EDDA",
-          color: "#7D6234",
+          background: "warning.light",
+          color: "warning.main",
           borderRadius: "999px",
           padding: "6px 12px",
           fontSize: "12px",
@@ -116,8 +116,8 @@ const getListingStatusBadge = (status: string) => {
   return (
     <Box
       sx={{
-        background: "#F1F5F9",
-        color: "#64748B",
+        background: "background.default",
+        color: "text.disabled",
         borderRadius: "999px",
         padding: "6px 12px",
         fontSize: "12px",
@@ -341,7 +341,7 @@ const LandlordDashboard = () => {
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", xl: "repeat(4, 1fr)" },
+            gridTemplateColumns: { xs: "repeat(2,1fr)", md: "repeat(4,1fr)" },
             gap: 2,
             mb: 3,
           }}
@@ -355,15 +355,15 @@ const LandlordDashboard = () => {
             <AppCard
               key={item.label}
               sx={{
-                borderLeft: "3px solid #1F4D3A",
-                p: 2,
+                borderLeft: "3px solid #B8975A",
+                p: { xs: 2, md: 2.5 },
                 textAlign: "center",
               }}
             >
               <Box sx={{ fontSize: "12px", color: "text.secondary", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 {item.label}
               </Box>
-              <Box sx={{ fontSize: "28px", fontWeight: 800, color: "#1F4D3A", mt: 0.5 }}>
+              <Box sx={{ fontSize: "28px", fontWeight: 800, color: "primary.main", mt: 0.5 }}>
                 {item.value}
               </Box>
             </AppCard>
@@ -413,7 +413,7 @@ const LandlordDashboard = () => {
                 </Box>
                 <Box
                   sx={{
-                    background: "#F8FAFC",
+                    background: "action.hover",
                     borderRadius: "8px",
                     p: "10px 12px",
                     fontSize: "13px",
@@ -478,8 +478,8 @@ const LandlordDashboard = () => {
             {listingDraftId ? (
               <Box
                 sx={{
-                  background: "#dbeafe",
-                  color: "#1e40af",
+                  background: "primary.light",
+                  color: "primary.dark",
                   borderRadius: "999px",
                   padding: "4px 10px",
                   fontSize: "12px",
@@ -519,11 +519,11 @@ const LandlordDashboard = () => {
             }}
           >
             <Box>
-              <Box sx={{ fontWeight: 700, color: "#1F4D3A" }}>
+              <Box sx={{ fontWeight: 700, color: "secondary.main" }}>
                 Unsaved listing draft
               </Box>
               {draftSavedAt ? (
-                <Box sx={{ color: "#6b7280", fontSize: "14px", mt: 0.5 }}>
+                <Box sx={{ color: "text.secondary", fontSize: "14px", mt: 0.5 }}>
                   Last saved {draftSavedAt}
                 </Box>
               ) : null}
@@ -599,22 +599,22 @@ const LandlordDashboard = () => {
                     hover
                     sx={{ "&:last-child td": { border: 0 } }}
                   >
-                    <TableCell>
-                      <Box
-                        sx={{
-                          fontWeight: 600,
-                          color: "#1F4D3A",
-                          cursor: "pointer",
-                          "&:hover": {
-                            textDecoration: "underline",
-                          },
-                        }}
-                        onClick={() => {
-                          navigate(`/listing/${item?._id}`);
-                        }}
-                      >
-                        {item?.name}
-                      </Box>
+                     <TableCell>
+                       <Box
+                         sx={{
+                           fontWeight: 600,
+                           color: "secondary.main",
+                           cursor: "pointer",
+                           "&:hover": {
+                             textDecoration: "underline",
+                           },
+                         }}
+                         onClick={() => {
+                           navigate(`/listing/${item?._id}`);
+                         }}
+                       >
+                         {item?.name}
+                       </Box>
                       {item?.studentAccommodation ? (
                         <Box
                           sx={{
@@ -630,17 +630,17 @@ const LandlordDashboard = () => {
                         </Box>
                       ) : null}
                     </TableCell>
-                    <TableCell sx={{ color: "#6b7280", fontSize: "14px" }}>
-                      {typeof item?.location === "object"
-                        ? item?.location?.province || item?.location?.city || "—"
-                        : item?.location ?? "—"}
-                    </TableCell>
-                    <TableCell>{getListingStatusBadge(item?.status)}</TableCell>
-                    <TableCell sx={{ color: "#6b7280", fontSize: "14px" }}>
-                      {item?.publishedAt
-                        ? convertToFormattedDate(item?.publishedAt)
-                        : "—"}
-                    </TableCell>
+                     <TableCell sx={{ color: "text.secondary", fontSize: "14px" }}>
+                       {typeof item?.location === "object"
+                         ? item?.location?.province || item?.location?.city || "—"
+                         : item?.location ?? "—"}
+                     </TableCell>
+                     <TableCell>{getListingStatusBadge(item?.status)}</TableCell>
+                     <TableCell sx={{ color: "text.secondary", fontSize: "14px" }}>
+                       {item?.publishedAt
+                         ? convertToFormattedDate(item?.publishedAt)
+                         : "—"}
+                     </TableCell>
                     <TableCell>
                       {item?.status === "expired" ? (
                         <AppButton
@@ -676,7 +676,8 @@ const LandlordDashboard = () => {
                               size="small"
                               onClick={() => navigate(`/listings/${item?._id}`)}
                               sx={{
-                                border: "1px solid #e5e7eb",
+                                border: "1px solid",
+                                borderColor: "divider",
                                 borderRadius: "8px",
                               }}
                             >
@@ -689,11 +690,12 @@ const LandlordDashboard = () => {
                               onClick={() => handleDeleteListing(item?._id)}
                               disabled={deletingListingId === item?._id}
                               sx={{
-                                border: "1px solid #fecaca",
+                                border: "1px solid",
+                                borderColor: "error.light",
                                 borderRadius: "8px",
-                                color: "#dc2626",
+                                color: "error.main",
                                 "&:hover": {
-                                  background: "#fef2f2",
+                                  background: "rgba(220,38,38,0.08)",
                                 },
                               }}
                             >
@@ -758,15 +760,15 @@ const LandlordDashboard = () => {
                     hover
                     sx={{ "&:last-child td": { border: 0 } }}
                   >
-                    <TableCell sx={{ color: "#6b7280", fontSize: "14px" }}>
-                      {convertToFormattedDate(payment?.createdAt)}
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 500, fontSize: "14px" }}>
-                      {payment?.listing?.name ?? "—"}
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 600, fontSize: "14px" }}>
-                      USD {payment?.amount}
-                    </TableCell>
+                     <TableCell sx={{ color: "text.secondary", fontSize: "14px" }}>
+                       {convertToFormattedDate(payment?.createdAt)}
+                     </TableCell>
+                     <TableCell sx={{ fontWeight: 500, fontSize: "14px" }}>
+                       {payment?.listing?.name ?? "—"}
+                     </TableCell>
+                     <TableCell sx={{ fontWeight: 600, fontSize: "14px" }}>
+                       USD {payment?.amount}
+                     </TableCell>
                     <TableCell>{getPaymentStatusBadge(payment?.status)}</TableCell>
                   </TableRow>
                 ))}

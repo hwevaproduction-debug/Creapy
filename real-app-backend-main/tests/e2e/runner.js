@@ -53,6 +53,12 @@ const state = {
   listingId: null,
   listingFeeRef: null,
   tenantPremiumRef: null,
+  reviewId: null,
+  promotionId: null,
+  couponId: null,
+  walletTransactionId: null,
+  notificationId: null,
+  legalDocSlug: null,
   password: "TestPass123!",
 };
 
@@ -320,6 +326,157 @@ async function cleanupWithPrisma() {
       where: userIds.length ? { id: { in: userIds } } : { id: "__never__" },
     })
   );
+
+  // Phase 2: Email-domain purge — delete ALL data owned by @test.creapy.com users
+  console.log(`${dim("cleanup")} Phase 2: email-domain purge (@test.creapy.com)`);
+
+  const domainUsers = await prisma.user.findMany({
+    where: { email: { endsWith: "@test.creapy.com" } },
+    select: { id: true },
+  }).catch(() => []);
+
+  if (domainUsers.length > 0) {
+    const domainUserIds = domainUsers.map((u) => u.id);
+
+    const domainListings = await prisma.listing?.findMany({
+      where: { userId: { in: domainUserIds } },
+      select: { id: true },
+    }).catch(() => []) ?? [];
+    const domainListingIds = domainListings.map((l) => l.id);
+
+    const domainAccommodations = await prisma.accommodation?.findMany({
+      where: { ownerId: { in: domainUserIds } },
+      select: { id: true },
+    }).catch(() => []) ?? [];
+    const domainAccommodationIds = domainAccommodations.map((a) => a.id);
+
+    const domainRooms = await prisma.room?.findMany({
+      where: { accommodationId: { in: domainAccommodationIds } },
+      select: { id: true },
+    }).catch(() => []) ?? [];
+    const domainRoomIds = domainRooms.map((r) => r.id);
+
+    const domainBookings = await prisma.booking?.findMany({
+      where: { OR: [{ guestId: { in: domainUserIds } }, { providerId: { in: domainUserIds } }, ...(domainRoomIds.length ? [{ roomId: { in: domainRoomIds } }] : [])] },
+      select: { id: true },
+    }).catch(() => []) ?? [];
+    const domainBookingIds = domainBookings.map((b) => b.id);
+
+    // Delete children first (FK-safe order)
+    await safeDb("phase2 reports", () =>
+      prisma.report?.deleteMany({ where: { OR: [{ reporterId: { in: domainUserIds } }, ...(domainListingIds.length ? [{ targetId: { in: domainListingIds } }] : []), ...(domainAccommodationIds.length ? [{ targetId: { in: domainAccommodationIds } }] : [])] } })
+    );
+    await safeDb("phase2 disputes", () =>
+      prisma.dispute?.deleteMany({ where: { OR: [...(domainBookingIds.length ? [{ bookingId: { in: domainBookingIds } }] : []), { raisedBy: { in: domainUserIds } }] } })
+    );
+    await safeDb("phase2 reviews", () =>
+      prisma.review?.deleteMany({ where: { OR: [{ guestId: { in: domainUserIds } }, ...(domainAccommodationIds.length ? [{ accommodationId: { in: domainAccommodationIds } }] : []), ...(domainBookingIds.length ? [{ bookingId: { in: domainBookingIds } }] : [])] } })
+    );
+    await safeDb("phase2 notifications", () =>
+      prisma.notification?.deleteMany({ where: { userId: { in: domainUserIds } } })
+    );
+    await safeDb("phase2 engagements", () =>
+      prisma.engagement?.deleteMany({ where: { OR: [{ tenantId: { in: domainUserIds } }, { landlordId: { in: domainUserIds } }, ...(domainListingIds.length ? [{ listingId: { in: domainListingIds } }] : [])] } })
+    );
+    await safeDb("phase2 saved searches", () =>
+      prisma.savedSearch?.deleteMany({ where: { userId: { in: domainUserIds } } })
+    );
+    await safeDb("phase2 listing drafts", () =>
+      prisma.listingDraft?.deleteMany({ where: { userId: { in: domainUserIds } } })
+    );
+    await safeDb("phase2 audit logs", () =>
+      prisma.auditLog?.deleteMany({ where: { adminId: { in: domainUserIds } } })
+    );
+    await safeDb("phase2 booking guest info", () =>
+      prisma.bookingGuestInfo?.deleteMany({ where: domainBookingIds.length ? { bookingId: { in: domainBookingIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 booking fee snapshots", () =>
+      prisma.bookingFeeSnapshot?.deleteMany({ where: domainBookingIds.length ? { bookingId: { in: domainBookingIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 refunds", () =>
+      prisma.refund?.deleteMany({ where: domainBookingIds.length ? { bookingId: { in: domainBookingIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 payments", () =>
+      prisma.payment?.deleteMany({ where: { OR: [{ userId: { in: domainUserIds } }, ...(domainBookingIds.length ? [{ bookingId: { in: domainBookingIds } }] : []), ...(domainListingIds.length ? [{ listingId: { in: domainListingIds } }] : [])] } })
+    );
+    await safeDb("phase2 bookings", () =>
+      prisma.booking?.deleteMany({ where: domainBookingIds.length ? { id: { in: domainBookingIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 availability blocks", () =>
+      prisma.availabilityBlock?.deleteMany({ where: domainRoomIds.length ? { roomId: { in: domainRoomIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 room images", () =>
+      prisma.roomImage?.deleteMany({ where: domainRoomIds.length ? { roomId: { in: domainRoomIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 room amenities", () =>
+      prisma.roomAmenity?.deleteMany({ where: domainRoomIds.length ? { roomId: { in: domainRoomIds } } : { roomId: "__never__" } })
+    );
+    await safeDb("phase2 seasonal rates", () =>
+      prisma.seasonalRate?.deleteMany({ where: domainRoomIds.length ? { roomId: { in: domainRoomIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 room fees", () =>
+      prisma.roomFee?.deleteMany({ where: domainRoomIds.length ? { roomId: { in: domainRoomIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 occupancy rules", () =>
+      prisma.occupancyRule?.deleteMany({ where: domainRoomIds.length ? { roomId: { in: domainRoomIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 occupancy pricing rules", () =>
+      prisma.occupancyPricingRule?.deleteMany({ where: domainRoomIds.length ? { roomId: { in: domainRoomIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 promotions", () =>
+      prisma.promotion?.deleteMany({
+        where: domainAccommodationIds.length || domainRoomIds.length
+          ? {
+              OR: [
+                ...(domainAccommodationIds.length ? [{ accommodationId: { in: domainAccommodationIds } }] : []),
+                ...(domainRoomIds.length ? [{ roomId: { in: domainRoomIds } }] : []),
+              ],
+            }
+          : { id: "__never__" },
+      })
+    );
+    await safeDb("phase2 rooms", () =>
+      prisma.room?.deleteMany({ where: domainRoomIds.length ? { id: { in: domainRoomIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 accommodation images", () =>
+      prisma.accommodationImage?.deleteMany({ where: domainAccommodationIds.length ? { accommodationId: { in: domainAccommodationIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 accommodation amenities", () =>
+      prisma.accommodationAmenity?.deleteMany({ where: domainAccommodationIds.length ? { accommodationId: { in: domainAccommodationIds } } : { accommodationId: "__never__" } })
+    );
+    await safeDb("phase2 cancellation policies", () =>
+      prisma.cancellationPolicy?.deleteMany({ where: domainAccommodationIds.length ? { accommodationId: { in: domainAccommodationIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 check-in rules", () =>
+      prisma.checkInOutRules?.deleteMany({ where: domainAccommodationIds.length ? { accommodationId: { in: domainAccommodationIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 tax rules", () =>
+      prisma.taxRule?.deleteMany({ where: domainAccommodationIds.length ? { accommodationId: { in: domainAccommodationIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 accommodations", () =>
+      prisma.accommodation?.deleteMany({ where: domainAccommodationIds.length ? { id: { in: domainAccommodationIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 listings", () =>
+      prisma.listing?.deleteMany({ where: domainListingIds.length ? { id: { in: domainListingIds } } : { id: "__never__" } })
+    );
+    await safeDb("phase2 wallet transactions", () =>
+      prisma.walletTransaction?.deleteMany({ where: { userId: { in: domainUserIds } } })
+    );
+    await safeDb("phase2 push subscriptions", () =>
+      prisma.userPushSubscription?.deleteMany({ where: { userId: { in: domainUserIds } } })
+    );
+    await safeDb("phase2 notification preferences", () =>
+      prisma.userNotificationPreferences?.deleteMany({ where: { userId: { in: domainUserIds } } })
+    );
+    await safeDb("phase2 notification jobs", () =>
+      prisma.notificationJob?.deleteMany({ where: { recipientId: { in: domainUserIds } } })
+    );
+    await safeDb("phase2 users", () =>
+      prisma.user?.deleteMany({ where: { email: { endsWith: "@test.creapy.com" } } })
+    );
+
+    console.log(`${dim("cleanup")} Phase 2: purged ${domainUserIds.length} test user(s) and their data`);
+  }
 }
 
 function printSummary() {
@@ -382,15 +539,20 @@ async function runTests() {
 
   try {
     const groups = [
-      { name: "Auth", module: require("./auth") },
-      { name: "Listing Drafts", module: require("./listing-drafts") },
-      { name: "Listings", module: require("./listings") },
-      { name: "Payments", module: require("./payments") },
-      { name: "Engagements and Notifications", module: require("./engagements") },
-      { name: "Saved Searches", module: require("./saved-searches") },
-      { name: "Reports and Leads", module: require("./reports-and-leads") },
-      { name: "Provider Stays and Bookings", module: require("./stays") },
-      { name: "Profile", module: require("./profile") },
+      { name: "Auth",                    module: require("./auth") },
+      { name: "Listing Drafts",          module: require("./listing-drafts") },
+      { name: "Listings",                module: require("./listings") },
+      { name: "Payments",                module: require("./payments") },
+      { name: "Engagements",             module: require("./engagements") },
+      { name: "Notifications",           module: require("./notifications") },
+      { name: "Wallet",                  module: require("./wallet") },
+      { name: "Saved Searches",          module: require("./saved-searches") },
+      { name: "Reports and Leads",       module: require("./reports-and-leads") },
+      { name: "Provider Stays",          module: require("./stays") },
+      { name: "Reviews",                 module: require("./reviews") },
+      { name: "Admin Panel",             module: require("./admin") },
+      { name: "Legal Documents",         module: require("./legal") },
+      { name: "Profile",                 module: require("./profile") },
     ];
 
     for (let index = 0; index < groups.length; index += 1) {

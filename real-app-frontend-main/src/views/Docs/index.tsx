@@ -1,16 +1,18 @@
 import { Box, Grid } from "@mui/material";
-import { Coins, FileText, Home, Map, Shield, User } from "lucide-react";
+import { Building2, Coins, FileText, Home, Map, Shield, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppCard from "../../components/ui/AppCard";
 import AppContainer from "../../components/ui/AppContainer";
+import { FEATURE_FLAGS } from "../../config/featureFlags";
 
 const docs = [
   { title: "Release Notes", path: "/docs/release-notes", icon: FileText, description: "See what changed in v1.1." },
   { title: "TR Tokens", path: "/docs/tr-tokens", icon: Coins, description: "Understand wallet costs and purchases." },
   { title: "Tenant Guide", path: "/docs/tenant-guide", icon: User, description: "Find, contact, and move in." },
   { title: "Landlord Guide", path: "/docs/landlord-guide", icon: Home, description: "List properties and manage requests." },
-  { title: "Roadmap", path: "/docs/roadmap", icon: Map, description: "What's now, next, and future." },
+  ...(FEATURE_FLAGS.PUBLIC_ROADMAP ? [{ title: "Roadmap", path: "/docs/roadmap", icon: Map, description: "What's now, next, and future." }] : []),
   { title: "Trust & Safety", path: "/trust-safety", icon: Shield, description: "Platform safety standards." },
+  { title: "Provider Guide", path: "/docs/provider-guide", icon: Building2, description: "Set up and manage your accommodation." },
 ];
 
 const DocsHub = () => {

@@ -271,14 +271,14 @@ const TenantDashboard = () => {
             <AppCard
               key={stat.label}
               sx={{
-                p: 2,
+                p: { xs: 2, md: 2.5 },
                 textAlign: "center",
-                borderLeft: "3px solid #1F4D3A",
+                borderLeft: "3px solid #B8975A",
                 transition: "box-shadow 0.2s ease",
                 "&:hover": { boxShadow: "0 8px 24px rgba(31,77,58,0.15)" },
               }}
             >
-              <Box sx={{ color: "#1F4D3A", fontSize: "28px", fontWeight: 800 }}>
+              <Box sx={{ color: "primary.main", fontSize: "28px", fontWeight: 800 }}>
                 {stat.value}
               </Box>
               <Box sx={{ color: "text.secondary", fontSize: "12px" }}>
@@ -317,7 +317,7 @@ const TenantDashboard = () => {
             </Box>
           ) : (
             <Box sx={{ marginTop: "12px" }}>
-              <Box sx={{ display: "inline-block", background: "#F1F5F9", color: "#64748B", borderRadius: "999px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, mb: 1.5 }}>
+              <Box sx={{ display: "inline-block", background: "action.selected", color: "text.secondary", borderRadius: "999px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, mb: 1.5 }}>
                 No Premium
               </Box>
               <SubHeading sx={{ color: "text.secondary", marginBottom: "14px" }}>

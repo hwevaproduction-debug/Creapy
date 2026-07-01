@@ -498,6 +498,100 @@ async function run(state, api, assert, test) {
     assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
     assert(body?.data?.booking?.status === "CANCELLED", "expected cancelled booking");
   });
+
+  await test("Provider can create promotion", async () => {
+    const { status, body } = await api(
+      "POST",
+      "/api/v1/promotions",
+      {
+        accommodationId: state.accommodationId,
+        name: "E2E Promo",
+        discountType: "PERCENTAGE",
+        discountValue: 10,
+        startDate: daysFromNow(1),
+        endDate: daysFromNow(30),
+        isActive: true,
+      },
+      state.providerToken
+    );
+    assert(status === 201, `expected 201, got ${status}: ${JSON.stringify(body)}`);
+    assert(
+      body?.data?.promotion?._id || body?.data?.promotion?.id,
+      "expected promotion id"
+    );
+    state.promotionId = body?.data?.promotion?._id || body?.data?.promotion?.id;
+  });
+
+  await test("Provider can generate promotion coupons", async () => {
+    if (!state.promotionId) {
+      await test.skip(
+        "Provider can generate promotion coupons",
+        "missing promotionId"
+      );
+      return;
+    }
+
+    const { status, body } = await api(
+      "POST",
+      `/api/v1/promotions/${state.promotionId}/coupons`,
+      { count: 1, prefix: "E2E" },
+      state.providerToken
+    );
+    assert(status === 200 || status === 201, `expected 200 or 201, got ${status}`);
+    const coupons = body?.data?.coupons || [];
+    if (coupons.length > 0) {
+      state.couponId = coupons[0]._id || coupons[0].id;
+    }
+  });
+
+  await test("Pricing quote works without coupon", async () => {
+    const { status, body } = await api(
+      "POST",
+      "/api/v1/pricing/quote",
+      {
+        roomId: state.roomId,
+        checkIn: daysFromNow(45),
+        checkOut: daysFromNow(47),
+        adultCount: 1,
+        childCount: 0,
+        infantCount: 0,
+      },
+      state.tenantToken
+    );
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(
+      Number(body?.data?.quote?.grandTotal || 0) > 0,
+      "expected positive grand total"
+    );
+  });
+
+  await test("Provider analytics include net payout", async () => {
+    const { status, body } = await api(
+      "GET",
+      "/api/v1/providers/me/analytics",
+      undefined,
+      state.providerToken
+    );
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(
+      Number(body?.data?.netPayout || 0) >= 0,
+      "expected non-negative netPayout"
+    );
+  });
+
+  await test("Provider can update room name", async () => {
+    const { status, body } = await api(
+      "PATCH",
+      `/api/v1/rooms/${state.roomId}`,
+      { name: "E2E Double Room Updated" },
+      state.providerToken
+    );
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(
+      body?.data?.room?.name === "E2E Double Room Updated",
+      "expected updated room name"
+    );
+  });
 }
 
 module.exports = { run };
