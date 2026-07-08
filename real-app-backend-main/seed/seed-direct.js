@@ -405,6 +405,152 @@ const ROOM_MATRIX = [
 const PROVIDER_BOOKING_COUNTS = [2, 2, 1, 1, 1];
 const passwordCache = new Map();
 
+function normalizeRoomType(roomType) {
+  const map = {
+    standard: 'DOUBLE',
+    deluxe: 'SUITE',
+    suite: 'SUITE',
+    family: 'ENTIRE_UNIT',
+    single: 'SINGLE',
+    twin: 'TWIN',
+  };
+
+  return map[String(roomType || '').toLowerCase()] || null;
+}
+
+function normalizeRoomStatus(status) {
+  const map = {
+    available: 'AVAILABLE',
+    unavailable: 'UNAVAILABLE',
+    maintenance: 'MAINTENANCE',
+  };
+
+  return map[String(status || '').toLowerCase()] || 'AVAILABLE';
+}
+
+function normalizeBookingMode(mode) {
+  const map = {
+    instant: 'INSTANT',
+    request: 'REQUEST',
+  };
+
+  return map[String(mode || '').toLowerCase()] || 'INSTANT';
+}
+
+function normalizeBookingStatus(status) {
+  const map = {
+    pending_confirmation: 'PENDING_CONFIRMATION',
+    pending_payment: 'PENDING_PAYMENT',
+    confirmed: 'CONFIRMED',
+    declined: 'DECLINED',
+    cancelled: 'CANCELLED',
+    checked_in: 'CHECKED_IN',
+    completed: 'COMPLETED',
+    expired: 'EXPIRED',
+    refunded: 'REFUNDED',
+  };
+
+  return map[String(status || '').toLowerCase()] || 'PENDING_CONFIRMATION';
+}
+
+function normalizePaymentStatus(status) {
+  const map = {
+    unpaid: 'UNPAID',
+    pending: 'PENDING',
+    paid: 'PAID',
+    refunded: 'REFUNDED',
+    partially_refunded: 'PARTIALLY_REFUNDED',
+    failed: 'FAILED',
+    partially_paid: 'PARTIALLY_PAID',
+  };
+
+  return map[String(status || '').toLowerCase()] || 'UNPAID';
+}
+
+function normalizeSettlementStatus(status) {
+  const map = {
+    pending: 'PENDING',
+    settled: 'SETTLED',
+    disputed: 'DISPUTED',
+  };
+
+  return map[String(status || '').toLowerCase()] || 'PENDING';
+}
+
+function getAmenitySeed(slug) {
+  const seeds = {
+    wifi: { label: 'WiFi', category: 'CONNECTIVITY', icon: 'wifi' },
+    'air-conditioning': { label: 'Air Conditioning', category: 'COMFORT', icon: 'ac_unit' },
+    tv: { label: 'Television', category: 'COMFORT', icon: 'tv' },
+    balcony: { label: 'Balcony', category: 'COMFORT', icon: 'balcony' },
+    ensuite: { label: 'En-suite Bathroom', category: 'COMFORT', icon: 'bathroom' },
+    minibar: { label: 'Minibar', category: 'FOOD', icon: 'local_bar' },
+    parking: { label: 'Parking', category: 'TRANSPORT', icon: 'local_parking' },
+  };
+
+  return seeds[slug] || null;
+}
+
+function buildRoomAmenities(room) {
+  const slugMap = {
+    wifi: 'wifi',
+    aircon: 'air-conditioning',
+    tv: 'tv',
+    balcony: 'balcony',
+    ensuite: 'ensuite',
+    minibar: 'minibar',
+    parking: 'parking',
+  };
+
+  return Object.entries(room.amenities || {})
+    .filter(([, enabled]) => Boolean(enabled))
+    .map(([key]) => slugMap[key])
+    .filter(Boolean)
+    .map((slug) => {
+      const seed = getAmenitySeed(slug);
+      return {
+        amenity: {
+          connectOrCreate: {
+            where: { slug },
+            create: {
+              slug,
+              label: seed?.label || slug,
+              category: seed?.category || 'COMFORT',
+              icon: seed?.icon || null,
+            },
+          },
+        },
+      };
+    });
+}
+
+function buildRoomImages(room) {
+  return (room.imageUrls || []).map((url, index) => ({
+    url,
+    altText: room.name,
+    isCover: index === 0,
+    sortOrder: index,
+  }));
+}
+
+function buildRoomCreateData(room, providerId) {
+  const images = buildRoomImages(room);
+  const amenities = buildRoomAmenities(room);
+
+  return {
+    providerId,
+    name: room.name,
+    description: room.description || null,
+    roomType: normalizeRoomType(room.roomType),
+    capacity: room.capacity ?? null,
+    basePricePerNight: room.basePricePerNight,
+    status: normalizeRoomStatus(room.status),
+    bookingMode: normalizeBookingMode(room.bookingMode),
+    images: images.length ? { create: images } : undefined,
+    amenities: amenities.length ? { create: amenities } : undefined,
+  };
+}
+
 function getIsoDate(daysFromNow) {
   const date = new Date();
   date.setDate(date.getDate() + daysFromNow);
@@ -560,7 +706,21 @@ async function ensureListing(listing, userId) {
 async function ensureRoom(providerId, room) {
   const existing = await prisma.room.findFirst({
     where: { providerId, name: room.name },
+    select: { id: true },
   });
+
+  const images = buildRoomImages(room);
+  const amenities = buildRoomAmenities(room);
+  const scalarData = {
+    providerId,
+    name: room.name,
+    description: room.description || null,
+    roomType: normalizeRoomType(room.roomType),
+    capacity: room.capacity ?? null,
+    basePricePerNight: room.basePricePerNight,
+    status: normalizeRoomStatus(room.status),
+    bookingMode: normalizeBookingMode(room.bookingMode),
+  };
 
   if (existing) {
     return {
@@ -568,8 +728,15 @@ async function ensureRoom(providerId, room) {
       room: await prisma.room.update({
         where: { id: existing.id },
         data: {
-          ...room,
-          providerId,
+          ...scalarData,
+          images: {
+            deleteMany: {},
+            create: images,
+          },
+          amenities: {
+            deleteMany: {},
+            create: amenities,
+          },
         },
       }),
     };
@@ -579,8 +746,9 @@ async function ensureRoom(providerId, room) {
     created: true,
     room: await prisma.room.create({
       data: {
-        ...room,
-        providerId,
+        ...scalarData,
+        images: images.length ? { create: images } : undefined,
+        amenities: amenities.length ? { create: amenities } : undefined,
       },
     }),
   };
@@ -609,19 +777,20 @@ async function ensureBooking({ roomId, providerId, guestId, checkIn, checkOut, s
         checkIn,
         checkOut,
         nights: Math.max(1, Math.round((checkOut - checkIn) / 86400000)),
-        bookingMode,
-        guestCount: 1,
+        bookingMode: normalizeBookingMode(bookingMode),
+        adultCount: 1,
+        childCount: 0,
+        infantCount: 0,
         pricePerNight: 0,
         subtotal: 0,
         commissionRate: 10,
         commissionAmount: 0,
-        totalAmount: 0,
         totalPrice: 0,
         netPayout: 0,
         specialRequests,
-        status: bookingMode === 'instant' ? 'confirmed' : 'pending_confirmation',
-        paymentStatus: 'unpaid',
-        settlementStatus: 'pending',
+        status: normalizeBookingStatus(bookingMode === 'instant' ? 'confirmed' : 'pending_confirmation'),
+        paymentStatus: normalizePaymentStatus('unpaid'),
+        settlementStatus: normalizeSettlementStatus('pending'),
       },
     }),
   };
@@ -803,3 +972,9 @@ seed()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+
+
+
+
+

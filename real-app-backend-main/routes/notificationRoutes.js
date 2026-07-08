@@ -14,5 +14,6 @@ router.get("/preferences", notificationController.getPreferences);
 router.put("/preferences", notificationController.updatePreferences);
 router.put("/read-all", notificationController.markAllAsRead);
 router.put("/:id/read", notificationController.markAsRead);
+router.post("/announcements", authController.requireRole("admin"), notificationController.createSystemAnnouncement);
 
 module.exports = router;

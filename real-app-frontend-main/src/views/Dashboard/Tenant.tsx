@@ -40,10 +40,11 @@ import TRTokenOnboarding from "./components/TRTokenOnboarding";
 import VerificationStatusCard from "./components/VerificationStatusCard";
 
 const getEngagementStatusBadge = (status: string) => {
+  const normalizedStatus = status === "CHARGED" ? "APPROVED" : status;
   const styles =
-    status === "APPROVED"
+    normalizedStatus === "APPROVED"
       ? { background: "#D1EAE0", color: "#1F4D3A", label: "Approved" }
-      : status === "DECLINED"
+      : normalizedStatus === "DECLINED"
       ? { background: "#FEE2E2", color: "#991B1B", label: "Declined" }
       : { background: "#FEF3C7", color: "#92400E", label: "Pending" };
 
@@ -107,10 +108,10 @@ const TenantDashboard = () => {
   const premiumAmountDisplay = Number.isFinite(premiumAmountNumber)
     ? premiumAmountNumber.toFixed(2)
     : "10.00";
-  const premiumActive = isPremiumTenant({ premiumExpiry });
+const premiumActive = isPremiumTenant({ premiumExpiry });
   const engagements = engagementsData?.data || [];
   const approvedEngagements = engagements.filter(
-    (engagement: any) => engagement.status === "APPROVED"
+    (engagement: any) => engagement.status === "APPROVED" || engagement.status === "CHARGED"
   );
   const pendingEngagements = engagements.filter(
     (engagement: any) => engagement.status === "PENDING"

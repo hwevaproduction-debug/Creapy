@@ -181,10 +181,11 @@ const getPaymentStatusBadge = (status: string) => {
 };
 
 const getEngagementStatusBadge = (status: string) => {
+  const normalizedStatus = status === "CHARGED" ? "APPROVED" : status;
   const styles =
-    status === "APPROVED"
+    normalizedStatus === "APPROVED"
       ? { background: "#D1EAE0", color: "#1F4D3A", label: "Approved" }
-      : status === "DECLINED"
+      : normalizedStatus === "DECLINED"
       ? { background: "#FEE2E2", color: "#991B1B", label: "Declined" }
       : { background: "#FEF3C7", color: "#92400E", label: "Pending" };
 

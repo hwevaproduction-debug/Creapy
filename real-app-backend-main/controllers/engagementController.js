@@ -3,10 +3,12 @@ const catchAsync = require("../utils/catchAsync");
 const prisma = require("../utils/prisma");
 const walletService = require("../utils/walletService");
 
+const ENGAGEMENT_FEE_TR = walletService.ENGAGEMENT_FEE_TR;
+
 const requireRole = (user, role) => user?.role === role;
 
 const hideListingContactDetails = (engagement) => {
-  if (engagement.status === "APPROVED" || !engagement.listing) {
+  if (engagement.status === "APPROVED" || engagement.status === "CHARGED" || !engagement.listing) {
     return engagement;
   }
 
@@ -39,7 +41,7 @@ exports.createEngagement = catchAsync(async (req, res, next) => {
     where: {
       listingId,
       tenantId: req.user.id,
-      status: { in: ["PENDING", "APPROVED"] },
+      status: { in: ["PENDING", "APPROVED", "CHARGED"] },
     },
   });
   if (activeEngagement) {
@@ -138,56 +140,59 @@ exports.respondToEngagement = catchAsync(async (req, res, next) => {
     return next(new AppError("Not found", 404));
   }
 
+  if (engagement.status !== "PENDING") {
+    return next(new AppError("Engagement has already been responded to", 409));
+  }
+
   let updated;
 
   if (action === "approve") {
     try {
       await prisma.$transaction(async (tx) => {
-        const transition = await tx.engagement.updateMany({
-          where: {
-            id: req.params.id,
-            landlordId: req.user.id,
-            status: "PENDING",
-          },
-          data: { status: "APPROVED" },
+        updated = await tx.engagement.update({
+          where: { id: req.params.id },
+          data: { status: "CHARGED" },
+          include: { listing: true, tenant: true },
         });
-
-        if (transition.count === 0) {
-          throw new AppError("Engagement has already been responded to", 409);
-        }
 
         await walletService.deductTokens(
           engagement.tenantId,
-          walletService.ENGAGEMENT_FEE_TR,
+          ENGAGEMENT_FEE_TR,
           "engagement_charge",
           `Contact approved — ${engagement.listing.name}`,
           tx
         );
-        updated = await tx.engagement.findUnique({
-          where: { id: req.params.id },
-          include: { listing: true, tenant: true },
-        });
+
         await tx.notification.create({
           data: {
             userId: engagement.tenantId,
             event: "engagement.approved",
             title: "Enquiry approved",
-            body: `Your request for "${engagement.listing.name}" was approved. Contact details are now visible. ${walletService.ENGAGEMENT_FEE_TR} TR tokens were deducted.`,
-            metadata: { engagementId: engagement.id, listingId: engagement.listingId, tokensDeducted: walletService.ENGAGEMENT_FEE_TR },
+            body: `Your request for "${engagement.listing.name}" was approved. Contact details are now visible. ${ENGAGEMENT_FEE_TR} TR tokens were charged.`,
+            metadata: { engagementId: engagement.id, listingId: engagement.listingId, tokensDeducted: ENGAGEMENT_FEE_TR },
           },
+        });
+
+        await tx.notification.create({
+          userId: engagement.tenantId,
+          event: "token.charged",
+          title: "TR tokens charged",
+          body: `${ENGAGEMENT_FEE_TR} TR tokens were charged for contacting "${engagement.listing.name}".`,
+          metadata: { engagementId: engagement.id, listingId: engagement.listingId, tokensDeducted: ENGAGEMENT_FEE_TR },
         });
       });
     } catch (err) {
       if (err.statusCode === 402) {
-        return next(new AppError(`Tenant has insufficient TR tokens. At least ${walletService.ENGAGEMENT_FEE_TR} TR required.`, 402));
+        return next(new AppError(`Tenant has insufficient TR tokens. At least ${ENGAGEMENT_FEE_TR} TR required.`, 402));
       }
       throw err;
     }
   } else {
-    updated = await prisma.engagement.update({
+    const timestamped = await prisma.engagement.update({
       where: { id: req.params.id },
       data: { status: "DECLINED" },
     });
+    updated = timestamped;
     await prisma.notification.create({
       data: {
         userId: engagement.tenantId,

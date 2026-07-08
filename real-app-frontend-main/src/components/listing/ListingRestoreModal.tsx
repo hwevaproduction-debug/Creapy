@@ -1,18 +1,27 @@
-import { useMemo, useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Box,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Slider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   Stack,
   Typography,
+  CircularProgress,
 } from "@mui/material";
 import AppButton from "../ui/AppButton";
 import useTypedSelector from "../../hooks/useTypedSelector";
 import { selectTokenBalance } from "../../redux/wallet/walletSlice";
-import { useRestoreListingMutation } from "../../redux/api/listingApiSlice";
+import { useRestoreListingMutation, useGetRestorationConfigQuery } from "../../redux/api/listingApiSlice";
+
+type RestorationOption = {
+  days: number;
+  label: string;
+};
 
 type ListingRestoreModalProps = {
   open: boolean;
@@ -29,12 +38,25 @@ const ListingRestoreModal = ({
   onClose,
   onSuccess,
 }: ListingRestoreModalProps) => {
-  const [days, setDays] = useState(7);
+  const [selectedDays, setSelectedDays] = useState(7);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const tokenBalance = useTypedSelector(selectTokenBalance);
   const [restoreListing] = useRestoreListingMutation();
 
-  const afterBalance = useMemo(() => tokenBalance - days, [days, tokenBalance]);
+  const { data: configData, isLoading: isLoadingConfig } = useGetRestorationConfigQuery(undefined, {
+    skip: !open,
+  });
+
+  const restorationOptions: RestorationOption[] = configData?.data?.durations || [
+    { days: 1, label: "1 day" },
+    { days: 3, label: "3 days" },
+    { days: 7, label: "7 days" },
+    { days: 14, label: "14 days" },
+  ];
+
+  const minTokensPerDay = configData?.data?.minTokensPerDay || 1;
+  const tokensToDeduct = selectedDays * minTokensPerDay;
+  const afterBalance = useMemo(() => tokenBalance - tokensToDeduct, [tokensToDeduct, tokenBalance]);
   const canConfirm = Boolean(listingId) && !isSubmitting && afterBalance >= 0;
 
   const handleConfirm = async () => {
@@ -42,13 +64,38 @@ const ListingRestoreModal = ({
 
     setIsSubmitting(true);
     try {
-      await restoreListing({ id: listingId, days }).unwrap();
+      await restoreListing({ id: listingId, days: selectedDays }).unwrap();
       await onSuccess();
       onClose();
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleDaysChange = (event: any) => {
+    setSelectedDays(Number(event.target.value));
+  };
+
+  useEffect(() => {
+    if (open && restorationOptions.length > 0) {
+      setSelectedDays(restorationOptions[0].days);
+    }
+  }, [open, restorationOptions]);
+
+  if (isLoadingConfig) {
+    return (
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+        <DialogTitle>Restore Listing</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+            <CircularProgress />
+          </Box>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const selectedOption = restorationOptions.find((o) => o.days === selectedDays) || restorationOptions[0];
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -63,21 +110,28 @@ const ListingRestoreModal = ({
           </Box>
 
           <Box>
-            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-              <Typography sx={{ fontSize: 13, fontWeight: 700 }}>Days</Typography>
-              <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
-                {days} day{days === 1 ? "" : "s"}
-              </Typography>
-            </Box>
-            <Slider
-              min={1}
-              max={30}
-              step={1}
-              value={days}
-              onChange={(_, value) => setDays(Array.isArray(value) ? value[0] : value)}
-            />
-            <Typography sx={{ fontSize: 13, color: "text.secondary", mt: 1 }}>
-              Cost preview: {days} TR tokens for {days} day{days === 1 ? "" : "s"}
+            <FormControl fullWidth>
+              <InputLabel>Restoration Duration</InputLabel>
+              <Select
+                value={selectedDays}
+                label="Restoration Duration"
+                onChange={handleDaysChange}
+              >
+                {restorationOptions.map((option) => (
+                  <MenuItem key={option.days} value={option.days}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+
+          <Box>
+            <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 1 }}>
+              Cost Preview
+            </Typography>
+            <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 1 }}>
+              {tokensToDeduct} TR token{minTokensPerDay > 1 ? "s" : ""} for {selectedOption.label}
             </Typography>
           </Box>
 

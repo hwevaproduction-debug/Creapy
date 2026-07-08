@@ -3,6 +3,7 @@ const AppError = require("../utils/appError");
 const prisma = require("../utils/prisma");
 const { computeQuote } = require("../utils/pricingEngine");
 const { findBestPromotion, validateCoupon } = require("../utils/promotionService");
+const listingConfig = require("../utils/listingConfig");
 
 const ROOM_PRICING_INCLUDE = {
   seasonalRates: true,
@@ -12,6 +13,19 @@ const ROOM_PRICING_INCLUDE = {
     select: { commissionRate: true, taxRule: true, timezone: true },
   },
 };
+
+exports.getRestorationConfig = catchAsync(async (req, res, next) => {
+  const durations = listingConfig.getRestorationDurations();
+  const minTokensPerDay = listingConfig.getMinTokensPerDay();
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      durations,
+      minTokensPerDay,
+    },
+  });
+});
 
 exports.getPricingQuote = catchAsync(async (req, res, next) => {
   const {

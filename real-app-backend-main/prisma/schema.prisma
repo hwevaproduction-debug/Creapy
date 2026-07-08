@@ -161,6 +161,9 @@ enum EngagementStatus {
   PENDING
   APPROVED
   DECLINED
+  CHARGED
+  REFUNDED
+  EXPIRED
 }
 
 model User {
@@ -211,6 +214,7 @@ model User {
   walletTransactions       WalletTransaction[]
   tenantEngagements        Engagement[]        @relation("TenantEngagements")
   landlordEngagements      Engagement[]        @relation("LandlordEngagements")
+  listingRestorations      ListingRestoration[]
   pushSubscription         UserPushSubscription?
   notificationPreferences  UserNotificationPreferences?
 }
@@ -240,15 +244,29 @@ model Listing {
   offer                Boolean
   studentAccommodation Boolean   @default(false)
   imageUrls            Json      @default("[]")
-  userId               String
+userId               String
   user                 User      @relation(fields: [userId], references: [id])
   payments             Payment[]
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  expiresAt            DateTime?
   engagements          Engagement[]
+  restorations         ListingRestoration[]
 
   @@index([userId, status])
+}
+
+model ListingRestoration {
+  id           String   @id @default(cuid())
+  listingId    String
+  listing      Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  durationDays Int
+  tokensSpent  Int
+  restoredAt   DateTime @default(now())
+  expiresAt    DateTime
+
+  @@index([listingId])
+  @@index([userId])
+  @@index([restoredAt])
 }
 
 model WalletTransaction {

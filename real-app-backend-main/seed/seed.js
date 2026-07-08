@@ -606,11 +606,24 @@ async function ensureAdmin() {
   }
 }
 
-async function resolveProviderId(providerData, providerToken, adminToken) {
+function pickProviderId(candidate) {
+  if (!candidate) {
+    return null;
+  }
+
+  return candidate._id || candidate.id || null;
+}
+
+async function resolveProviderId(providerData, providerToken, adminToken, loginUser) {
+  const loginUserId = pickProviderId(loginUser);
+  if (loginUserId) {
+    return loginUserId;
+  }
+
   const myProfile = await request('GET', '/api/v1/providers/me', null, providerToken).catch(
     () => null
   );
-  const myProviderId = myProfile?.data?.provider?._id;
+  const myProviderId = pickProviderId(myProfile?.data?.provider);
   if (myProviderId) {
     return myProviderId;
   }
@@ -621,7 +634,7 @@ async function resolveProviderId(providerData, providerToken, adminToken) {
   const matchedProvider =
     providerList?.data?.find((provider) => provider?.email === providerData.email) || null;
 
-  return matchedProvider?._id || null;
+  return pickProviderId(matchedProvider);
 }
 
 async function ensureProvider(providerData, adminToken) {
@@ -636,7 +649,7 @@ async function ensureProvider(providerData, adminToken) {
       password: providerData.password,
       providerProfile: providerData.providerProfile,
     });
-    providerId = registerResponse?.data?.user?._id || null;
+    providerId = registerResponse?.data?.user?._id || registerResponse?.data?.user?.id || null;
     created = true;
   } catch (error) {
     if (![400, 409].includes(error.status)) {
@@ -651,16 +664,29 @@ async function ensureProvider(providerData, adminToken) {
       password: providerData.password,
     });
   } catch (error) {
-    if (error.status === 403) {
+    if (error.status !== 403) {
+      throw error;
+    }
+
+    providerId = providerId || (await resolveProviderId(providerData, null, adminToken, null));
+    if (!providerId) {
       throw new Error(
-        `Provider ${providerData.email} is not email-verified. Set SKIP_EMAIL_VERIFICATION=true on the backend or verify the provider account before seeding rooms and bookings.`
+        `Provider ${providerData.email} exists but could not be resolved for admin verification.`
       );
     }
-    throw error;
+
+    await request('PUT', `/api/v1/providers/${providerId}/verify`, { status: 'approved' }, adminToken);
+    approved = true;
+
+    login = await request('POST', '/api/v1/users/login', {
+      email: providerData.email,
+      password: providerData.password,
+    });
   }
+
   const user = login?.data?.user || null;
-  providerId = providerId || user?._id || null;
-  providerId = providerId || (await resolveProviderId(providerData, login.token, adminToken));
+  providerId = providerId || user?._id || user?.id || null;
+  providerId = providerId || (await resolveProviderId(providerData, login.token, adminToken, user));
 
   if (!providerId) {
     throw new Error(`Unable to resolve provider id for ${providerData.email}`);
@@ -1067,3 +1093,5 @@ seed()
     console.error('\nSeed failed:', error.message);
     process.exitCode = 1;
   });
+
+

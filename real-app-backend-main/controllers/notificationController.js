@@ -216,3 +216,37 @@ exports.updatePreferences = catchAsync(async (req, res) => {
 
   res.status(200).json({ status: "success", data: preferences });
 });
+
+exports.createSystemAnnouncement = catchAsync(async (req, res, next) => {
+  const { title, body, targetUserIds } = req.body;
+
+  if (!title || !body) {
+    return next(new AppError("Title and body are required", 400));
+  }
+
+  if (!Array.isArray(targetUserIds) || targetUserIds.length === 0) {
+    return next(new AppError("At least one target user ID is required", 400));
+  }
+
+  const notifications = await prisma.$transaction(
+    targetUserIds.map((userId) =>
+      prisma.notification.create({
+        data: {
+          userId,
+          event: "system.announcement",
+          title,
+          body,
+          metadata: { isSystemAnnouncement: true },
+        },
+      })
+    )
+  );
+
+  res.status(201).json({
+    status: "success",
+    data: {
+      notifications,
+      count: notifications.length,
+    },
+  });
+});

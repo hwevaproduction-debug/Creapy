@@ -147,12 +147,19 @@ export const listingApiSlice = apiSlice.injectEndpoints({
       },
       invalidatesTags: [{ type: "ListingDraft", id: "MINE" }],
     }),
-    deleteListingDraft: builder.mutation({
+deleteListingDraft: builder.mutation({
       query: (id) => ({
         url: `listing-drafts/${id}`,
         method: "DELETE",
       }),
       invalidatesTags: [{ type: "ListingDraft", id: "MINE" }],
+    }),
+    getRestorationConfig: builder.query<{ status: string; data: { durations: { days: number; label: string }[]; minTokensPerDay: number } }, void>({
+      query: () => ({
+        url: "pricing/restoration-config",
+        method: "GET",
+      }),
+      providesTags: ["Listing"],
     }),
   }),
 });
@@ -171,4 +178,5 @@ export const {
   useGetListingDraftQuery,
   useUpdateListingDraftMutation,
   useDeleteListingDraftMutation,
+  useGetRestorationConfigQuery,
 } = listingApiSlice;

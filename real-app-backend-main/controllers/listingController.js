@@ -5,6 +5,7 @@ const prisma = require("../utils/prisma");
 const { sendEmail } = require("../utils/email");
 const { isPremiumTenant } = require("../utils/monetization");
 const walletService = require("../utils/walletService");
+const listingConfig = require("../utils/listingConfig");
 
 const SINGLE_ACTIVE_LISTING_MESSAGE =
   "You already have an active listing. You can only have one listing at a time.";
@@ -620,30 +621,63 @@ exports.restoreListing = catchAsync(async (req, res, next) => {
     return next(new AppError("You do not own this listing", 403));
   }
 
+  if (listing.deletedAt) {
+    return next(new AppError("Cannot restore a deleted listing", 400));
+  }
+
   if (listing.status !== "expired") {
     return next(new AppError("Only expired listings can be restored", 400));
   }
 
   const days = parseInt(req.body.days, 10);
-  if (!days || days < 1 || days > 30) {
-    return next(new AppError("Days must be between 1 and 30", 400));
+  if (!listingConfig.isValidRestorationDuration(days)) {
+    const validDurations = listingConfig.RESTORATION_DURATIONS.map((d) => d.days);
+    return next(new AppError(`Days must be one of: ${validDurations.join(", ")}`, 400));
   }
 
+  const tokensToDeduct = listingConfig.calculateRestorationCost(days);
+  const now = new Date();
+  const newExpiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
   let updatedListing;
+  let restoration;
+
   try {
     await prisma.$transaction(async (tx) => {
       await walletService.deductTokens(
         req.user.id,
-        days,
+        tokensToDeduct,
         "listing_renewal",
         `Listing restored — ${days} day${days === 1 ? "" : "s"}`,
         tx
       );
+
       updatedListing = await tx.listing.update({
         where: { id: req.params.id },
         data: {
           status: "active",
-          expiresAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+          expiresAt: newExpiresAt,
+        },
+      });
+
+      restoration = await tx.listingRestoration.create({
+        data: {
+          listingId: req.params.id,
+          userId: req.user.id,
+          durationDays: days,
+          tokensSpent: tokensToDeduct,
+          restoredAt: now,
+          expiresAt: newExpiresAt,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId: req.user.id,
+          event: "listing.restored",
+          title: "Listing restored",
+          body: `Your listing "${listing.name}" was restored for ${days} day${days === 1 ? "" : "s"} using ${tokensToDeduct} TR tokens.`,
+          metadata: { listingId: req.params.id, restorationId: restoration.id, days, tokensSpent: tokensToDeduct },
         },
       });
     });
@@ -654,7 +688,20 @@ exports.restoreListing = catchAsync(async (req, res, next) => {
     throw err;
   }
 
-  res.status(200).json({ status: "success", data: { listing: mapListingId(updatedListing) } });
+  res.status(200).json({ 
+    status: "success", 
+    data: { 
+      listing: mapListingId(updatedListing),
+      restoration: {
+        id: restoration.id,
+        durationDays: restoration.durationDays,
+        tokensSpent: restoration.tokensSpent,
+        restoredAt: restoration.restoredAt,
+        expiresAt: restoration.expiresAt,
+      }
+    },
+    message: `Listing restored for ${days} days`
+  });
 });
 
 exports.getHomeHighlighted = catchAsync(async (req, res, next) => {
