@@ -341,7 +341,7 @@ const createSendToken = (user, statusCode, res) => {
 };
 
 exports.signup = catchAsync(async (req, res, next) => {
-  const { username, email, password, role, consentAcceptedAt } = req.body;
+  const { username, email, password, role, consentAcceptedAt, phoneNumber, nationalId } = req.body;
   const allowedRoles = ["tenant", "landlord"];
 
   if (role && !allowedRoles.includes(role)) {
@@ -358,28 +358,124 @@ exports.signup = catchAsync(async (req, res, next) => {
       password: await bcrypt.hash(password, 12),
       ...(role ? { role } : {}),
       consentAcceptedAt: consentAcceptedAt ? new Date(consentAcceptedAt) : undefined,
+      phoneNumber: phoneNumber || undefined,
+      nationalId: nationalId || undefined,
       isEmailVerified: false,
       emailVerificationToken: verification.hashedToken,
       emailVerificationExpires: new Date(verification.expiresAt),
     },
   });
 
-  if (process.env.SKIP_EMAIL_VERIFICATION === "true") {
+  const skipEmail = process.env.SKIP_EMAIL_VERIFICATION === "true";
+  const skipPhone = process.env.SKIP_PHONE_VERIFICATION === "true";
+
+  if (skipPhone && role === "landlord") {
+    const fullyVerified = await prisma.user.update({
+      where: { id: newUser.id },
+      data: {
+        isPhoneVerified: true,
+        phoneOtp: null,
+        phoneOtpExpires: null,
+      },
+    });
+
+    if (skipEmail) {
+      await prisma.user.update({
+        where: { id: newUser.id },
+        data: {
+          isEmailVerified: true,
+          isPhoneVerified: true,
+          phoneOtp: null,
+          phoneOtpExpires: null,
+        },
+      });
+
+      if (fullyVerified.walletInitialized === false) {
+        await prisma.$transaction(async (tx) => {
+          await walletService.grantTokens(fullyVerified.id, 100, "welcome_bonus", "Welcome bonus — 100 TR", tx);
+          await tx.user.update({ where: { id: fullyVerified.id }, data: { walletInitialized: true } });
+        });
+        const refreshed = await prisma.user.findUnique({ where: { id: fullyVerified.id } });
+        return createSendToken(refreshed, 201, res);
+      }
+      return createSendToken(fullyVerified, 201, res);
+    }
+
+    return res.status(201).json({
+      status: "pending_verification",
+      message: "Account created. Please check your email to verify your account.",
+      data: {
+        user: buildPendingVerificationUserPayload(fullyVerified),
+      },
+    });
+  }
+
+  if (skipEmail) {
+    if (skipPhone) {
+      const fullyVerified = await prisma.user.update({
+        where: { id: newUser.id },
+        data: {
+          isEmailVerified: true,
+          isPhoneVerified: true,
+          phoneOtp: null,
+          phoneOtpExpires: null,
+        },
+      });
+
+      if (fullyVerified.walletInitialized === false) {
+        await prisma.$transaction(async (tx) => {
+          await walletService.grantTokens(fullyVerified.id, 100, "welcome_bonus", "Welcome bonus — 100 TR", tx);
+          await tx.user.update({ where: { id: fullyVerified.id }, data: { walletInitialized: true } });
+        });
+        const refreshed = await prisma.user.findUnique({ where: { id: fullyVerified.id } });
+        return createSendToken(refreshed, 201, res);
+      }
+      return createSendToken(fullyVerified, 201, res);
+    }
+
+    if (role === "landlord") {
+      const phoneVerification = generatePhoneOtp();
+      const pendingLandlord = await prisma.user.update({
+        where: { id: newUser.id },
+        data: {
+          isEmailVerified: true,
+          phoneOtp: phoneVerification.hashedOtp,
+          phoneOtpExpires: new Date(phoneVerification.expiresAt),
+        },
+      });
+
+      try {
+        await sendSms({
+          to: phoneNumber,
+          message: `Your Town Ruins verification code is ${phoneVerification.rawOtp}. It expires in 10 minutes.`,
+        });
+      } catch (error) {
+        await prisma.user.delete({ where: { id: newUser.id } });
+        return next(buildVerificationDeliveryError("sms", error));
+      }
+
+      return res.status(201).json({
+        status: "pending_phone_verification",
+        data: {
+          user: buildPendingVerificationUserPayload(pendingLandlord),
+        },
+      });
+    }
+
     const verifiedUser = await prisma.user.update({
       where: { id: newUser.id },
       data: { isEmailVerified: true },
     });
-    if (!verifiedUser.walletInitialized) {
+
+    if (verifiedUser.walletInitialized === false) {
       await prisma.$transaction(async (tx) => {
         await walletService.grantTokens(verifiedUser.id, 100, "welcome_bonus", "Welcome bonus — 100 TR", tx);
         await tx.user.update({ where: { id: verifiedUser.id }, data: { walletInitialized: true } });
       });
       const refreshed = await prisma.user.findUnique({ where: { id: verifiedUser.id } });
-      createSendToken(refreshed, 201, res);
-      return;
+      return createSendToken(refreshed, 201, res);
     }
-    createSendToken(verifiedUser, 201, res);
-    return;
+    return createSendToken(verifiedUser, 201, res);
   }
 
   try {
@@ -456,7 +552,16 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
     },
   });
 
-  if (!user.walletInitialized) {
+  if (verifiedUser.role === "landlord" && verifiedUser.isPhoneVerified !== true) {
+    return res.status(200).json({
+      status: "pending_phone_verification",
+      data: {
+        user: buildPendingVerificationUserPayload(verifiedUser),
+      },
+    });
+  }
+
+  if (verifiedUser.walletInitialized === false) {
     await prisma.$transaction(async (tx) => {
       await walletService.grantTokens(verifiedUser.id, 100, "welcome_bonus", "Welcome bonus — 100 TR", tx);
       await tx.user.update({ where: { id: verifiedUser.id }, data: { walletInitialized: true } });

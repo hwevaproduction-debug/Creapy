@@ -8,23 +8,23 @@ const ensurePrismaClientForRuntime = () => {
     return;
   }
 
-  if (process.platform !== "linux") {
+  if (process.platform !== "linux" && process.platform !== "win32") {
     return;
   }
 
-  const linuxEngine = path.join(
+  const generatedClientEntry = path.join(
     __dirname,
     "node_modules",
     ".prisma",
     "client",
-    "libquery_engine-rhel-openssl-3.0.x.so.node"
+    "default.js"
   );
 
-  if (fs.existsSync(linuxEngine)) {
+  if (fs.existsSync(generatedClientEntry)) {
     return;
   }
 
-  console.log("Generating Prisma Client for the Linux deployment runtime...");
+  console.log("Generating Prisma Client for the deployment runtime...");
   execFileSync(
     "npx",
     ["prisma", "generate", "--schema=prisma/schema.prisma"],
@@ -101,3 +101,4 @@ async function start() {
 }
 
 start();
+

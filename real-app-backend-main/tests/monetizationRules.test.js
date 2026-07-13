@@ -24,6 +24,7 @@ const originalPrisma = {
   paymentUpdateMany: prisma.payment.updateMany,
   userFindUnique: prisma.user.findUnique,
   userUpdate: prisma.user.update,
+  webhookEventCreate: prisma.webhookEvent.create,
 };
 
 const invokeController = (handler, req) =>
@@ -106,6 +107,7 @@ test.afterEach(() => {
   prisma.payment.updateMany = originalPrisma.paymentUpdateMany;
   prisma.user.findUnique = originalPrisma.userFindUnique;
   prisma.user.update = originalPrisma.userUpdate;
+  prisma.webhookEvent.create = originalPrisma.webhookEventCreate;
   delete process.env.PAYMENT_PROVIDER;
 });
 
@@ -454,6 +456,7 @@ test("webhook idempotency returns ok on duplicate webhook payloads", async () =>
   prisma.user.update = async () => {
     throw new Error("unexpected user update");
   };
+  prisma.webhookEvent.create = async () => ({ id: "we_1" });
 
   const req = {
     body: { reference: "tx_idem", status: "paid" },
@@ -463,6 +466,7 @@ test("webhook idempotency returns ok on duplicate webhook payloads", async () =>
   const second = await invokeWebhookHandler(webhookController.handlePaynowWebhook, req);
 
   provider.verifyWebhook = originalVerifyWebhook;
+  prisma.webhookEvent.create = originalPrisma.webhookEventCreate;
 
   assert.equal(first.statusCode, 200);
   assert.equal(first.body.status, "ok");

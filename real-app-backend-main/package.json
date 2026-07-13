@@ -4,6 +4,7 @@
   "description": "Town Ruins Rental Marketplace",
   "main": "server.js",
   "scripts": {
+    "prestart": "prisma generate",
     "start": "node server.js",
     "postinstall": "prisma generate",
     "server": "nodemon server.js",

@@ -4,7 +4,14 @@ require("dotenv").config({
 
 const prisma = require("../../utils/prisma");
 
-const API_BASE = process.env.SEED_API_BASE || "http://localhost:5000";
+const API_BASE = process.env.SEED_API_BASE || "api.townruins.com";
+
+if (!API_BASE.startsWith("http://") && !API_BASE.startsWith("https://")) {
+  console.warn(`[e2e] SEED_API_BASE missing protocol, prepending https://`);
+}
+const normalizedApiBase = API_BASE.startsWith("http://") || API_BASE.startsWith("https://")
+  ? API_BASE
+  : `https://${API_BASE}`;
 
 const green = (s) => `\x1b[32m${s}\x1b[0m`;
 const red = (s) => `\x1b[31m${s}\x1b[0m`;
@@ -75,7 +82,7 @@ async function api(method, path, body, token, formEncoded = false) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${normalizedApiBase}${path}`, {
     method,
     headers,
     body:
@@ -124,6 +131,16 @@ const compact = (values) => values.filter(Boolean);
 
 async function cleanupWithPrisma() {
   if (!process.env.DATABASE_URL) {
+    return;
+  }
+
+  if (
+    !process.env.DATABASE_URL.startsWith("postgresql://") &&
+    !process.env.DATABASE_URL.startsWith("postgres://")
+  ) {
+    console.error(
+      "[cleanup] DATABASE_URL is not a valid postgres connection string — skipping DB cleanup."
+    );
     return;
   }
 
@@ -534,7 +551,7 @@ async function cleanup() {
 
 async function runTests() {
   console.log("Running Creapy API E2E Tests");
-  console.log(`API: ${dim(API_BASE)}`);
+  console.log(`API: ${dim(normalizedApiBase)}`);
   console.log("-------------------------------------");
 
   try {

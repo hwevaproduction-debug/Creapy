@@ -64,7 +64,7 @@ test("createEngagement creates a fresh engagement after previous declined reques
     assert.deepEqual(args.where, {
       listingId: "listing-1",
       tenantId: "tenant-1",
-      status: { in: ["PENDING", "APPROVED"] },
+      status: { in: ["PENDING", "APPROVED", "CHARGED"] },
     });
     return null;
   };

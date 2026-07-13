@@ -34,17 +34,22 @@ const mapListingWithUser = (listing) =>
       }
     : listing;
 
-const sanitizeListingForPublic = (listing) => {
+const sanitizeListingForPublic = (listing, options = {}) => {
   if (!listing) return listing;
 
   const { phoneNumber, address, addressLine, ...publicListing } = listing;
+  if (publicListing.addressLine !== undefined) {
+    delete publicListing.addressLine;
+  }
   if (
+    options.stripLocationAddressLine !== false &&
     publicListing.location &&
     typeof publicListing.location === "object" &&
     !Array.isArray(publicListing.location)
   ) {
-    publicListing.location = { ...publicListing.location };
-    delete publicListing.location.addressLine;
+    const location = { ...publicListing.location };
+    delete location.addressLine;
+    publicListing.location = location;
   }
 
   return publicListing;
@@ -720,9 +725,7 @@ exports.getHomeHighlighted = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: "success",
     results: listings.length,
-    data: listings.map((listing) =>
-      sanitizeListingForPublic(mapListingId(listing))
-    ),
+    data: listings.map((listing) => sanitizeListingForPublic(mapListingId(listing))),
   });
 });
 

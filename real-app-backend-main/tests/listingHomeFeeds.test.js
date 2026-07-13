@@ -61,8 +61,8 @@ test("getHomeHighlighted returns active listings with default limit", async () =
   assert.equal(result.body.status, "success");
   assert.equal(result.body.results, 2);
   assert.deepEqual(result.body.data, [
-    { id: "1", status: "active", _id: "1", location: { province: "", city: "", addressLine: "", country: "Zimbabwe" } },
-    { id: "2", status: "active", _id: "2", location: { province: "", city: "", addressLine: "", country: "Zimbabwe" } },
+    { id: "1", status: "active", _id: "1", location: { province: "", city: "", country: "Zimbabwe" } },
+    { id: "2", status: "active", _id: "2", location: { province: "", city: "", country: "Zimbabwe" } },
   ]);
 });
 

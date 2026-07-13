@@ -90,7 +90,7 @@ const ProviderSignUp = () => {
     try {
       // Transform the data to match the API expected format
       const apiData = {
-        userName: data.userName,
+        username: data.userName,
         email: data.email,
         password: data.password,
         businessName: data.businessName,

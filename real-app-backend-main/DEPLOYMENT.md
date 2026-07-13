@@ -64,6 +64,7 @@ Avoid static AWS keys in Amplify. Prefer the Amplify backend runtime IAM role fo
 2. Set database name `creapy`, note the cluster endpoint.
 3. Set `DATABASE_URL` in Amplify environment variables.
 4. Add `npx prisma migrate deploy && npx prisma generate` to the Amplify build command before `npm start`.
+5. Production startup no longer regenerates Prisma at boot, so the build step must produce the client ahead of time.
 
 ## Frontend environment variables
 

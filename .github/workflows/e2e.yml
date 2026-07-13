@@ -80,7 +80,7 @@ jobs:
         env:
           E2E_ADMIN_EMAIL: admin@demo.com
           E2E_ADMIN_PASSWORD: demo1234
-          SEED_API_BASE: http://localhost:5000
+          SEED_API_BASE: api.townruins.com
 
   e2e-deployed:
     runs-on: ubuntu-latest
