@@ -6,11 +6,11 @@
  *
  * @interface PaymentProvider
  * @method initiateListingFee(listing, landlord)
- *   - Initiates a listing fee payment
+ *   - Legacy hook for listing activation flows
  *   - Returns: { transactionRef, instructions }
  *
  * @method initiatePremiumSubscription(user)
- *   - Initiates a premium subscription payment for a tenant
+ *   - Legacy hook for premium access flows
  *   - Returns: { transactionRef, instructions }
  *
  * @method verifyWebhook(formFields)

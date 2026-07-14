@@ -1,7 +1,11 @@
 const crypto = require("crypto");
 const prisma = require("../utils/prisma");
 const { getProviderByName } = require("../utils/paymentProvider");
-const { applyPaymentSuccess, BOOKING_PAYMENT_TYPES } = require("../utils/paymentSideEffects");
+const {
+  applyPaymentSuccess,
+  BOOKING_PAYMENT_TYPES,
+  isLegacyNonBookingPaymentType,
+} = require("../utils/paymentSideEffects");
 
 const SUCCESSFUL_PAYNOW_STATUSES = ["paid"];
 
@@ -160,6 +164,22 @@ exports.handlePaynowWebhook = async (req, res) => {
 
     try {
       claimedPayment = await ensureConfirmedAmount(claimedPayment, amountPaid);
+
+      if (isLegacyNonBookingPaymentType(claimedPayment)) {
+        await prisma.payment.update({
+          where: { id: claimedPayment.id },
+          data: {
+            webhookVerified: false,
+            status: "failed",
+          },
+        });
+
+        return res.status(200).json({
+          status: "manual_migration_required",
+          reason: "Legacy non-booking payment requires manual migration",
+        });
+      }
+
       await applyPaymentSuccess(
         {
           ...claimedPayment,
@@ -247,6 +267,21 @@ exports.handleStripeWebhook = async (req, res) => {
             amountPaid,
           },
         });
+
+        if (isLegacyNonBookingPaymentType(updatedPayment)) {
+          await prisma.payment.update({
+            where: { id: updatedPayment.id },
+            data: {
+              webhookVerified: false,
+              status: "failed",
+            },
+          });
+
+          return res.status(200).json({
+            status: "manual_migration_required",
+            reason: "Legacy non-booking payment requires manual migration",
+          });
+        }
 
         await applyPaymentSuccess(updatedPayment, prisma);
       } catch (sideEffectErr) {

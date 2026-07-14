@@ -6,10 +6,12 @@ const path = require("node:path");
 const paymentController = require("../controllers/paymentController");
 const webhookController = require("../controllers/webhookController");
 const listingController = require("../controllers/listingController");
+const uploadController = require("../controllers/uploadController");
 const { createListingValidators } = require("../middleware/listingValidators");
 const validate = require("../middleware/validate");
 const prisma = require("../utils/prisma");
 const { isPremiumTenant } = require("../utils/monetization");
+const walletService = require("../utils/walletService");
 
 const originalPrisma = {
   bookingFindUnique: prisma.booking.findUnique,
@@ -22,9 +24,11 @@ const originalPrisma = {
   paymentFindFirst: prisma.payment.findFirst,
   paymentUpdate: prisma.payment.update,
   paymentUpdateMany: prisma.payment.updateMany,
+  transaction: prisma.$transaction,
   userFindUnique: prisma.user.findUnique,
   userUpdate: prisma.user.update,
   webhookEventCreate: prisma.webhookEvent.create,
+  deductTokens: walletService.deductTokens,
 };
 
 const invokeController = (handler, req) =>
@@ -105,9 +109,11 @@ test.afterEach(() => {
   prisma.payment.findFirst = originalPrisma.paymentFindFirst;
   prisma.payment.update = originalPrisma.paymentUpdate;
   prisma.payment.updateMany = originalPrisma.paymentUpdateMany;
+  prisma.$transaction = originalPrisma.transaction;
   prisma.user.findUnique = originalPrisma.userFindUnique;
   prisma.user.update = originalPrisma.userUpdate;
   prisma.webhookEvent.create = originalPrisma.webhookEventCreate;
+  walletService.deductTokens = originalPrisma.deductTokens;
   delete process.env.PAYMENT_PROVIDER;
 });
 
@@ -180,109 +186,125 @@ test("tenant saved searches no longer require premium middleware", async () => {
   assert.ok(!file.includes("requirePremium"));
 });
 
-test("landlord can initiate listing fee payment", async () => {
-  let capturedPayment = null;
+test("landlord can activate a listing with TR tokens", async () => {
+  let deductArgs = null;
   let updateArgs = null;
 
-  prisma.payment.create = async ({ data }) => {
-    capturedPayment = data;
-    return { id: "pay_1", ...data, status: "pending" };
+  prisma.$transaction = async (callback) =>
+    callback({
+      listing: { update: prisma.listing.update },
+      user: { update: prisma.user.update },
+    });
+  walletService.deductTokens = async (...args) => {
+    deductArgs = args;
+    return 95;
   };
 
   prisma.listing.findUnique = async () => ({
     id: "listing_1",
+    name: "Listing One",
     userId: "u_1",
     status: "pending_payment",
   });
 
   prisma.listing.update = async (args) => {
     updateArgs = args;
-    return null;
+    return {
+      id: args.where.id,
+      status: args.data.status,
+      paymentDeadline: args.data.paymentDeadline ?? null,
+      earlyAccessUntil: args.data.earlyAccessUntil ?? null,
+    };
   };
 
   const result = await invokeController(paymentController.initiateListingFee, {
     user: { _id: "u_1" },
-    body: { listingId: "listing_1", phone: "256700000000" },
+    body: { listingId: "listing_1" },
   });
 
   assert.equal(result.statusCode, 201);
   assert.equal(result.body.status, "success");
-  assert.ok(result.body.data.transactionRef);
-  assert.equal(capturedPayment.type, "listing_fee");
-  assert.equal(capturedPayment.status, "pending");
+  assert.equal(result.body.data.listing.status, "active");
+  assert.equal(result.body.data.tokenBalance, 95);
+  assert.equal(result.body.data.tokenCost, 5);
+  assert.deepEqual(deductArgs?.slice(2, 4), ["listing_activation", "Listing activation for Listing One"]);
   assert.deepEqual(updateArgs, {
     where: { id: "listing_1" },
-    data: { status: "pending_payment" },
+    data: { status: "active", paymentDeadline: null },
   });
 });
 
-test("landlord can initiate listing fee payment for inactive listing revival", async () => {
-  let capturedPayment = null;
+test("landlord can restore an inactive listing with TR tokens", async () => {
+  let deductArgs = null;
   let updateArgs = null;
 
-  prisma.payment.create = async ({ data }) => {
-    capturedPayment = data;
-    return { id: "pay_inactive", ...data, status: "pending" };
+  prisma.$transaction = async (callback) =>
+    callback({
+      listing: { update: prisma.listing.update },
+      user: { update: prisma.user.update },
+    });
+  walletService.deductTokens = async (...args) => {
+    deductArgs = args;
+    return 90;
   };
 
   prisma.listing.findUnique = async () => ({
     id: "listing_inactive",
+    name: "Listing Inactive",
     userId: "u_1",
     status: "inactive",
   });
 
   prisma.listing.update = async (args) => {
     updateArgs = args;
-    return null;
+    return {
+      id: args.where.id,
+      status: args.data.status,
+      paymentDeadline: args.data.paymentDeadline ?? null,
+      earlyAccessUntil: args.data.earlyAccessUntil ?? null,
+    };
   };
 
   const result = await invokeController(paymentController.initiateListingFee, {
     user: { _id: "u_1" },
-    body: { listingId: "listing_inactive", phone: "256700000000" },
+    body: { listingId: "listing_inactive" },
   });
 
   assert.equal(result.statusCode, 201);
   assert.equal(result.body.status, "success");
-  assert.equal(capturedPayment.type, "listing_fee");
+  assert.equal(result.body.data.listing.status, "active");
+  assert.equal(result.body.data.tokenBalance, 90);
+  assert.equal(result.body.data.tokenCost, 5);
+  assert.equal(deductArgs?.[2], "listing_activation");
   assert.deepEqual(updateArgs, {
     where: { id: "listing_inactive" },
-    data: { status: "pending_payment" },
+    data: { status: "active", paymentDeadline: null },
   });
 });
 
-test("landlord can initiate listing fee payment for active listing", async () => {
-  let capturedPayment = null;
-  let updateArgs = null;
-
-  prisma.payment.create = async ({ data }) => {
-    capturedPayment = data;
-    return { id: "pay_active", ...data, status: "pending" };
-  };
-
+test("landlord cannot spend TR tokens on an already-active listing", async () => {
+  let deductCalled = false;
   prisma.listing.findUnique = async () => ({
     id: "listing_active",
+    name: "Listing Active",
     userId: "u_1",
     status: "active",
     paymentDeadline: null,
   });
 
-  prisma.listing.update = async (args) => {
-    updateArgs = args;
-    return null;
+  walletService.deductTokens = async () => {
+    deductCalled = true;
+    return 85;
   };
 
   const result = await invokeController(paymentController.initiateListingFee, {
     user: { _id: "u_1" },
-    body: { listingId: "listing_active", phone: "256700000000" },
+    body: { listingId: "listing_active" },
   });
 
-  assert.equal(result.statusCode, 201);
-  assert.equal(result.body.status, "success");
-  assert.equal(capturedPayment.type, "listing_fee");
-  assert.deepEqual(updateArgs, {
-    where: { id: "listing_active" },
-    data: { status: "pending_payment" },
-  });
+  assert.equal(result.error.statusCode, 400);
+  assert.equal(result.error.message, "Listing is already active");
+  assert.equal(deductCalled, false);
 });
 
 test("landlord can transition active listing to pending payment", async () => {
@@ -344,24 +366,123 @@ test("listing transition rejects non-active listings", async () => {
   );
 });
 
-test("tenant can initiate premium subscription payment", async () => {
-  let capturedPayment = null;
+test("tenant can activate premium membership with TR tokens", async () => {
+  let deductArgs = null;
 
-  prisma.payment.create = async ({ data }) => {
-    capturedPayment = data;
-    return { id: "pay_2", ...data, status: "pending" };
+  prisma.$transaction = async (callback) =>
+    callback({
+      listing: { update: prisma.listing.update },
+      user: { update: prisma.user.update },
+    });
+  walletService.deductTokens = async (...args) => {
+    deductArgs = args;
+    return 70;
   };
+  prisma.user.findUnique = async () => ({
+    id: "u_2",
+    premiumExpiry: null,
+  });
+  prisma.user.update = async (args) => ({
+    id: args.where.id,
+    premiumExpiry: args.data.premiumExpiry,
+  });
 
   const result = await invokeController(paymentController.initiateTenantPremium, {
     user: { _id: "u_2" },
-    body: { phone: "256700000001" },
+    body: {},
   });
 
   assert.equal(result.statusCode, 201);
   assert.equal(result.body.status, "success");
-  assert.ok(result.body.data.transactionRef);
-  assert.equal(capturedPayment.type, "premium_subscription");
-  assert.equal(capturedPayment.status, "pending");
+  assert.equal(result.body.data.user._id, "u_2");
+  assert.equal(result.body.data.tokenBalance, 70);
+  assert.equal(result.body.data.tokenCost, 10);
+  assert.equal(deductArgs?.[2], "premium_access");
+});
+
+test("listing uploads remain landlord-only even in tenant-payer mode", async () => {
+  process.env.TOKEN_PAYER_ROLE = "TENANT";
+
+  const result = await invokeController(uploadController.getSignedUploadUrl, {
+    query: {
+      folder: "listings",
+      contentType: "image/png",
+    },
+    user: { _id: "tenant_1", role: "tenant" },
+  });
+
+  assert.equal(result.statusCode, 403);
+  assert.equal(result.body.status, "fail");
+  assert.equal(result.body.message, "Landlord role required to publish listings");
+});
+
+test("retryPayment blocks legacy non-booking payments from provider retries", async () => {
+  prisma.payment.findUnique = async () => ({
+    id: "pay_legacy",
+    userId: "u_2",
+    status: "failed",
+    retryCount: 0,
+    lastRetryAt: null,
+    type: "listing_fee",
+  });
+
+  const result = await invokeController(paymentController.retryPayment, {
+    params: { id: "pay_legacy" },
+    user: { id: "u_2" },
+    body: {},
+  });
+
+  assert.equal(result.error.statusCode, 400);
+  assert.equal(result.error.message, "Provider retry/status is only available for booking payments");
+});
+
+test("webhook rejects legacy non-booking payments without applying side effects", async () => {
+  const paymentProvider = require("../utils/paymentProvider");
+  const provider = paymentProvider.getProviderByName("paynow");
+  const originalVerifyWebhook = provider.verifyWebhook;
+
+  let listingUpdateCalled = false;
+  let userUpdateCalled = false;
+
+  provider.verifyWebhook = async () => ({
+    valid: true,
+    transactionRef: "tx_legacy",
+    status: "paid",
+    amountPaid: 10,
+  });
+
+  prisma.payment.updateMany = async () => ({ count: 1 });
+  prisma.payment.update = async () => ({
+    id: "pay_legacy",
+    transactionRef: "tx_legacy",
+    type: "premium_subscription",
+  });
+  prisma.payment.findFirst = async () => ({
+    id: "pay_legacy",
+    transactionRef: "tx_legacy",
+    type: "premium_subscription",
+  });
+  prisma.listing.update = async () => {
+    listingUpdateCalled = true;
+    return {};
+  };
+  prisma.user.findUnique = async () => ({ id: "u_2", premiumExpiry: null });
+  prisma.user.update = async () => {
+    userUpdateCalled = true;
+    return {};
+  };
+  prisma.webhookEvent.create = async () => ({ id: "we_legacy" });
+
+  const result = await invokeWebhookHandler(webhookController.handlePaynowWebhook, {
+    body: { reference: "tx_legacy", status: "paid" },
+  });
+
+  provider.verifyWebhook = originalVerifyWebhook;
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.status, "manual_migration_required");
+  assert.equal(listingUpdateCalled, false);
+  assert.equal(userUpdateCalled, false);
 });
 
 test("webhook ignores payments with invalid hash", async () => {

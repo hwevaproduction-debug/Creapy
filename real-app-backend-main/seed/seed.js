@@ -893,36 +893,38 @@ async function ensurePermanentListing(listing, token) {
     return false;
   }
 
-  if (listing.paymentDeadline == null && listing.status === 'active') {
+  if (
+    listing.paymentDeadline == null &&
+    (listing.status === 'active' || listing.status === 'early_access')
+  ) {
     return true;
   }
 
   try {
-    const payment = await request(
+    const activation = await request(
       'POST',
       '/api/v1/payments/listing-fee',
-      { listingId: listing._id, phone: listing.phoneNumber || DEMO_PHONE },
+      { listingId: listing._id },
       token
     );
-    const transactionRef = payment?.data?.transactionRef;
-    if (!transactionRef) {
-      throw new Error(`No transactionRef returned for listing ${listing._id}`);
+    const activatedListing = activation?.data?.listing || null;
+    if (
+      activatedListing?.paymentDeadline == null &&
+      (activatedListing.status === 'active' || activatedListing.status === 'early_access')
+    ) {
+      return true;
     }
-
-    await requestForm(
-      'POST',
-      '/webhooks/payment',
-      { reference: transactionRef, status: 'paid', hash: 'ignored' },
-      null
-    );
   } catch (error) {
     console.warn(
-      `\n  Payment/webhook finalization failed for listing ${listing._id}; falling back to direct database update.`
+      `\n  Token activation failed for listing ${listing._id}; checking listing state again.`
     );
   }
 
   const updatedListing = await getListingById(listing._id, token).catch(() => null);
-  if (updatedListing?.paymentDeadline == null && updatedListing?.status === 'active') {
+  if (
+    updatedListing?.paymentDeadline == null &&
+    (updatedListing?.status === 'active' || updatedListing?.status === 'early_access')
+  ) {
     return true;
   }
 
@@ -1070,7 +1072,7 @@ async function seed() {
   console.log('  Free tenant:     tenant@demo.com / demo1234');
   console.log(`  Admin:           ${ADMIN_SEED.email} / ${ADMIN_SEED.password}`);
   console.log(
-    '\nNote: premium@demo.com is created as a tenant account only. Premium activation still requires the payment/webhook flow.'
+    '\nNote: premium@demo.com is created as a tenant account only. Premium activation now uses TR Tokens from the wallet.'
   );
   console.log('\nDemo credentials (Temporary Stay):');
   PROVIDERS.forEach((provider) => {

@@ -22,7 +22,7 @@ services:
         sync: false
       - key: JWT_EXPIRES_IN
         sync: false
-      - key: MONETIZATION_MODE
+      - key: TOKEN_PAYER_ROLE
         sync: false
       - key: PAYMENT_PROVIDER
         sync: false

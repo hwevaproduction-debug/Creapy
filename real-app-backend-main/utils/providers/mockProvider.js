@@ -7,7 +7,7 @@
 
 const mockProvider = {
   /**
-   * Initiates a mock listing fee payment
+   * Legacy listing activation hook used by compatibility tests
    * @param {object} listing - Listing model
    * @param {object} landlord - Landlord user
    * @returns {object} Payment initiation response
@@ -23,7 +23,7 @@ const mockProvider = {
   },
 
   /**
-   * Initiates a mock premium subscription payment
+   * Legacy premium access hook used by compatibility tests
    * @param {object} user - Tenant user
    * @returns {object} Payment initiation response
    */

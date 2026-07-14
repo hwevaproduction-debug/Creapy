@@ -71,7 +71,7 @@ const stripeProvider = {
     createPaymentIntent({
       amount: process.env.LISTING_FEE_AMOUNT,
       metadata: {
-        type: "listing_fee",
+        type: "listing_activation",
         listingId: getRecordId(listing),
         userId: getRecordId(landlord),
       },
@@ -81,7 +81,7 @@ const stripeProvider = {
     createPaymentIntent({
       amount: process.env.TENANT_PREMIUM_AMOUNT,
       metadata: {
-        type: "premium_subscription",
+        type: "premium_access",
         userId: getRecordId(user),
       },
     }),

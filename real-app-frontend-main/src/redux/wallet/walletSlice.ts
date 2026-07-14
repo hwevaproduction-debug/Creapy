@@ -155,7 +155,7 @@ const walletSlice = createSlice({
       action: PayloadAction<{ tokenBalance: number; transactions?: WalletTransaction[] }>
     ) {
       state.tokenBalance = action.payload.tokenBalance;
-      if (action.payload.transactions && action.payload.transactions.length > 0) {
+      if (action.payload.transactions !== undefined) {
         state.transactions = action.payload.transactions;
       }
       persistWallet(state);

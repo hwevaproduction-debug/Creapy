@@ -105,7 +105,7 @@ const initiateBookingAmount = async (booking, guest, amount, referenceSuffix = '
 
 const paynowProvider = {
   /**
-   * Initiates a Paynow listing fee payment
+   * Legacy listing activation hook for compatibility
    * @param {object} listing - Listing model
    * @param {object} landlord - Landlord user
    * @returns {object} Payment initiation response
@@ -118,13 +118,13 @@ const paynowProvider = {
       reference: `listing-${getRecordId(listing)}`,
       email: landlord.email,
       phone: landlord.phone,
-      label: 'Listing Publication Fee',
+      label: 'Listing Activation Tokens',
       amount,
     });
   },
 
   /**
-   * Initiates a Paynow premium subscription payment
+   * Legacy premium access hook for compatibility
    * @param {object} user - Tenant user
    * @returns {object} Payment initiation response
    */
@@ -136,7 +136,7 @@ const paynowProvider = {
       reference: `premium-${getRecordId(user)}-${Date.now()}`,
       email: user.email,
       phone: user.phone,
-      label: 'Tenant Premium Subscription',
+      label: 'Tenant Premium Tokens',
       amount,
     });
   },

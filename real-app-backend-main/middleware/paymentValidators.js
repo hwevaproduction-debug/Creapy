@@ -9,20 +9,13 @@ const listingFeeValidators = [
     .bail()
     .custom((value) => value.trim().length > 0)
     .withMessage("listingId must be a valid listing ID"),
-  body("phone")
-    .notEmpty()
-    .withMessage("phone is required")
-    .isString()
-    .withMessage("phone must be a string"),
+  body("earlyAccess")
+    .optional()
+    .isBoolean()
+    .withMessage("earlyAccess must be a boolean"),
 ];
 
-const tenantPremiumValidators = [
-  body("phone")
-    .notEmpty()
-    .withMessage("phone is required")
-    .isString()
-    .withMessage("phone must be a string"),
-];
+const tenantPremiumValidators = [];
 
 const bookingPaymentValidators = [
   body("phone")

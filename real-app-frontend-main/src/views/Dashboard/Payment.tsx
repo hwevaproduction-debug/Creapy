@@ -2,13 +2,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 // MUI Imports
-import { Box, CircularProgress, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 // Redux Imports
 import { useGetSingleListingQuery } from "../../redux/api/listingApiSlice";
-import {
-  useGetMyPaymentsQuery,
-  useInitiateListingFeeMutation,
-} from "../../redux/api/paymentApiSlice";
+import { useInitiateListingFeeMutation } from "../../redux/api/paymentApiSlice";
 import { selectedUserId } from "../../redux/auth/authSlice";
 // Hook Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
@@ -17,88 +14,48 @@ import { Heading, SubHeading } from "../../components/Heading";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
-import PrimaryInput from "../../components/PrimaryInput/PrimaryInput";
 import DotLoader from "../../components/Spinner/dotLoader";
 import OverlayLoader from "../../components/Spinner/OverlayLoader";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 // React Icons
 import { FaCheckCircle } from "react-icons/fa";
 
-const ListingPayment = () => {
+const Payment = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const userId = useTypedSelector(selectedUserId);
 
-  const [uiState, setUiState] = useState<"idle" | "polling" | "success">(
-    "idle"
-  );
-  const [phone, setPhone] = useState("");
-  const [transactionRef, setTransactionRef] = useState("");
-  const [instructions, setInstructions] = useState("");
-  const [countdown, setCountdown] = useState(5);
+  const [uiState, setUiState] = useState<"idle" | "submitting" | "success">("idle");
   const [toast, setToast] = useState({
     message: "",
     appearence: false,
     type: "",
   });
 
-  const { data, isLoading } = useGetSingleListingQuery(id as string, {
+  const { data, isLoading, refetch } = useGetSingleListingQuery(id as string, {
     skip: !id,
-    pollingInterval: uiState === "polling" ? 5000 : 0,
-  });
-  const { data: paymentsData } = useGetMyPaymentsQuery(undefined, {
-    pollingInterval: uiState === "polling" ? 5000 : 0,
     refetchOnMountOrArgChange: true,
   });
-
   const [initiateListingFee, { isLoading: isInitiating }] =
     useInitiateListingFeeMutation();
 
   const listing = data?.data;
-  const feeAmount = process.env.REACT_APP_LISTING_FEE_AMOUNT || "5";
+  const tokenCost = Number(process.env.REACT_APP_LISTING_FEE_AMOUNT || "5");
+  const tokenCostDisplay = Number.isFinite(tokenCost) ? tokenCost.toFixed(0) : "5";
   const isOwner = listing?.user === userId || listing?.user?._id === userId;
-  const listingPayments = (paymentsData?.data || []).filter((payment: any) => {
-    const paymentListingId =
-      typeof payment?.listing === "string"
-        ? payment.listing
-        : payment?.listing?._id;
-    return payment?.type === "listing_fee" && paymentListingId === id;
-  });
-  const hasVerifiedListingFeePayment = listingPayments.some(
-    (payment: any) => payment?.status === "success" && payment?.webhookVerified
-  );
-  const canInitiatePayment = ["pending_payment", "inactive"].includes(
-    listing?.status
-  );
+  const canActivate = ["pending_payment", "inactive"].includes(listing?.status);
 
   useEffect(() => {
-    if (uiState !== "success" && hasVerifiedListingFeePayment) {
-      setUiState("success");
-    }
-  }, [hasVerifiedListingFeePayment, uiState]);
-
-  useEffect(() => {
-    if (uiState === "success") {
-      const timer = setTimeout(() => {
-        navigate("/dashboard/landlord");
-      }, 4000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [uiState, navigate]);
-
-  useEffect(() => {
-    if (uiState !== "polling") {
-      setCountdown(5);
+    if (uiState !== "success") {
       return;
     }
 
-    const intervalId = setInterval(() => {
-      setCountdown((prev) => (prev <= 1 ? 5 : prev - 1));
-    }, 1000);
+    const timer = window.setTimeout(() => {
+      navigate("/dashboard/landlord");
+    }, 2500);
 
-    return () => clearInterval(intervalId);
-  }, [uiState]);
+    return () => window.clearTimeout(timer);
+  }, [uiState, navigate]);
 
   const handleCloseToast = () => {
     setToast((prev) => ({ ...prev, appearence: false }));
@@ -106,13 +63,19 @@ const ListingPayment = () => {
 
   const handleSubmit = async () => {
     try {
-      const payload: any = await initiateListingFee({
+      await initiateListingFee({
         listingId: id,
-        phone,
+        earlyAccess: false,
       }).unwrap();
-      setTransactionRef(payload?.data?.transactionRef || "");
-      setInstructions(payload?.data?.instructions || "");
-      setUiState("polling");
+
+      setToast({
+        message: "Listing activated with TR Tokens.",
+        appearence: true,
+        type: "success",
+      });
+
+      await refetch();
+      setUiState("success");
     } catch (error: any) {
       setToast({
         message:
@@ -162,7 +125,7 @@ const ListingPayment = () => {
         <AppContainer>
           <AppCard sx={{ p: { xs: 2, md: 3 }, maxWidth: 500, mx: "auto" }}>
             <Typography sx={{ marginBottom: "16px" }}>
-              You do not have permission to pay for this listing.
+              You do not have permission to activate this listing.
             </Typography>
             <AppButton onClick={() => navigate("/dashboard/landlord")}>
               Back to Dashboard
@@ -179,13 +142,13 @@ const ListingPayment = () => {
     );
   }
 
-  if (uiState === "idle" && !canInitiatePayment && !hasVerifiedListingFeePayment) {
+  if (uiState === "idle" && !canActivate) {
     return (
       <Box sx={{ marginTop: "50px" }}>
         <AppContainer>
           <AppCard sx={{ p: { xs: 2, md: 3 }, maxWidth: 500, mx: "auto" }}>
             <Typography sx={{ marginBottom: "16px" }}>
-              This listing is not awaiting payment.
+              This listing is already active.
             </Typography>
             <AppButton onClick={() => navigate("/dashboard/landlord")}>
               Back to Dashboard
@@ -229,18 +192,18 @@ const ListingPayment = () => {
               }}
             >
               {listing?.status === "inactive"
-                ? "Inactive — Revive Listing"
-                : "Pending Payment"}
+                ? "Inactive - Restore Listing"
+                : "Pending Activation"}
             </Box>
             <Heading sx={{ marginBottom: "8px" }}>
               {listing?.status === "inactive"
-                ? "Revive Your Listing"
+                ? "Restore Your Listing"
                 : "Activate Your Listing"}
             </Heading>
             <SubHeading sx={{ marginBottom: "16px" }}>
               {listing?.status === "inactive"
-                ? "Pay the activation fee via EcoCash to restore your listing."
-                : "Pay the activation fee via EcoCash to publish your listing."}
+                ? "Spend TR Tokens to restore this listing."
+                : "Spend TR Tokens to publish this listing."}
             </SubHeading>
             <Box
               sx={{
@@ -259,76 +222,16 @@ const ListingPayment = () => {
                 marginBottom: "16px",
               }}
             >
-              <Box>Activation Fee</Box>
-              <Box sx={{ fontWeight: 600 }}>USD {feeAmount}.00</Box>
+              <Box>Token Cost</Box>
+              <Box sx={{ fontWeight: 600 }}>{tokenCostDisplay} TR</Box>
             </Box>
-            <Box sx={{ marginBottom: "16px" }}>
-              <PrimaryInput
-                label="Your EcoCash Number"
-                type="tel"
-                placeholder="+263 77 123 4567"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-              />
-            </Box>
-            <AppButton fullWidth onClick={handleSubmit} disabled={isInitiating}>
-              {isInitiating ? (
-                <DotLoader color="#fff" size={10} />
-              ) : (
-                "Send Payment Request"
-              )}
+            <AppButton
+              fullWidth
+              onClick={handleSubmit}
+              disabled={isInitiating}
+            >
+              {isInitiating ? <DotLoader color="#fff" size={10} /> : "Spend TR Tokens"}
             </AppButton>
-          </AppCard>
-        ) : null}
-
-        {uiState === "polling" ? (
-          <AppCard
-            sx={{
-              marginTop: "30px",
-              p: { xs: 2, md: 3 },
-              maxWidth: 500,
-              mx: "auto",
-              textAlign: "center",
-            }}
-          >
-            <CircularProgress size={52} sx={{ marginBottom: "16px" }} />
-            <Typography variant="h6" sx={{ marginBottom: "8px" }}>
-              Waiting for EcoCash confirmation...
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Approve the EcoCash prompt on your phone to complete payment.
-            </Typography>
-            <Box
-              sx={{
-                background: "#f1f5f9",
-                borderRadius: "8px",
-                padding: "12px 16px",
-                marginTop: "16px",
-              }}
-            >
-              Reference:{" "}
-              <Box component="span" sx={{ fontWeight: 700 }}>
-                {transactionRef}
-              </Box>
-            </Box>
-            {instructions ? (
-              <Typography sx={{ marginTop: "12px" }}>{instructions}</Typography>
-            ) : null}
-            <Box
-              component="ol"
-              sx={{ marginTop: "12px", textAlign: "left", paddingLeft: "20px" }}
-            >
-              <li>You will receive a USSD prompt on your phone</li>
-              <li>Enter your EcoCash PIN to approve the payment</li>
-              <li>Wait for confirmation below</li>
-            </Box>
-            <Typography
-              variant="body2"
-              color="text.disabled"
-              sx={{ marginTop: "12px" }}
-            >
-              Checking status in {countdown}s...
-            </Typography>
           </AppCard>
         ) : null}
 
@@ -344,7 +247,7 @@ const ListingPayment = () => {
           >
             <FaCheckCircle size={64} color="#16a34a" />
             <Typography variant="h6" sx={{ marginTop: "16px" }}>
-              ✓ Payment confirmed! Your listing is now live.
+              ✓ Listing activated with TR Tokens.
             </Typography>
             <AppButton
               onClick={() => navigate("/dashboard/landlord")}
@@ -357,7 +260,7 @@ const ListingPayment = () => {
               color="text.disabled"
               sx={{ marginTop: "12px" }}
             >
-              Redirecting to dashboard in 4 seconds...
+              Redirecting to dashboard in 2.5 seconds...
             </Typography>
           </AppCard>
         ) : null}
@@ -372,4 +275,4 @@ const ListingPayment = () => {
   );
 };
 
-export default ListingPayment;
+export default Payment;

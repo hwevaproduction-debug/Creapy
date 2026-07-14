@@ -2,6 +2,15 @@ const prisma = require("./prisma");
 const notificationService = require("./notificationService");
 
 const BOOKING_PAYMENT_TYPES = ["booking_payment", "partial_booking_payment"];
+const LEGACY_NON_BOOKING_PAYMENT_TYPES = [
+  "listing_fee",
+  "listing_activation",
+  "premium_subscription",
+  "premium_access",
+];
+
+const isLegacyNonBookingPaymentType = (payment) =>
+  LEGACY_NON_BOOKING_PAYMENT_TYPES.includes(payment?.type);
 
 const normalizeEnumInput = (value) => {
   if (value == null || value === "") {
@@ -168,11 +177,15 @@ const applyPaymentSuccess = async (payment, prismaClient = prisma) => {
     return null;
   }
 
-  if (payment.type === "listing_fee") {
+  if (isLegacyNonBookingPaymentType(payment)) {
+    throw new Error("Legacy non-booking payment must be handled manually");
+  }
+
+  if (payment.type === "listing_fee" || payment.type === "listing_activation") {
     return applyListingPaymentSuccess(payment, prismaClient);
   }
 
-  if (payment.type === "premium_subscription") {
+  if (payment.type === "premium_subscription" || payment.type === "premium_access") {
     return applyPremiumPaymentSuccess(payment, prismaClient);
   }
 
@@ -186,4 +199,6 @@ const applyPaymentSuccess = async (payment, prismaClient = prisma) => {
 module.exports = {
   applyPaymentSuccess,
   BOOKING_PAYMENT_TYPES,
+  LEGACY_NON_BOOKING_PAYMENT_TYPES,
+  isLegacyNonBookingPaymentType,
 };

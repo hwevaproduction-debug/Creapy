@@ -50,7 +50,10 @@ import { FEATURE_FLAGS } from "./config/featureFlags";
 import FloatingNotificationBubble from "./components/notifications/FloatingNotificationBubble";
 import useTypedSelector from "./hooks/useTypedSelector";
 import { selectedUserToken } from "./redux/auth/authSlice";
-import { useGetWalletBalanceQuery } from "./redux/api/walletApiSlice";
+import {
+  useGetWalletBalanceQuery,
+  useGetWalletTransactionsQuery,
+} from "./redux/api/walletApiSlice";
 import { syncWalletFromServer } from "./redux/wallet/walletSlice";
 
 export const ColorModeContext = React.createContext({ toggleColorMode: () => {} });
@@ -94,6 +97,10 @@ function App() {
     skip: !token,
     refetchOnMountOrArgChange: true,
   });
+  const { data: walletTransactionsData } = useGetWalletTransactionsQuery(undefined, {
+    skip: !token,
+    refetchOnMountOrArgChange: true,
+  });
   const colorModeValue = useMemo(
     () => ({
       toggleColorMode: () => {
@@ -117,9 +124,24 @@ function App() {
 
     const serverBalance = walletBalanceData?.data?.tokenBalance;
     if (typeof serverBalance === "number") {
-      dispatch(syncWalletFromServer({ tokenBalance: serverBalance }));
+      const serverTransactions = walletTransactionsData?.data?.transactions?.map((transaction) => ({
+        id: transaction.id,
+        type: transaction.type,
+        amount: transaction.amount,
+        label: transaction.label,
+        timestamp: transaction.createdAt,
+        reason: transaction.reason,
+        balanceAfter: transaction.balanceAfter,
+      }));
+
+      dispatch(
+        syncWalletFromServer({
+          tokenBalance: serverBalance,
+          transactions: serverTransactions,
+        })
+      );
     }
-  }, [dispatch, token, walletBalanceData]);
+  }, [dispatch, token, walletBalanceData, walletTransactionsData]);
 
   return (
     <ColorModeContext.Provider value={colorModeValue}>

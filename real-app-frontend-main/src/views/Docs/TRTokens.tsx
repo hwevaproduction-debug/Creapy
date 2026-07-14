@@ -165,7 +165,7 @@ const TRTokens = () => (
           </TableBody>
         </Table>
         <Box sx={{ color: "text.secondary", lineHeight: 1.75, mt: 2 }}>
-          Payment via EcoCash from your dashboard wallet.
+          Buy token bundles via EcoCash from your dashboard wallet.
         </Box>
       </AppCard>
 
@@ -216,8 +216,8 @@ const TRTokens = () => (
           <Box component="li" sx={{ mb: 2 }}>
             <strong>Q: Are tokens the same as the listing fee?</strong>
             <br />
-            A: No. The listing fee is a real USD payment to activate a listing. Tokens are a separate platform
-            currency for interactions.
+            A: No. Listing activation uses TR Tokens. Money is only used to buy token bundles, while tokens power
+            premium platform actions.
           </Box>
         </Box>
       </AppCard>

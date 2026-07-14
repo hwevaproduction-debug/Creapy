@@ -86,7 +86,7 @@ const TenantGuide = () => (
           <AppCard sx={{ p: 3, height: "100%" }}>
             <Box sx={{ fontWeight: 800, fontSize: "20px", mb: 1 }}>Premium Membership</Box>
             <Box sx={{ color: "text.secondary" }}>
-              Upgrade to Premium Membership for $10/month via EcoCash. Premium tenants get early access to new listings before they go public, giving you a head start on the best properties. Renew from your dashboard at any time. Each membership lasts 30 days and your dashboard shows the expiry date and days remaining.
+              Upgrade to Premium Membership by spending TR Tokens from your wallet. Premium tenants get early access to new listings before they go public, giving you a head start on the best properties. Renew from your dashboard at any time. Each membership lasts 30 days and your dashboard shows the expiry date and days remaining.
             </Box>
           </AppCard>
         </Grid>
@@ -136,7 +136,7 @@ const TenantGuide = () => (
               </Grid>
               <Grid item xs={12} md={6}>
                 <Box sx={{ fontWeight: 700, mb: 0.5 }}>What is Premium Membership?</Box>
-                <Box sx={{ color: "text.secondary" }}>A $10/month subscription that gives you early access to new listings before they go public.</Box>
+                <Box sx={{ color: "text.secondary" }}>A 30-day TR Token spend that gives you early access to new listings before they go public.</Box>
               </Grid>
               <Grid item xs={12} md={6}>
                 <Box sx={{ fontWeight: 700, mb: 0.5 }}>How do I pay for a stay?</Box>

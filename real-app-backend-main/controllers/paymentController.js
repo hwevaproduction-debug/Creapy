@@ -1,11 +1,10 @@
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const prisma = require("../utils/prisma");
-const { getProvider, getProviderByName } = require("../utils/paymentProvider");
+const { getProviderByName } = require("../utils/paymentProvider");
+const walletService = require("../utils/walletService");
 
 const getUserId = (user) => user?.id || user?._id?.toString();
-
-const getPaymentMethod = () => String(process.env.PAYMENT_PROVIDER || "mock").trim().toLowerCase();
 
 const mapId = (record) => {
   if (!record) {
@@ -16,10 +15,43 @@ const mapId = (record) => {
   return record;
 };
 
+const getTokenCost = (value, fallback) => {
+  const parsed = Number.parseFloat(value);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return Math.round(parsed);
+};
+
 const getPaymentProvider = (payment) => getProviderByName(payment?.method);
+const SANCTIONED_PROVIDER_PAYMENT_TYPES = ["booking_payment", "partial_booking_payment"];
+
+const isSanctionedProviderPaymentType = (payment) =>
+  SANCTIONED_PROVIDER_PAYMENT_TYPES.includes(payment?.type);
+
+exports.requireBookingPaymentForProviderActions = catchAsync(async (req, res, next) => {
+  const payment = await prisma.payment.findUnique({
+    where: { id: req.params.id },
+  });
+
+  if (!payment) {
+    return next(new AppError("Payment not found", 404));
+  }
+
+  if (!isSanctionedProviderPaymentType(payment)) {
+    return next(new AppError("Provider retry/status is only available for booking payments", 400));
+  }
+
+  req.payment = payment;
+  next();
+});
 
 exports.initiateListingFee = catchAsync(async (req, res, next) => {
-  const { listingId, phone } = req.body;
+  const { listingId } = req.body;
+  const earlyAccess = req.body.earlyAccess === true || req.body.earlyAccess === "true";
+  const listingTokenCost = getTokenCost(process.env.LISTING_FEE_AMOUNT, 5);
 
   const listing = await prisma.listing.findUnique({ where: { id: listingId } });
   if (!listing) {
@@ -30,71 +62,116 @@ exports.initiateListingFee = catchAsync(async (req, res, next) => {
     return next(new AppError("Forbidden", 403));
   }
 
-  if (!["pending_payment", "inactive", "active"].includes(listing.status)) {
+  if (listing.status === "active") {
+    return next(new AppError("Listing is already active", 400));
+  }
+
+  if (!["pending_payment", "inactive"].includes(listing.status)) {
     return next(new AppError("Listing is not awaiting payment", 400));
   }
 
-  listing._id = listing.id;
+  let updatedListing;
+  let updatedBalance;
 
-  const provider = getProvider();
-  const result = await provider.initiateListingFee(listing, {
-    ...req.user,
-    _id: getUserId(req.user),
-    phone,
-  });
+  try {
+    await prisma.$transaction(async (tx) => {
+      updatedBalance = await walletService.deductTokens(
+        getUserId(req.user),
+        listingTokenCost,
+        "listing_activation",
+        `Listing activation for ${listing.name}`,
+        tx
+      );
 
-  await prisma.payment.create({
-    data: {
-      type: "listing_fee",
-      listingId: listing.id,
-      userId: getUserId(req.user),
-      transactionRef: result.transactionRef,
-      status: "pending",
-      method: getPaymentMethod(),
-      amount: parseFloat(process.env.LISTING_FEE_AMOUNT) || 0,
-    },
-  });
-
-  await prisma.listing.update({
-    where: { id: listing.id },
-    data: { status: "pending_payment" },
-  });
+      updatedListing = await tx.listing.update({
+        where: { id: listing.id },
+        data: earlyAccess
+          ? {
+              status: "early_access",
+              earlyAccessUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+              paymentDeadline: null,
+            }
+          : {
+              status: "active",
+              paymentDeadline: null,
+            },
+      });
+    });
+  } catch (err) {
+    if (err.statusCode === 402) {
+      return next(new AppError("Insufficient TR token balance to activate this listing", 402));
+    }
+    throw err;
+  }
 
   res.status(201).json({
     status: "success",
     data: {
-      transactionRef: result.transactionRef,
-      instructions: result.instructions,
+      listing: {
+        ...updatedListing,
+        _id: updatedListing.id,
+      },
+      tokenBalance: updatedBalance,
+      tokenCost: listingTokenCost,
     },
   });
 });
 
 exports.initiateTenantPremium = catchAsync(async (req, res) => {
-  const { phone } = req.body;
-
-  const provider = getProvider();
-  const result = await provider.initiatePremiumSubscription({
-    ...req.user,
-    _id: getUserId(req.user),
-    phone,
+  const premiumTokenCost = getTokenCost(process.env.TENANT_PREMIUM_AMOUNT, 10);
+  const userId = getUserId(req.user);
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
   });
 
-  await prisma.payment.create({
-    data: {
-      type: "premium_subscription",
-      userId: getUserId(req.user),
-      transactionRef: result.transactionRef,
-      status: "pending",
-      method: getPaymentMethod(),
-      amount: parseFloat(process.env.TENANT_PREMIUM_AMOUNT) || 0,
-    },
-  });
+  if (!currentUser) {
+    throw new AppError("User not found", 404);
+  }
+
+  let updatedUser;
+  let updatedBalance;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      updatedBalance = await walletService.deductTokens(
+        userId,
+        premiumTokenCost,
+        "premium_access",
+        "Tenant premium access",
+        tx
+      );
+
+      const base =
+        currentUser.premiumExpiry && currentUser.premiumExpiry > new Date()
+          ? currentUser.premiumExpiry
+          : new Date();
+
+      updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          premiumExpiry: new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+    });
+  } catch (err) {
+    if (err.statusCode === 402) {
+      return res.status(402).json({
+        status: "fail",
+        message: "Insufficient TR token balance to activate premium membership",
+      });
+    }
+    throw err;
+  }
 
   res.status(201).json({
     status: "success",
     data: {
-      transactionRef: result.transactionRef,
-      instructions: result.instructions,
+      user: {
+        ...updatedUser,
+        _id: updatedUser.id,
+      },
+      tokenBalance: updatedBalance,
+      tokenCost: premiumTokenCost,
     },
   });
 });
@@ -127,12 +204,20 @@ exports.getMyPayments = catchAsync(async (req, res) => {
 });
 
 exports.retryPayment = catchAsync(async (req, res, next) => {
-  const payment = await prisma.payment.findUnique({
-    where: { id: req.params.id },
-  });
+  let payment = req.payment;
+
+  if (!payment) {
+    payment = await prisma.payment.findUnique({
+      where: { id: req.params.id },
+    });
+  }
 
   if (!payment) {
     return next(new AppError("Payment not found", 404));
+  }
+
+  if (!isSanctionedProviderPaymentType(payment)) {
+    return next(new AppError("Provider retry/status is only available for booking payments", 400));
   }
 
   if (payment.userId !== getUserId(req.user)) {
@@ -195,25 +280,30 @@ exports.retryPayment = catchAsync(async (req, res, next) => {
 });
 
 exports.getPaymentStatus = catchAsync(async (req, res, next) => {
-  const payment = await prisma.payment.findUnique({
-    where: { id: req.params.id },
-  });
+  let payment = req.payment;
+
+  if (!payment) {
+    payment = await prisma.payment.findUnique({
+      where: { id: req.params.id },
+    });
+  }
 
   if (!payment) {
     return next(new AppError("Payment not found", 404));
+  }
+
+  if (!isSanctionedProviderPaymentType(payment)) {
+    return next(new AppError("Provider retry/status is only available for booking payments", 400));
   }
 
   if (payment.userId !== getUserId(req.user)) {
     return next(new AppError("Forbidden", 403));
   }
 
-  const provider = getPaymentProvider(payment);
-  const liveStatus = await provider.pollPaymentStatus(payment);
-
   res.status(200).json({
     status: "success",
     data: {
-      status: liveStatus.status,
+      status: payment.status,
       amountPaid: payment.amountPaid,
       amountDue: payment.amountDue,
       retryCount: payment.retryCount,

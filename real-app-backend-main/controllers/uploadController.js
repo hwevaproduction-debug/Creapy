@@ -1,7 +1,6 @@
 const crypto = require('crypto');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { MONETIZATION_MODE } = require('../utils/monetization');
 const AppError = require('../utils/appError');
 
 const s3ClientConfig = {
@@ -26,10 +25,7 @@ exports.getSignedUploadUrl = async (req, res, next) => {
       return res.status(400).json({ status: 'fail', message: 'contentType is required' });
     }
 
-    if (
-      normalizedFolder === "listings" &&
-      MONETIZATION_MODE === "LANDLORD_PAID"
-    ) {
+    if (normalizedFolder === "listings") {
       if (!req.user || req.user.role !== "landlord") {
         return res.status(403).json({
           status: "fail",

@@ -10,7 +10,6 @@ import useTypedSelector from "../../hooks/useTypedSelector";
 // Redux Imports
 import {
   useDeleteSavedSearchMutation,
-  useGetMeQuery,
   useGetMySavedSearchesQuery,
 } from "../../redux/api/userApiSlice";
 import { useGetMyEngagementsQuery } from "../../redux/api/engagementApiSlice";
@@ -27,10 +26,8 @@ import { getGreeting } from "../../utils/greeting";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
-import PrimaryInput from "../../components/PrimaryInput/PrimaryInput";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import { Heading, SubHeading } from "../../components/Heading";
-import DotLoader from "../../components/Spinner/dotLoader";
 import WalletCard from "../../components/wallet/WalletCard";
 import TransactionList from "../../components/wallet/TransactionList";
 import useTokenNotifications from "../../hooks/useTokenNotifications";
@@ -78,17 +75,12 @@ const TenantDashboard = () => {
   >([]);
 
   const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [showPolling, setShowPolling] = useState(false);
-  const [phone, setPhone] = useState("");
   const [toast, setToast] = useState({
     message: "",
     appearence: false,
     type: "",
   });
 
-  const { data: getMeData } = useGetMeQuery(undefined, {
-    pollingInterval: showPolling ? 5000 : 0,
-  });
   const {
     data: savedSearchesData,
     isLoading: savedSearchesLoading,
@@ -108,7 +100,7 @@ const TenantDashboard = () => {
   const premiumAmountDisplay = Number.isFinite(premiumAmountNumber)
     ? premiumAmountNumber.toFixed(2)
     : "10.00";
-const premiumActive = isPremiumTenant({ premiumExpiry });
+  const premiumActive = isPremiumTenant({ premiumExpiry });
   const engagements = engagementsData?.data || [];
   const approvedEngagements = engagements.filter(
     (engagement: any) => engagement.status === "APPROVED" || engagement.status === "CHARGED"
@@ -141,77 +133,41 @@ const premiumActive = isPremiumTenant({ premiumExpiry });
     }
   }, []);
 
-  useEffect(() => {
-    if (!showPolling) return;
-
-    const updatedUser = getMeData?.data?.user;
-    if (!updatedUser) return;
-
-    const previousExpiryMs = premiumExpiry
-      ? new Date(premiumExpiry).getTime()
-      : 0;
-    const updatedExpiryMs = updatedUser?.premiumExpiry
-      ? new Date(updatedUser.premiumExpiry).getTime()
-      : 0;
-
-    const hasExpiryUpdate =
-      updatedExpiryMs > Date.now() &&
-      updatedExpiryMs > previousExpiryMs &&
-      updatedExpiryMs !== previousExpiryMs;
-
-    if (hasExpiryUpdate) {
-      const nextAuthUser = {
-        ...authUser,
-        data: {
-          ...(authUser?.data || {}),
-          user: updatedUser,
-        },
-      };
-
-      dispatch(setUser(nextAuthUser));
-      localStorage.setItem("user", JSON.stringify(nextAuthUser));
-
-      setShowPolling(false);
-      setShowPaymentForm(false);
-      setPhone("");
-      setToast({
-        message: "Premium activated!",
-        appearence: true,
-        type: "success",
-      });
-    }
-  }, [getMeData, showPolling, premiumExpiry, authUser, dispatch]);
-
   const handleCloseToast = () => {
     setToast({ ...toast, appearence: false });
   };
 
   const handleInitiatePremium = async () => {
     try {
-      const result: any = await initiateTenantPremium({ phone });
+      const result: any = await initiateTenantPremium(undefined).unwrap();
+      const updatedUser = result?.data?.user;
 
-      if (result?.error) {
-        setToast({
-          message:
-            result?.error?.data?.message ||
-            result?.error?.message ||
-            "Failed to initiate premium payment",
-          appearence: true,
-          type: "error",
-        });
-        return;
+      if (updatedUser) {
+        const nextAuthUser = {
+          ...authUser,
+          data: {
+            ...(authUser?.data || {}),
+            user: updatedUser,
+          },
+        };
+
+        dispatch(setUser(nextAuthUser));
+        localStorage.setItem("user", JSON.stringify(nextAuthUser));
       }
 
-      setShowPolling(true);
+      setShowPaymentForm(false);
       setToast({
-        message: "Payment request sent. Approve the prompt on your phone.",
+        message: "Premium activated with TR Tokens.",
         appearence: true,
-        type: "info",
+        type: "success",
       });
     } catch (error) {
       console.error("Initiate Tenant Premium Error", error);
       setToast({
-        message: "Something went wrong",
+        message:
+          (error as any)?.data?.message ||
+          (error as any)?.message ||
+          "Something went wrong",
         appearence: true,
         type: "error",
       });
@@ -334,58 +290,25 @@ const premiumActive = isPremiumTenant({ premiumExpiry });
           {showPaymentForm ? (
             <Box sx={{ marginTop: "12px" }}>
               <SubHeading sx={{ color: "text.secondary", marginBottom: "10px" }}>
-                Premium price: USD {premiumAmountDisplay}
+                Premium cost: {premiumAmountDisplay} TR
               </SubHeading>
               <SubHeading sx={{ color: "text.secondary", marginBottom: "10px" }}>
                 Duration: 30-day membership
               </SubHeading>
-              {showPolling ? (
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 1,
-                    py: 1,
-                  }}
+              <Box sx={{ mt: 1.5, display: "flex", gap: 1 }}>
+                <AppButton
+                  onClick={handleInitiatePremium}
+                  disabled={isInitiatingPremium}
                 >
-                  <DotLoader color="#B8975A" size={14} />
-                  <SubHeading sx={{ color: "text.secondary", fontSize: "13px", textAlign: "center" }}>
-                    Waiting for payment confirmation. Checking every 5 seconds...
-                  </SubHeading>
-                </Box>
-              ) : null}
-              {!showPolling ? (
-                <>
-                  <Box sx={{ mt: 1.5 }}>
-                    <PrimaryInput
-                      label="Your EcoCash Number"
-                      type="tel"
-                      placeholder="+263 77 123 4567"
-                      value={phone}
-                      onChange={(event) => setPhone(event.target.value)}
-                    />
-                  </Box>
-                  <Box sx={{ mt: 1.5, display: "flex", gap: 1 }}>
-                    <AppButton
-                      onClick={handleInitiatePremium}
-                      disabled={isInitiatingPremium}
-                    >
-                      Send Payment Request
-                    </AppButton>
-                    <AppButton
-                      variant="outlined"
-                      onClick={() => {
-                        setShowPaymentForm(false);
-                        setShowPolling(false);
-                      }}
-                    >
-                      Cancel
-                    </AppButton>
-                  </Box>
-                </>
-              ) : null}
+                  Spend TR Tokens
+                </AppButton>
+                <AppButton
+                  variant="outlined"
+                  onClick={() => setShowPaymentForm(false)}
+                >
+                  Cancel
+                </AppButton>
+              </Box>
             </Box>
           ) : null}
         </AppCard>

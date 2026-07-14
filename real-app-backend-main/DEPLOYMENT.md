@@ -30,14 +30,14 @@ Amplify backend hosting expects the build output in the following structure:
 | `DATABASE_URL` | Aurora PostgreSQL connection string (postgresql://user:pass@host:5432/creapy?schema=public) |
 | `JWT_SECRET` | Secret used to sign JWTs |
 | `JWT_EXPIRES_IN` | JWT expiration window (e.g. `30d`) |
-| `MONETIZATION_MODE` | Monetization mode flag (default `LANDLORD_PAID`) |
+| `TOKEN_PAYER_ROLE` | Token-payer role for non-booking premium flows (default `LANDLORD`) |
 | `PAYMENT_PROVIDER` | Payment provider selector (e.g. `mock`, `paynow`) |
 | `PAYNOW_INTEGRATION_ID` | Paynow integration ID |
 | `PAYNOW_INTEGRATION_KEY` | Paynow integration key |
 | `PAYNOW_RESULT_URL` | Must be the Amplify backend compute URL + `/webhooks/payment` |
 | `PAYNOW_RETURN_URL` | Must be the Amplify frontend URL + `/payment-complete` |
-| `LISTING_FEE_AMOUNT` | Per-listing activation fee amount |
-| `TENANT_PREMIUM_AMOUNT` | Tenant premium subscription amount |
+| `LISTING_FEE_AMOUNT` | Token cost for listing activation/restoration |
+| `TENANT_PREMIUM_AMOUNT` | Token cost for tenant premium access |
 | `GMAIL_USER` | Gmail account used for SMTP delivery |
 | `GMAIL_APP_PASSWORD` | Google App Password for `GMAIL_USER`; the Google account must have 2-Step Verification enabled |
 | `EMAIL_FROM` | From address for outbound emails |
@@ -73,7 +73,7 @@ Avoid static AWS keys in Amplify. Prefer the Amplify backend runtime IAM role fo
 | `REACT_APP_API_URL` | Amplify backend URL + `/api/v1` (e.g. `https://<branch>.<appid>.amplifyapp.com/api/v1`) |
 | `REACT_APP_BACKEND_URL` | Amplify backend URL (e.g. `https://<branch>.<appid>.amplifyapp.com`) |
 | `REACT_APP_FIREBASE_API_KEY` | Firebase project API key |
-| `REACT_APP_MONETIZATION_MODE` | `LANDLORD_PAID` |
+| `REACT_APP_TOKEN_PAYER_ROLE` | `LANDLORD` |
 | `REACT_APP_LISTING_FEE_AMOUNT` | `5` |
 | `REACT_APP_TENANT_PREMIUM_AMOUNT` | `10` |
 | `DISABLE_ESLINT_PLUGIN` | `true` |

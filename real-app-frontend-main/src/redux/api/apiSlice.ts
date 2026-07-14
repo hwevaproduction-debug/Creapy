@@ -46,6 +46,7 @@ export const apiSlice = createApi({
     "OccupancyPricingRule",
     "ProviderReview",
     "LegalDoc",
+    "WalletTransaction",
   ],
   endpoints: (builder) => ({}),
 });

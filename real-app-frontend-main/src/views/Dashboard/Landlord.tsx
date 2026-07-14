@@ -657,7 +657,7 @@ const LandlordDashboard = () => {
                           variant="contained"
                           onClick={() => navigate(`/listings/${item?._id}/pay`)}
                         >
-                          Pay Now
+                          Activate with TR Tokens
                         </AppButton>
                       ) : item?.status === "inactive" ? (
                         <AppButton
@@ -668,7 +668,7 @@ const LandlordDashboard = () => {
                           }}
                           onClick={() => navigate(`/listings/${item?._id}/pay`)}
                         >
-                          Revive (Pay to Restore)
+                          Revive (Restore with TR Tokens)
                         </AppButton>
                       ) : (
                         <Box sx={{ display: "flex", gap: 1 }}>

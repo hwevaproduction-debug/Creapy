@@ -10,7 +10,9 @@ type TransactionListProps = {
 const reasonLabels: Record<string, string> = {
   welcome_bonus: "Welcome Bonus",
   engagement_charge: "Engagement Fee",
+  listing_activation: "Listing Activation",
   listing_renewal: "Listing Renewal",
+  premium_access: "Premium Membership",
   token_purchase: "Token Purchase",
   refund: "Refund",
   promo_grant: "Promo Grant",
