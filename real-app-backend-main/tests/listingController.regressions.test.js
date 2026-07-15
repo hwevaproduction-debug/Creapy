@@ -82,6 +82,40 @@ test("getListing hides pending payment listings from non-owners", async () => {
   assert.equal(result.error.message, "No listing found with that ID");
 });
 
+test("getListings defaults to createdAt ascending order", async () => {
+  let capturedArgs;
+  prisma.listing.updateMany = async () => ({ count: 0 });
+  prisma.listing.findMany = async (args) => {
+    capturedArgs = args;
+    return [];
+  };
+
+  const result = await invokeController(listingController.getListings, {
+    query: {},
+    user: { id: "tenant_1", role: "tenant" },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(capturedArgs.orderBy, { createdAt: "asc" });
+});
+
+test("getListings respects createdAt sort query for public listings endpoint", async () => {
+  let capturedArgs;
+  prisma.listing.updateMany = async () => ({ count: 0 });
+  prisma.listing.findMany = async (args) => {
+    capturedArgs = args;
+    return [];
+  };
+
+  const result = await invokeController(listingController.getListings, {
+    query: { sort: "createdAt_desc" },
+    user: { id: "tenant_1", role: "tenant" },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(capturedArgs.orderBy, { createdAt: "desc" });
+});
+
 test("normalizeListingPayload maps legacy price and strips non-Prisma fields", () => {
   const payload = normalizeListingPayload({
     name: "Legacy listing",

@@ -245,7 +245,9 @@ model Listing {
   offer                Boolean
   studentAccommodation Boolean   @default(false)
   imageUrls            Json      @default("[]")
-userId               String
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  userId               String
   user                 User      @relation(fields: [userId], references: [id])
   payments             Payment[]
   engagements          Engagement[]

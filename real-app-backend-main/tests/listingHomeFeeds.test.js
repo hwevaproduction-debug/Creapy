@@ -66,6 +66,21 @@ test("getHomeHighlighted returns active listings with default limit", async () =
   ]);
 });
 
+test("getHomeHighlighted orders by createdAt descending", async () => {
+  let capturedArgs = null;
+  prisma.listing.updateMany = async () => ({ count: 0 });
+  prisma.listing.findMany = async (args) => {
+    capturedArgs = args;
+    return [];
+  };
+
+  await invokeController(listingController.getHomeHighlighted, {
+    query: {},
+  });
+
+  assert.deepEqual(capturedArgs.orderBy, { createdAt: "desc" });
+});
+
 test("getHomeHighlighted respects custom limit", async () => {
   let capturedArgs = null;
   prisma.listing.updateMany = async () => ({ count: 0 });

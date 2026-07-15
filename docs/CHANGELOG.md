@@ -4,6 +4,61 @@ All notable changes to this project will be documented in this file.
 
 ## 2607
 
+### 150730
+
+| Field      | Value                                   |
+| ---------- | --------------------------------------- |
+| Author     | Tea                                     |
+| Identifier | 150730                                  |
+| Date       | 1507                                    |
+| Year       | 26                                      |
+| Type       | Fix                                     |
+| Status     | ✅ Verified                              |
+| Validation | Passed                                  |
+| Scope      | Backend - Prisma & Listing APIs        |
+
+#### Summary
+
+Restored the missing Listing timestamp fields and added a new Prisma migration so listing ordering by createdAt works again for the default listings endpoint and the home-highlighted feed. The change also adds regression coverage for the createdAt ordering paths.
+
+#### Files Changed
+
+| Action   | File                                                      |
+| -------- | --------------------------------------------------------- |
+| Modified | real-app-backend-main/prisma/schema.prisma                |
+| Created  | real-app-backend-main/prisma/migrations/20260715073857_restore_listing_timestamps/migration.sql |
+| Modified | real-app-backend-main/tests/listingController.regressions.test.js |
+| Modified | real-app-backend-main/tests/listingHomeFeeds.test.js       |
+| Modified | docs/CHANGELOG.md                                         |
+
+#### Detailed Changes
+
+| Category      | Description |
+| ------------- | ----------- |
+| Fix           | Reintroduced `createdAt` and `updatedAt` on the Listing Prisma model so existing controller queries using `orderBy: { createdAt }` are valid again. |
+| Migration     | Added a new migration that restores the missing columns and backfills `updatedAt` for existing rows without touching the earlier applied migration. |
+| Tests         | Added regression assertions for the default listings ordering path and the home-highlighted feed ordering path. |
+| Validation    | Verified Prisma migration application, Prisma Client generation, and listing controller/home feed regression tests. |
+
+#### Repository Validation
+
+| Check                  | Result |
+| ---------------------- | ------ |
+| Required files exist   | ✅      |
+| References updated     | ✅      |
+| Obsolete files removed | ✅      |
+| Duplicate files        | None   |
+| TODO/FIXME search      | None   |
+| Validation rerun       | Passed |
+
+#### Git
+
+| Field          | Value              |
+| -------------- | ------------------ |
+| Branch         | awsfullmig         |
+| Commit(s)      | TBD                |
+| Generated From | prisma migrate + tests |
+
 ### 0730
 
 | Field      | Value                                   |
