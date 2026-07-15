@@ -236,6 +236,7 @@ model Listing {
   earlyAccessUntil     DateTime?
   publishedAt          DateTime?
   paymentDeadline      DateTime?
+  expiresAt            DateTime?
   bathrooms            Int
   bedrooms             Int?
   totalRooms           Int

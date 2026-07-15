@@ -4,6 +4,62 @@ All notable changes to this project will be documented in this file.
 
 ## 2607
 
+### 0730
+
+| Field      | Value                                   |
+| ---------- | --------------------------------------- |
+| Author     | Tea                                     |
+| Identifier | 0730                                    |
+| Date       | 1507                                    |
+| Year       | 26                                      |
+| Type       | Fix                                     |
+| Status     | ✅ Verified                              |
+| Validation | Passed                                  |
+| Scope      | Backend - Database Schema               |
+
+#### Summary
+
+Fixed Prisma schema-database mismatch for Listing.expiresAt field. The database column existed (added via migration 20260607000000_v1_1_wallet_and_listing_lifecycle) but was missing from the schema definition, causing PrismaClientValidationError when the applyListingLifecycle function attempted to use it. Added field definition to schema, regenerated Prisma Client, and verified all listing-related tests pass without regression.
+
+#### Files Changed
+
+| Action   | File                              |
+| -------- | --------------------------------- |
+| Modified | prisma/schema.prisma              |
+| Modified | docs/CHANGELOG.md                 |
+
+#### Detailed Changes
+
+| Category      | Description |
+| ------------- | ----------- |
+| Fix           | Added missing `expiresAt DateTime?` field to Listing model in prisma/schema.prisma, placed alongside other lifecycle-related fields (earlyAccessUntil, publishedAt, paymentDeadline). |
+| Regeneration  | Ran `npx prisma generate` to regenerate Prisma Client (v5.22.0) so expiresAt is recognized as a valid field. |
+| Verification  | Confirmed no destructive migration is needed—the database column already exists from migration 20260607000000_v1_1_wallet_and_listing_lifecycle. |
+| Build Process | Verified package.json already includes `"postinstall": "prisma generate"` and `"prestart": "prisma generate"`, ensuring Prisma Client regeneration happens automatically during deployment. |
+| Tests         | All 4 regression tests pass without modification or failure: listingController.regressions.test.js (13 tests), listingHomeFeeds.test.js (4 tests), listingLocationCompatibility.test.js (5 tests), monetizationRules.test.js (21 tests). |
+
+#### Repository Validation
+
+| Check                              | Result |
+| ---------------------------------- | ------ |
+| expiresAt field added to schema    | ✅      |
+| Prisma Client regenerated          | ✅      |
+| No migration drift detected        | ✅      |
+| postinstall script verified        | ✅      |
+| prestart script verified           | ✅      |
+| listingController tests pass       | ✅      |
+| listingHomeFeeds tests pass        | ✅      |
+| listingLocationCompatibility tests | ✅      |
+| monetizationRules tests pass       | ✅      |
+
+#### Git
+
+| Field          | Value                    |
+| -------------- | ------------------------ |
+| Branch         | awsfullmig               |
+| Commit(s)      | TBD (post-merge)         |
+| Generated From | git diff + schema change |
+
 ### 095549
 
 | Field      | Value                                   |
