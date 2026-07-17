@@ -8,3 +8,4 @@ real-app-backend-main/.env.example
 *.md
 !docs/domain/TOKEN_ECONOMY.md
 !docs/CHANGELOG.md
+/_aside_docs_pre_submodule

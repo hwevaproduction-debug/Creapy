@@ -26,11 +26,23 @@ sequenceDiagram
     Render-->>Amplify: CORS allows *.amplifyapp.com origin
 ```
 
+## Documentation
+
+The canonical documentation set now lives under [docs/INDEX.md](docs/INDEX.md) with the main reference, operations, legal, and client-handover sections.
+
+- [docs/INDEX.md](docs/INDEX.md) - entry point for the documentation hierarchy
+- [docs/reference/architecture.md](docs/reference/architecture.md) - architecture reference
+- [docs/reference/api.md](docs/reference/api.md) - API reference
+- [docs/reference/database.md](docs/reference/database.md) - database reference
+- [docs/client-handover/README.md](docs/client-handover/README.md) - client-facing handover pack
+- [docs/guides/END_USER_GUIDE.md](docs/guides/END_USER_GUIDE.md) - end-user guide
+- [docs/guides/LANDLORD_GUIDE.md](docs/guides/LANDLORD_GUIDE.md) - landlord guide
+- [docs/guides/ADMIN_GUIDE.md](docs/guides/ADMIN_GUIDE.md) - administrator guide
+
 ## E2E Testing
 
 Creapy includes a full automated E2E test suite and manual QA checklists.
 
-- [docs/user-manual.md](docs/user-manual.md) - step-by-step user manual for landlords and tenants
-- [docs/testing-landlord.md](docs/testing-landlord.md) - manual QA checklist for landlord flows
-- [docs/testing-tenant.md](docs/testing-tenant.md) - manual QA checklist for tenant flows
+- [docs/guides/END_USER_GUIDE.md](docs/guides/END_USER_GUIDE.md) - end-user guide for tenants and landlords
+- [docs/operations/SMOKE_TEST_PLAN.md](docs/operations/SMOKE_TEST_PLAN.md) - launch-day smoke testing plan
 - [real-app-backend-main/README.md](real-app-backend-main/README.md) - automated E2E test run command (`PAYMENT_PROVIDER=mock npm run test:e2e`)
