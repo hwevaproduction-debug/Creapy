@@ -211,6 +211,55 @@ test("respondToEngagement does not charge tokens for already approved engagement
   assert.equal(notificationCalled, false);
 });
 
+test("respondToEngagement sends a single approval notification with valid prisma payload", async () => {
+  const originalDeductTokens = walletService.deductTokens;
+  let notificationCalls = [];
+
+  prisma.engagement.findUnique = async () => ({
+    id: "engagement-1",
+    listingId: "listing-1",
+    tenantId: "tenant-1",
+    landlordId: "landlord-1",
+    status: "PENDING",
+    listing: { id: "listing-1", name: "Borrowdale Cottage" },
+    tenant: { id: "tenant-1" },
+  });
+  prisma.$transaction = async (callback) =>
+    callback({
+      engagement: {
+        update: async () => ({
+          id: "engagement-1",
+          listingId: "listing-1",
+          tenantId: "tenant-1",
+          landlordId: "landlord-1",
+          status: "CHARGED",
+          listing: { id: "listing-1", name: "Borrowdale Cottage" },
+          tenant: { id: "tenant-1" },
+        }),
+      },
+      notification: {
+        create: async (args) => {
+          notificationCalls.push(args);
+          return { id: "notification-1" };
+        },
+      },
+    });
+  walletService.deductTokens = async () => 5;
+
+  const result = await invokeController(engagementController.respondToEngagement, {
+    params: { id: "engagement-1" },
+    user: { id: "landlord-1", role: "landlord" },
+    body: { action: "approve" },
+  });
+
+  walletService.deductTokens = originalDeductTokens;
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(notificationCalls.length, 1);
+  assert.equal(notificationCalls[0].data.event, "engagement.approved");
+  assert.equal(notificationCalls[0].data.userId, "tenant-1");
+});
+
 test("getMyEngagements hides listing contact details until approval", async () => {
   prisma.engagement.findMany = async (args) => {
     assert.deepEqual(args.where, { tenantId: "tenant-1" });

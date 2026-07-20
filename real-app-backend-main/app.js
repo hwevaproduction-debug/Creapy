@@ -99,7 +99,8 @@ if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 app.use("/webhooks", webhookRouter);
-app.use(express.json({ limit: "10kb" }));
+const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "50mb";
+app.use(express.json({ limit: jsonBodyLimit }));
 
 app.use((req, res, next) => {
   req.requestTime = new Date().toISOString();

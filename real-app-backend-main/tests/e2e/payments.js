@@ -12,7 +12,7 @@ async function run(state, api, assert, test) {
       body.data.listing.status === 'early_access',
       `expected early_access, got ${JSON.stringify(body.data.listing)}`
     );
-  }
+  });
 
   await test('early_access listing hidden from non-premium tenant', async () => {
     const { status } = await api(

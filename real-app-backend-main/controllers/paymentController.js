@@ -62,11 +62,13 @@ exports.initiateListingFee = catchAsync(async (req, res, next) => {
     return next(new AppError("Forbidden", 403));
   }
 
+  const canInitiatePayment = ["pending_payment", "inactive", "early_access"].includes(listing.status);
+
   if (listing.status === "active") {
     return next(new AppError("Listing is already active", 400));
   }
 
-  if (!["pending_payment", "inactive"].includes(listing.status)) {
+  if (!canInitiatePayment) {
     return next(new AppError("Listing is not awaiting payment", 400));
   }
 

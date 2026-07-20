@@ -196,6 +196,31 @@ test("getUser includes contact details only when auth context is present", async
   assert.equal("nationalId" in result.body.data, false);
 });
 
+test("resendVerification uses authenticated email when no body email is provided", async () => {
+  const authController = loadAuthController();
+  let updateArgs = null;
+
+  prisma.user.findUnique = async ({ where }) => {
+    assert.deepEqual(where, { email: "authenticated@example.com" });
+    return { id: "user-1", email: "authenticated@example.com", isEmailVerified: false };
+  };
+  prisma.user.update = async (args) => {
+    updateArgs = args;
+    return { id: "user-1", email: "authenticated@example.com", isEmailVerified: false };
+  };
+  emailUtils.sendEmail = async () => {};
+
+  const result = await invokeController(authController.resendVerification, {
+    user: { email: "authenticated@example.com" },
+    body: {},
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(updateArgs.where.id, "user-1");
+  assert.equal(typeof updateArgs.data.emailVerificationToken, "string");
+  assert.equal(result.body.message, "Verification email resent.");
+});
+
 test("signup removes a newly created user if verification email delivery fails", async () => {
   let deletedFilter = null;
 

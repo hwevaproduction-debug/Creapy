@@ -278,7 +278,7 @@ exports.createListing = catchAsync(async (req, res, next) => {
   const data = {
     ...buildListingCreateData(req.body),
     userId: req.user.id,
-    status: "active",
+    status: "pending_payment",
     publishedAt: new Date(),
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
   };

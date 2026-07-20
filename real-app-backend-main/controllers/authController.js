@@ -915,7 +915,7 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
 });
 
 exports.resendVerification = catchAsync(async (req, res, next) => {
-  const { email } = req.body;
+  const email = req.body?.email || req.user?.email;
   if (!email) return next(new AppError("Email is required", 400));
 
   const user = await prisma.user.findUnique({ where: { email } });

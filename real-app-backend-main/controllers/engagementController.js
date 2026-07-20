@@ -172,14 +172,6 @@ exports.respondToEngagement = catchAsync(async (req, res, next) => {
             metadata: { engagementId: engagement.id, listingId: engagement.listingId, tokensDeducted: ENGAGEMENT_FEE_TR },
           },
         });
-
-        await tx.notification.create({
-          userId: engagement.tenantId,
-          event: "token.charged",
-          title: "TR tokens charged",
-          body: `${ENGAGEMENT_FEE_TR} TR tokens were charged for contacting "${engagement.listing.name}".`,
-          metadata: { engagementId: engagement.id, listingId: engagement.listingId, tokensDeducted: ENGAGEMENT_FEE_TR },
-        });
       });
     } catch (err) {
       if (err.statusCode === 402) {
