@@ -143,6 +143,12 @@ const Profile = () => {
     authUser?.data?.user?.verificationStatus || "UNVERIFIED"
   );
 
+  const openDialogSafely = (setter: (open: boolean) => void) => {
+    const activeElement = document.activeElement as HTMLElement | null;
+    activeElement?.blur();
+    setter(true);
+  };
+
   useEffect(() => {
     setVerificationStatus(
       authUser?.data?.user?.verificationStatus || "UNVERIFIED"
@@ -668,7 +674,7 @@ const Profile = () => {
                       <SubHeading sx={{ color: "text.secondary", mb: 1.5 }}>
                         Your verification was not approved. Please resubmit.
                       </SubHeading>
-                      <AppButton onClick={() => setVerificationOpen(true)}>
+                      <AppButton onClick={() => openDialogSafely(setVerificationOpen)}>
                         Resubmit
                       </AppButton>
                     </AppCard>
@@ -684,7 +690,7 @@ const Profile = () => {
                         Upload your government ID and a selfie to verify your
                         identity and list properties.
                       </SubHeading>
-                      <AppButton onClick={() => setVerificationOpen(true)}>
+                      <AppButton onClick={() => openDialogSafely(setVerificationOpen)}>
                         Start Verification
                       </AppButton>
                     </AppCard>
@@ -797,15 +803,15 @@ const Profile = () => {
                           </AppButton>
                         </Box>
                         <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                          <AppButton
-                            variant="outlined"
-                            color="error"
-                            disabled={deleteLoading}
-                            startIcon={<Trash2 size={16} />}
-                            onClick={() => setConfirmDialog(true)}
-                          >
-                            Delete Account
-                          </AppButton>
+                        <AppButton
+                          variant="outlined"
+                          color="error"
+                          disabled={deleteLoading}
+                          startIcon={<Trash2 size={16} />}
+                          onClick={() => openDialogSafely(setConfirmDialog)}
+                        >
+                          Delete Account
+                        </AppButton>
                         </Box>
                       </Form>
                     );
