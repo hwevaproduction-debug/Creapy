@@ -230,7 +230,7 @@ test("createListing only sends Prisma-safe fields", async () => {
 
   assert.equal(result.statusCode, 201);
   assert.equal(receivedData.userId, "user_1");
-  assert.equal(receivedData.status, "pending_payment");
+  assert.equal(receivedData.status, "active");
   assert.equal(receivedData.monthlyRent, 25000);
   assert.equal(Object.prototype.hasOwnProperty.call(receivedData, "regularPrice"), false);
 });

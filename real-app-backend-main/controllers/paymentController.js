@@ -64,11 +64,11 @@ exports.initiateListingFee = catchAsync(async (req, res, next) => {
 
   const canInitiatePayment = ["pending_payment", "inactive", "early_access"].includes(listing.status);
 
-  if (listing.status === "active") {
+  if (listing.status === "active" && !earlyAccess) {
     return next(new AppError("Listing is already active", 400));
   }
 
-  if (!canInitiatePayment) {
+  if (listing.status === "active" ? !earlyAccess : !canInitiatePayment) {
     return next(new AppError("Listing is not awaiting payment", 400));
   }
 

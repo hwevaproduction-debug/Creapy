@@ -15,7 +15,7 @@ router.post("/verify-phone", authController.verifyPhone);
 router.post("/resend-phone-otp", authController.resendPhoneOtp);
 router.post("/forgot-password", authController.forgotPassword);
 router.post("/reset-password", authController.resetPassword);
-router.post("/resend-verification", authController.resendVerification);
+router.post("/resend-verification", authController.protect, authController.resendVerification);
 router.get("/check-availability", authController.checkAvailability);
 router.get("/me", authController.protect, authController.getMe);
 router.get("/:id", authController.optionalAuth, authController.getUserByListingId);

@@ -137,7 +137,7 @@ exports.markAsRead = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: "success",
-    data: updatedNotification,
+    data: { notification: updatedNotification },
   });
 });
 
@@ -167,7 +167,16 @@ exports.markAllAsRead = catchAsync(async (req, res) => {
 
 exports.savePushSubscription = catchAsync(async (req, res) => {
   const userId = getUserId(req.user);
-  const { endpoint, p256dh, auth } = req.body;
+  const { endpoint } = req.body;
+  const p256dh = req.body?.p256dh || req.body?.keys?.p256dh;
+  const auth = req.body?.auth || req.body?.keys?.auth;
+
+  if (!endpoint || !p256dh || !auth) {
+    return res.status(400).json({
+      status: "fail",
+      message: "endpoint, p256dh, and auth are required",
+    });
+  }
 
   const subscription = await prisma.userPushSubscription.upsert({
     where: { userId },

@@ -232,7 +232,7 @@ test("respondToEngagement sends a single approval notification with valid prisma
           listingId: "listing-1",
           tenantId: "tenant-1",
           landlordId: "landlord-1",
-          status: "CHARGED",
+          status: "APPROVED",
           listing: { id: "listing-1", name: "Borrowdale Cottage" },
           tenant: { id: "tenant-1" },
         }),

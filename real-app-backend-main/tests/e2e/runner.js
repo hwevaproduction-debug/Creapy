@@ -82,6 +82,10 @@ async function api(method, path, body, token, formEncoded = false) {
     headers.Authorization = `Bearer ${token}`;
   }
 
+  if (process.env.SEED_API_KEY) {
+    headers["x-seed-api-key"] = process.env.SEED_API_KEY;
+  }
+
   const response = await fetch(`${normalizedApiBase}${path}`, {
     method,
     headers,

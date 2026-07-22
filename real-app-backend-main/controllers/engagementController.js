@@ -151,7 +151,7 @@ exports.respondToEngagement = catchAsync(async (req, res, next) => {
       await prisma.$transaction(async (tx) => {
         updated = await tx.engagement.update({
           where: { id: req.params.id },
-          data: { status: "CHARGED" },
+          data: { status: "APPROVED" },
           include: { listing: true, tenant: true },
         });
 

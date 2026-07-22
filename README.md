@@ -1,5 +1,4 @@
 # Creapy
-i did
 ## Deployment
 
 1. Connect the `real-app-frontend-main` subdirectory to AWS Amplify. In Amplify monorepo settings, set **App root** to `real-app-frontend-main`.

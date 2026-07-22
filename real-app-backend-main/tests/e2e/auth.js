@@ -202,10 +202,7 @@ async function run(state, api, assert, test) {
       `/api/v1/users/check-availability?email=${encodeURIComponent(state.landlordEmail)}`
     );
     assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
-    assert(
-      body?.data?.emailAvailable ?? body?.emailAvailable === false,
-      "expected email to be unavailable"
-    );
+    assert(body?.data?.emailAvailable === false || body?.emailAvailable === false, "expected email to be unavailable");
   });
 
   await test("GET /users/check-availability with existing landlord username", async () => {
@@ -214,10 +211,7 @@ async function run(state, api, assert, test) {
       `/api/v1/users/check-availability?username=${encodeURIComponent(state.landlordUsername)}`
     );
     assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
-    assert(
-      body?.data?.usernameAvailable ?? body?.usernameAvailable === false,
-      "expected username to be unavailable"
-    );
+    assert(body?.data?.usernameAvailable === false || body?.usernameAvailable === false, "expected username to be unavailable");
   });
 
   await test("Landlord can request password reset", async () => {
