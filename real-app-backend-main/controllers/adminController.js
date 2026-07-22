@@ -7,6 +7,9 @@ const auditLog = require("../utils/auditLog");
 
 const MAX_BULK_REVIVE_IDS = 100;
 const SETTLEMENT_INELIGIBLE_STATUSES = ["cancelled", "canceled", "rejected", "expired"];
+const SEEDED_LANDLORD_EMAILS = Array.from({ length: 100 }, (_, index) =>
+  index === 0 ? "landlord@demo.com" : `landlord${index + 1}@demo.com`
+);
 
 function parseDateRange(startValue, endValue, startLabel, endLabel, next) {
   if (!startValue && !endValue) {
@@ -195,6 +198,16 @@ function mapAuditLog(entry) {
   return {
     ...mapId(entry),
     admin: entry.admin ? mapId(entry.admin) : null,
+  };
+}
+
+function buildSeededListingWhere() {
+  return {
+    user: {
+      email: {
+        in: SEEDED_LANDLORD_EMAILS,
+      },
+    },
   };
 }
 
@@ -534,6 +547,32 @@ exports.bulkReviveListings = catchAsync(async (req, res, next) => {
     status: "success",
     revived,
     failed,
+  });
+});
+
+exports.purgeSeededListings = catchAsync(async (_req, res) => {
+  const where = buildSeededListingWhere();
+  const [listingCount, engagementCount, restorationCount, paymentCount] =
+    await Promise.all([
+      prisma.listing.count({ where }),
+      prisma.engagement.count({ where }),
+      prisma.listingRestoration.count({ where }),
+      prisma.payment.count({ where }),
+    ]);
+
+  const deleted = await prisma.listing.deleteMany({ where });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      deletedCount: deleted.count,
+      matchedCount: listingCount,
+      relatedCounts: {
+        engagements: engagementCount,
+        restorations: restorationCount,
+        payments: paymentCount,
+      },
+    },
   });
 });
 

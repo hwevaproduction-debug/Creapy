@@ -46,6 +46,18 @@ interface BulkReviveResponse {
   failed: BulkReviveFailure[];
 }
 
+interface PurgeSeededListingsResponse {
+  data: {
+    deletedCount: number;
+    matchedCount: number;
+    relatedCounts: {
+      engagements: number;
+      restorations: number;
+      payments: number;
+    };
+  };
+}
+
 interface PaginationMeta {
   page: number;
   limit: number;
@@ -396,6 +408,13 @@ export const adminApiSlice = apiSlice.injectEndpoints({
         url: "admin/listings/bulk-revive",
         method: "POST",
         body: { ids },
+      }),
+      invalidatesTags: ["AdminListing"],
+    }),
+    purgeSeededListings: builder.mutation<PurgeSeededListingsResponse, void>({
+      query: () => ({
+        url: "admin/listings/purge-seeded",
+        method: "POST",
       }),
       invalidatesTags: ["AdminListing"],
     }),
@@ -818,6 +837,7 @@ export const {
   useGetInactiveListingsQuery,
   useLazyGetInactiveListingsQuery,
   useBulkReviveListingsMutation,
+  usePurgeSeededListingsMutation,
   useGetProvidersQuery,
   useVerifyProviderMutation,
   useUpdateCommissionRateMutation,

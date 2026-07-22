@@ -13,6 +13,7 @@ const originalPrisma = {
   listingFindMany: prisma.listing.findMany,
   listingFindUnique: prisma.listing.findUnique,
   listingUpdate: prisma.listing.update,
+  listingDeleteMany: prisma.listing.deleteMany,
   accommodationCount: prisma.accommodation.count,
   accommodationFindMany: prisma.accommodation.findMany,
   accommodationFindUnique: prisma.accommodation.findUnique,
@@ -24,6 +25,9 @@ const originalPrisma = {
   disputeCount: prisma.dispute.count,
   reportCount: prisma.report.count,
   reviewCount: prisma.review.count,
+  engagementCount: prisma.engagement.count,
+  listingRestorationCount: prisma.listingRestoration.count,
+  paymentCount: prisma.payment.count,
   roomGroupBy: prisma.room.groupBy,
   userFindMany: prisma.user.findMany,
   userFindUnique: prisma.user.findUnique,
@@ -67,6 +71,7 @@ test.afterEach(() => {
   prisma.listing.findMany = originalPrisma.listingFindMany;
   prisma.listing.findUnique = originalPrisma.listingFindUnique;
   prisma.listing.update = originalPrisma.listingUpdate;
+  prisma.listing.deleteMany = originalPrisma.listingDeleteMany;
   prisma.accommodation.count = originalPrisma.accommodationCount;
   prisma.accommodation.findMany = originalPrisma.accommodationFindMany;
   prisma.accommodation.findUnique = originalPrisma.accommodationFindUnique;
@@ -78,6 +83,9 @@ test.afterEach(() => {
   prisma.dispute.count = originalPrisma.disputeCount;
   prisma.report.count = originalPrisma.reportCount;
   prisma.review.count = originalPrisma.reviewCount;
+  prisma.engagement.count = originalPrisma.engagementCount;
+  prisma.listingRestoration.count = originalPrisma.listingRestorationCount;
+  prisma.payment.count = originalPrisma.paymentCount;
   prisma.room.groupBy = originalPrisma.roomGroupBy;
   prisma.user.findMany = originalPrisma.userFindMany;
   prisma.user.findUnique = originalPrisma.userFindUnique;
@@ -96,9 +104,14 @@ test("admin routes expose inactive listings and bulk revive endpoints", async ()
     (layer) =>
       layer.route.path === "/listings/bulk-revive" && layer.route.methods.post
   );
+  const purgeLayer = routeLayers.find(
+    (layer) =>
+      layer.route.path === "/listings/purge-seeded" && layer.route.methods.post
+  );
 
   assert.ok(inactiveLayer);
   assert.ok(reviveLayer);
+  assert.ok(purgeLayer);
   assert.ok(
     routeLayers.find((layer) => layer.route.path === "/queue" && layer.route.methods.get)
   );
@@ -342,6 +355,144 @@ test("bulkReviveListings rejects oversized batches", async () => {
     "Cannot revive more than 100 listings at once"
   );
   assert.equal(findUniqueCalls, 0);
+});
+
+test("purgeSeededListings deletes seeded landlord listings and reports counts", async () => {
+  const adminController = loadAdminController();
+
+  let deleteArgs = null;
+  prisma.listing.count = async () => 4;
+  prisma.engagement.count = async () => 2;
+  prisma.listingRestoration.count = async () => 1;
+  prisma.payment.count = async () => 3;
+  prisma.listing.deleteMany = async (args) => {
+    deleteArgs = args;
+    return { count: 4 };
+  };
+
+  const result = await invokeController(adminController.purgeSeededListings, {
+    user: { id: "admin_1" },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(deleteArgs, {
+    where: {
+      user: {
+        email: {
+          in: [
+            "landlord@demo.com",
+            "landlord2@demo.com",
+            "landlord3@demo.com",
+            "landlord4@demo.com",
+            "landlord5@demo.com",
+            "landlord6@demo.com",
+            "landlord7@demo.com",
+            "landlord8@demo.com",
+            "landlord9@demo.com",
+            "landlord10@demo.com",
+            "landlord11@demo.com",
+            "landlord12@demo.com",
+            "landlord13@demo.com",
+            "landlord14@demo.com",
+            "landlord15@demo.com",
+            "landlord16@demo.com",
+            "landlord17@demo.com",
+            "landlord18@demo.com",
+            "landlord19@demo.com",
+            "landlord20@demo.com",
+            "landlord21@demo.com",
+            "landlord22@demo.com",
+            "landlord23@demo.com",
+            "landlord24@demo.com",
+            "landlord25@demo.com",
+            "landlord26@demo.com",
+            "landlord27@demo.com",
+            "landlord28@demo.com",
+            "landlord29@demo.com",
+            "landlord30@demo.com",
+            "landlord31@demo.com",
+            "landlord32@demo.com",
+            "landlord33@demo.com",
+            "landlord34@demo.com",
+            "landlord35@demo.com",
+            "landlord36@demo.com",
+            "landlord37@demo.com",
+            "landlord38@demo.com",
+            "landlord39@demo.com",
+            "landlord40@demo.com",
+            "landlord41@demo.com",
+            "landlord42@demo.com",
+            "landlord43@demo.com",
+            "landlord44@demo.com",
+            "landlord45@demo.com",
+            "landlord46@demo.com",
+            "landlord47@demo.com",
+            "landlord48@demo.com",
+            "landlord49@demo.com",
+            "landlord50@demo.com",
+            "landlord51@demo.com",
+            "landlord52@demo.com",
+            "landlord53@demo.com",
+            "landlord54@demo.com",
+            "landlord55@demo.com",
+            "landlord56@demo.com",
+            "landlord57@demo.com",
+            "landlord58@demo.com",
+            "landlord59@demo.com",
+            "landlord60@demo.com",
+            "landlord61@demo.com",
+            "landlord62@demo.com",
+            "landlord63@demo.com",
+            "landlord64@demo.com",
+            "landlord65@demo.com",
+            "landlord66@demo.com",
+            "landlord67@demo.com",
+            "landlord68@demo.com",
+            "landlord69@demo.com",
+            "landlord70@demo.com",
+            "landlord71@demo.com",
+            "landlord72@demo.com",
+            "landlord73@demo.com",
+            "landlord74@demo.com",
+            "landlord75@demo.com",
+            "landlord76@demo.com",
+            "landlord77@demo.com",
+            "landlord78@demo.com",
+            "landlord79@demo.com",
+            "landlord80@demo.com",
+            "landlord81@demo.com",
+            "landlord82@demo.com",
+            "landlord83@demo.com",
+            "landlord84@demo.com",
+            "landlord85@demo.com",
+            "landlord86@demo.com",
+            "landlord87@demo.com",
+            "landlord88@demo.com",
+            "landlord89@demo.com",
+            "landlord90@demo.com",
+            "landlord91@demo.com",
+            "landlord92@demo.com",
+            "landlord93@demo.com",
+            "landlord94@demo.com",
+            "landlord95@demo.com",
+            "landlord96@demo.com",
+            "landlord97@demo.com",
+            "landlord98@demo.com",
+            "landlord99@demo.com",
+            "landlord100@demo.com",
+          ],
+        },
+      },
+    },
+  });
+  assert.equal(result.body.status, "success");
+  assert.equal(result.body.data.deletedCount, 4);
+  assert.equal(result.body.data.matchedCount, 4);
+  assert.deepEqual(result.body.data.relatedCounts, {
+    engagements: 2,
+    restorations: 1,
+    payments: 3,
+  });
 });
 
 test("getAccommodations returns paginated moderation results with filters", async () => {

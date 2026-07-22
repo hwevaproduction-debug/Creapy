@@ -45,6 +45,7 @@ import {
   useGetLegalDocsQuery,
   useGetProvidersQuery,
   useLazyGetInactiveListingsQuery,
+  usePurgeSeededListingsMutation,
   useSettleBookingMutation,
   useUpdateLegalDocMutation,
   useUpdateCommissionRateMutation,
@@ -224,6 +225,7 @@ const AdminDashboard: React.FC = () => {
   const [hasSearchedExpired, setHasSearchedExpired] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
 
   const [providerDraftFilters, setProviderDraftFilters] = useState<ProviderFilters>({
     verificationStatus: "",
@@ -269,6 +271,8 @@ const AdminDashboard: React.FC = () => {
   const [triggerSearch, { data: inactiveData, isFetching: isFetchingInactive }] =
     useLazyGetInactiveListingsQuery();
   const [bulkRevive, { isLoading: isReviving }] = useBulkReviveListingsMutation();
+  const [purgeSeededListings, { isLoading: isPurgingSeededListings }] =
+    usePurgeSeededListingsMutation();
   const { data: providersData, isFetching: isFetchingProviders } =
     useGetProvidersQuery(providerFilters);
   const { data: providerOptionsData } = useGetProvidersQuery({});
@@ -411,6 +415,10 @@ const AdminDashboard: React.FC = () => {
     setShowConfirm(true);
   };
 
+  const handlePurgeSeededClick = () => {
+    setShowPurgeConfirm(true);
+  };
+
   const handleConfirmRevive = async () => {
     if (selectedCount === 0) {
       setShowConfirm(false);
@@ -462,6 +470,25 @@ const AdminDashboard: React.FC = () => {
       setToast({
         open: true,
         message: getErrorMessage(error, "An error occurred during revival."),
+        type: "error",
+      });
+    }
+  };
+
+  const handleConfirmPurgeSeeded = async () => {
+    try {
+      const result = await purgeSeededListings().unwrap();
+      setToast({
+        open: true,
+        message: `${result.data.deletedCount} seeded listings purged successfully.`,
+        type: "success",
+      });
+      setShowPurgeConfirm(false);
+      triggerSearch({ ...expiredFilters, limit: ROWS_PER_PAGE });
+    } catch (error) {
+      setToast({
+        open: true,
+        message: getErrorMessage(error, "Unable to purge seeded listings."),
         type: "error",
       });
     }
@@ -711,7 +738,7 @@ const AdminDashboard: React.FC = () => {
                 size="small"
                 variant="outlined"
                 onClick={() => setShowConfirm(false)}
-                disabled={isReviving}
+                disabled={isReviving || isPurgingSeededListings}
               >
                 Cancel
               </AppButton>
@@ -733,9 +760,17 @@ const AdminDashboard: React.FC = () => {
             </Typography>
             <AppButton
               onClick={handleReviveClick}
-              disabled={selectedCount === 0 || isReviving}
+              disabled={selectedCount === 0 || isReviving || isPurgingSeededListings}
             >
               Revive Selected
+            </AppButton>
+            <AppButton
+              variant="outlined"
+              color="error"
+              onClick={handlePurgeSeededClick}
+              disabled={isReviving || isPurgingSeededListings}
+            >
+              Purge Seeded Listings
             </AppButton>
           </Box>
         </>
@@ -762,12 +797,12 @@ const AdminDashboard: React.FC = () => {
             <TableHead>
               <TableRow sx={{ background: "background.paper" }}>
                 <TableCell padding="checkbox">
-                  <Checkbox
-                    checked={allCurrentPageSelected}
-                    indeterminate={someCurrentPageSelected}
-                    onChange={handleSelectAll}
-                    disabled={isReviving}
-                  />
+                    <Checkbox
+                      checked={allCurrentPageSelected}
+                      indeterminate={someCurrentPageSelected}
+                      onChange={handleSelectAll}
+                      disabled={isReviving || isPurgingSeededListings}
+                    />
                 </TableCell>
                 {["Listing", "Landlord", "Location", "Date Uploaded", "Date Expired"].map(
                   (header) => (
@@ -793,7 +828,7 @@ const AdminDashboard: React.FC = () => {
                     <Checkbox
                       checked={selectedIds[item._id] === true}
                       onChange={() => handleRowCheck(item._id)}
-                      disabled={isReviving}
+                      disabled={isReviving || isPurgingSeededListings}
                     />
                   </TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>{item.name}</TableCell>
@@ -834,15 +869,15 @@ const AdminDashboard: React.FC = () => {
                 ...
               </Typography>
             ) : (
-              <AppButton
-                key={item}
-                size="small"
-                variant={expiredFilters.page === item ? "contained" : "outlined"}
-                onClick={() => handleExpiredPageChange(item)}
-                disabled={isReviving}
-              >
-                {item}
-              </AppButton>
+                <AppButton
+                  key={item}
+                  size="small"
+                  variant={expiredFilters.page === item ? "contained" : "outlined"}
+                  onClick={() => handleExpiredPageChange(item)}
+                  disabled={isReviving || isPurgingSeededListings}
+                >
+                  {item}
+                </AppButton>
             )
           )}
         </Box>
@@ -1531,6 +1566,30 @@ const AdminDashboard: React.FC = () => {
             }}
           >
             Confirm
+          </AppButton>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={showPurgeConfirm}
+        onClose={() => setShowPurgeConfirm(false)}
+      >
+        <DialogTitle>Purge Seeded Listings</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Delete all demo listings created from the seeded landlord accounts? This
+            removes the records from Prisma and cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <AppButton
+            variant="outlined"
+            onClick={() => setShowPurgeConfirm(false)}
+            disabled={isPurgingSeededListings}
+          >
+            Cancel
+          </AppButton>
+          <AppButton onClick={handleConfirmPurgeSeeded} disabled={isPurgingSeededListings}>
+            {isPurgingSeededListings ? <CircularProgress size={16} color="inherit" /> : "Purge"}
           </AppButton>
         </DialogActions>
       </Dialog>

@@ -21,6 +21,7 @@ router.post(
   "/listings/bulk-revive",
   adminController.bulkReviveListings
 );
+router.post("/listings/purge-seeded", adminController.purgeSeededListings);
 
 router.get("/accommodations", adminController.getAccommodations);
 router.put("/accommodations/:id/approve", adminController.approveAccommodation);
