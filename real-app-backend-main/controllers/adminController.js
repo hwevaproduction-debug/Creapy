@@ -6,6 +6,7 @@ const notificationService = require("../utils/notificationService");
 const auditLog = require("../utils/auditLog");
 
 const MAX_BULK_REVIVE_IDS = 100;
+const LISTING_STATUSES = ["active", "early_access", "pending_payment", "inactive", "expired"];
 const SETTLEMENT_INELIGIBLE_STATUSES = ["cancelled", "canceled", "rejected", "expired"];
 const SEEDED_LANDLORD_EMAILS = Array.from({ length: 100 }, (_, index) =>
   index === 0 ? "landlord@demo.com" : `landlord${index + 1}@demo.com`
@@ -355,7 +356,7 @@ async function getReportTarget(report) {
   return null;
 }
 
-exports.getInactiveListings = catchAsync(async (req, res, next) => {
+async function getAdminListings(req, res, next, forcedStatus = "") {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
   const skip = (page - 1) * limit;
@@ -386,7 +387,22 @@ exports.getInactiveListings = catchAsync(async (req, res, next) => {
     }
   }
 
-  const where = { status: "inactive" };
+  const status = forcedStatus || (req.query.status ? String(req.query.status).trim().toLowerCase() : "");
+  if (status && !LISTING_STATUSES.includes(status)) {
+    return next(new AppError("Invalid listing status", 400));
+  }
+
+  const category = req.query.category
+    ? String(req.query.category).trim().toLowerCase()
+    : "";
+  if (category && !["rent", "student"].includes(category)) {
+    return next(new AppError("Invalid listing category", 400));
+  }
+
+  const where = {};
+  if (status) where.status = status;
+  if (category === "student") where.studentAccommodation = true;
+  if (category === "rent") where.studentAccommodation = false;
   const {
     province: provinceRaw,
     city: cityRaw,
@@ -406,18 +422,18 @@ exports.getInactiveListings = catchAsync(async (req, res, next) => {
     where.city = { contains: city, mode: "insensitive" };
   }
 
-  const paymentDeadlineRange = parseDateRange(
+  const expiresAtRange = parseDateRange(
     expiredFrom,
     expiredTo,
     "expiredFrom",
     "expiredTo",
     next
   );
-  if (paymentDeadlineRange === null && (expiredFrom || expiredTo)) {
+  if (expiresAtRange === null && (expiredFrom || expiredTo)) {
     return;
   }
-  if (paymentDeadlineRange) {
-    where.paymentDeadline = paymentDeadlineRange;
+  if (expiresAtRange) {
+    where.expiresAt = expiresAtRange;
   }
 
   const createdAtRange = parseDateRange(
@@ -443,10 +459,11 @@ exports.getInactiveListings = catchAsync(async (req, res, next) => {
     where,
     skip,
     take: limit,
-    orderBy: { paymentDeadline: "asc" },
+    orderBy: { createdAt: "desc" },
     include: {
       user: {
         select: {
+          id: true,
           username: true,
           email: true,
         },
@@ -461,8 +478,66 @@ exports.getInactiveListings = catchAsync(async (req, res, next) => {
     data: listings.map((listing) => ({
       ...listing,
       _id: listing.id,
+      location: {
+        province: listing.province,
+        city: listing.city,
+      },
       user: listing.user,
     })),
+  });
+}
+
+exports.getAdminListings = catchAsync((req, res, next) =>
+  getAdminListings(req, res, next)
+);
+
+exports.getInactiveListings = catchAsync((req, res, next) =>
+  getAdminListings(req, res, next, "inactive")
+);
+
+exports.deleteListing = catchAsync(async (req, res, next) => {
+  const listing = await prisma.listing.findUnique({
+    where: { id: req.params.id },
+    include: { user: { select: { id: true, email: true, username: true } } },
+  });
+
+  if (!listing) {
+    return next(new AppError("Listing not found", 404));
+  }
+
+  await prisma.listing.delete({ where: { id: listing.id } });
+  auditAdminAction(req, "listing.deleted", "Listing", listing.id, {
+    listingName: listing.name,
+    ownerId: listing.userId,
+    ownerEmail: listing.user?.email || null,
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: { deletedId: listing.id },
+  });
+});
+
+exports.deleteListingsByOwner = catchAsync(async (req, res, next) => {
+  const owner = await prisma.user.findUnique({
+    where: { id: req.params.userId },
+    select: { id: true, email: true, username: true },
+  });
+
+  if (!owner) {
+    return next(new AppError("User not found", 404));
+  }
+
+  const deleted = await prisma.listing.deleteMany({ where: { userId: owner.id } });
+  auditAdminAction(req, "listings.owner_deleted", "User", owner.id, {
+    ownerEmail: owner.email,
+    ownerUsername: owner.username,
+    deletedCount: deleted.count,
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: { user: mapId(owner), deletedCount: deleted.count },
   });
 });
 
@@ -552,12 +627,20 @@ exports.bulkReviveListings = catchAsync(async (req, res, next) => {
 
 exports.purgeSeededListings = catchAsync(async (_req, res) => {
   const where = buildSeededListingWhere();
+  const seededListings = await prisma.listing.findMany({
+    where,
+    select: { id: true },
+  });
+  const listingIds = seededListings.map((listing) => listing.id);
+  const relatedWhere = listingIds.length
+    ? { listingId: { in: listingIds } }
+    : { listingId: "__never__" };
   const [listingCount, engagementCount, restorationCount, paymentCount] =
     await Promise.all([
       prisma.listing.count({ where }),
-      prisma.engagement.count({ where }),
-      prisma.listingRestoration.count({ where }),
-      prisma.payment.count({ where }),
+      prisma.engagement.count({ where: relatedWhere }),
+      prisma.listingRestoration.count({ where: relatedWhere }),
+      prisma.payment.count({ where: relatedWhere }),
     ]);
 
   const deleted = await prisma.listing.deleteMany({ where });

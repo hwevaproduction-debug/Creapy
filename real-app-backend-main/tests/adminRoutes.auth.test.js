@@ -81,6 +81,7 @@ function createRequest(app) {
     get: (path) => run("GET", path),
     post: (path) => run("POST", path),
     put: (path) => run("PUT", path),
+    delete: (path) => run("DELETE", path),
   };
 }
 
@@ -149,6 +150,8 @@ test.after(async () => {
 });
 
 const adminRoutes = [
+  { method: "get", path: "/api/v1/admin/listings" },
+  { method: "delete", path: "/api/v1/admin/listings/fake-id" },
   { method: "get", path: "/api/v1/admin/accommodations" },
   { method: "put", path: "/api/v1/admin/providers/fake-id/suspend" },
   { method: "get", path: "/api/v1/admin/disputes" },
@@ -158,6 +161,8 @@ const adminRoutes = [
 ];
 
 const tenantForbiddenRoutes = [
+  { method: "get", path: "/api/v1/admin/listings" },
+  { method: "delete", path: "/api/v1/admin/listings/fake-id" },
   { method: "get", path: "/api/v1/admin/accommodations" },
   { method: "get", path: "/api/v1/admin/disputes" },
   { method: "get", path: "/api/v1/admin/reports" },

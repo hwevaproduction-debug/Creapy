@@ -1,6 +1,6 @@
 import { apiSlice } from "./apiSlice";
 
-interface InactiveListingsParams {
+export interface AdminListingsParams {
   province?: string;
   city?: string;
   expiredFrom?: string;
@@ -8,14 +8,22 @@ interface InactiveListingsParams {
   uploadedFrom?: string;
   uploadedTo?: string;
   landlord?: string;
+  status?: string;
+  category?: string;
   page?: number;
   limit?: number;
 }
 
-interface AdminListing {
+export interface AdminListing {
   _id: string;
   name: string;
+  status?: string;
+  type?: string;
+  studentAccommodation?: boolean;
+  userId?: string;
   user?: {
+    id?: string;
+    _id?: string;
     username?: string;
     email?: string;
   };
@@ -24,10 +32,11 @@ interface AdminListing {
     city?: string;
   };
   createdAt?: string;
+  expiresAt?: string;
   paymentDeadline?: string;
 }
 
-interface InactiveListingsResponse {
+interface AdminListingsResponse {
   data: AdminListing[];
   total: number;
 }
@@ -137,8 +146,8 @@ export interface AdminBooking {
 }
 
 interface AdminBookingsResponse {
-  data: AdminBooking[];
-  total: number;
+  data: { bookings: AdminBooking[] };
+  results: number;
 }
 
 interface SettleBookingRequest {
@@ -394,14 +403,28 @@ function buildSearchParams(params: Record<string, string | number | undefined>) 
 
 export const adminApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getInactiveListings: builder.query<InactiveListingsResponse, InactiveListingsParams>({
+    getAdminListings: builder.query<AdminListingsResponse, AdminListingsParams>({
       query: (params) => ({
-        url: `admin/listings/inactive${buildSearchParams(
+        url: `admin/listings${buildSearchParams(
           (params || {}) as Record<string, string | number | undefined>
         )}`,
         method: "GET",
       }),
       providesTags: ["AdminListing"],
+    }),
+    deleteAdminListing: builder.mutation<{ data: { deletedId: string } }, string>({
+      query: (id) => ({ url: `admin/listings/${id}`, method: "DELETE" }),
+      invalidatesTags: ["AdminListing", "Listing"],
+    }),
+    deleteListingsByOwner: builder.mutation<
+      { data: { deletedCount: number } },
+      string
+    >({
+      query: (userId) => ({
+        url: `admin/listings/owner/${userId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["AdminListing", "Listing"],
     }),
     bulkReviveListings: builder.mutation<BulkReviveResponse, BulkReviveRequest>({
       query: ({ ids }) => ({
@@ -470,7 +493,7 @@ export const adminApiSlice = apiSlice.injectEndpoints({
       providesTags: (result) =>
         result
           ? [
-              ...result.data.map((booking) => ({
+              ...result.data.bookings.map((booking) => ({
                 type: "AdminBooking" as const,
                 id: booking._id,
               })),
@@ -484,7 +507,8 @@ export const adminApiSlice = apiSlice.injectEndpoints({
         method: "PUT",
         body: settlementReference ? { settlementReference } : {},
       }),
-      transformResponse: (response: { data: AdminBooking }) => response.data,
+      transformResponse: (response: { data: { booking: AdminBooking } }) =>
+        response.data.booking,
       invalidatesTags: (_result, _error, { id }) => [
         { type: "AdminBooking", id },
         { type: "AdminBooking", id: "LIST" },
@@ -834,8 +858,10 @@ export const adminApiSlice = apiSlice.injectEndpoints({
 });
 
 export const {
-  useGetInactiveListingsQuery,
-  useLazyGetInactiveListingsQuery,
+  useGetAdminListingsQuery,
+  useLazyGetAdminListingsQuery,
+  useDeleteAdminListingMutation,
+  useDeleteListingsByOwnerMutation,
   useBulkReviveListingsMutation,
   usePurgeSeededListingsMutation,
   useGetProvidersQuery,

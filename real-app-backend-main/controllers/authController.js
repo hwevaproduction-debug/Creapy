@@ -198,6 +198,7 @@ const deleteUserAccount = async (userId) => {
     await tx.notification.deleteMany({ where: { userId } });
     await tx.savedSearch.deleteMany({ where: { userId } });
     await tx.listingDraft.deleteMany({ where: { userId } });
+    await tx.listingRestoration.deleteMany({ where: { userId } });
     await tx.engagement.deleteMany({
       where: whereAny([
         { tenantId: userId },
@@ -324,7 +325,7 @@ const deleteUserAccount = async (userId) => {
     });
 
     await tx.user.delete({ where: { id: userId } });
-  });
+  }, { timeout: 30000 });
 };
 
 const createSendToken = (user, statusCode, res) => {

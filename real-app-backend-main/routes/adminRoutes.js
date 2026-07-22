@@ -17,11 +17,14 @@ router.get(
   "/listings/inactive",
   adminController.getInactiveListings
 );
+router.get("/listings", adminController.getAdminListings);
 router.post(
   "/listings/bulk-revive",
   adminController.bulkReviveListings
 );
 router.post("/listings/purge-seeded", adminController.purgeSeededListings);
+router.delete("/listings/owner/:userId", adminController.deleteListingsByOwner);
+router.delete("/listings/:id", adminController.deleteListing);
 
 router.get("/accommodations", adminController.getAccommodations);
 router.put("/accommodations/:id/approve", adminController.approveAccommodation);

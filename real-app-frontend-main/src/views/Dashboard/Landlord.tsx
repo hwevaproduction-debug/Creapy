@@ -5,6 +5,11 @@ import { useDispatch } from "react-redux";
 // MUI Imports
 import {
   Box,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   IconButton,
   Table,
   TableBody,
@@ -234,6 +239,7 @@ const LandlordDashboard = () => {
     type: "",
   });
   const [restoreListingId, setRestoreListingId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
   const {
     data: listingsData,
@@ -289,6 +295,14 @@ const LandlordDashboard = () => {
     setDeletingListingId(listingId);
     try {
       await deleteListing(listingId).unwrap();
+      setDeleteConfirm(null);
+      setToast({ message: "Listing deleted", appearence: true, type: "success" });
+    } catch (error: any) {
+      setToast({
+        message: error?.data?.message || error?.message || "Unable to delete listing",
+        appearence: true,
+        type: "error",
+      });
     } finally {
       setDeletingListingId(null);
     }
@@ -643,6 +657,7 @@ const LandlordDashboard = () => {
                          : "—"}
                      </TableCell>
                     <TableCell>
+                      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
                       {item?.status === "expired" ? (
                         <AppButton
                           variant="contained"
@@ -685,30 +700,29 @@ const LandlordDashboard = () => {
                               <Pencil size={18} />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Delete">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDeleteListing(item?._id)}
-                              disabled={deletingListingId === item?._id}
-                              sx={{
-                                border: "1px solid",
-                                borderColor: "error.light",
-                                borderRadius: "8px",
-                                color: "error.main",
-                                "&:hover": {
-                                  background: "rgba(220,38,38,0.08)",
-                                },
-                              }}
-                            >
-                              {deletingListingId === item?._id ? (
-                                <DotLoader color="#dc2626" size={10} />
-                              ) : (
-                                <Trash2 size={18} />
-                              )}
-                            </IconButton>
-                          </Tooltip>
                         </Box>
                       )}
+                      <Tooltip title="Delete">
+                        <IconButton
+                          size="small"
+                          onClick={() => setDeleteConfirm({ id: item?._id || item?.id, name: item?.name || "listing" })}
+                          disabled={deletingListingId === (item?._id || item?.id)}
+                          sx={{
+                            border: "1px solid",
+                            borderColor: "error.light",
+                            borderRadius: "8px",
+                            color: "error.main",
+                            "&:hover": { background: "rgba(220,38,38,0.08)" },
+                          }}
+                        >
+                          {deletingListingId === (item?._id || item?.id) ? (
+                            <DotLoader color="#dc2626" size={10} />
+                          ) : (
+                            <Trash2 size={18} />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -806,6 +820,26 @@ const LandlordDashboard = () => {
           }
         }}
       />
+      <Dialog open={Boolean(deleteConfirm)} onClose={() => setDeleteConfirm(null)}>
+        <DialogTitle>Delete Listing</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Permanently delete "{deleteConfirm?.name}"? This cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <AppButton variant="outlined" onClick={() => setDeleteConfirm(null)}>
+            Cancel
+          </AppButton>
+          <AppButton
+            color="error"
+            disabled={Boolean(deletingListingId)}
+            onClick={() => handleDeleteListing(deleteConfirm?.id)}
+          >
+            Delete
+          </AppButton>
+        </DialogActions>
+      </Dialog>
       <ToastAlert
         appearence={toast.appearence}
         type={toast.type}

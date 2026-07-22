@@ -87,6 +87,7 @@ const buildAccountDeleteTx = ({
     notification: { deleteMany: record("notification.deleteMany") },
     savedSearch: { deleteMany: record("savedSearch.deleteMany") },
     listingDraft: { deleteMany: record("listingDraft.deleteMany") },
+    listingRestoration: { deleteMany: record("listingRestoration.deleteMany") },
     engagement: { deleteMany: record("engagement.deleteMany") },
     report: {
       deleteMany: record("report.deleteMany"),
@@ -813,6 +814,10 @@ test("delete removes dependent account records before deleting the user", async 
   );
   assert.deepEqual(
     calls.find((call) => call.name === "savedSearch.deleteMany").args,
+    { where: { userId: "user-1" } }
+  );
+  assert.deepEqual(
+    calls.find((call) => call.name === "listingRestoration.deleteMany").args,
     { where: { userId: "user-1" } }
   );
   assert.deepEqual(

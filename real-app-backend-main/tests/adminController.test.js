@@ -13,6 +13,7 @@ const originalPrisma = {
   listingFindMany: prisma.listing.findMany,
   listingFindUnique: prisma.listing.findUnique,
   listingUpdate: prisma.listing.update,
+  listingDelete: prisma.listing.delete,
   listingDeleteMany: prisma.listing.deleteMany,
   accommodationCount: prisma.accommodation.count,
   accommodationFindMany: prisma.accommodation.findMany,
@@ -71,6 +72,7 @@ test.afterEach(() => {
   prisma.listing.findMany = originalPrisma.listingFindMany;
   prisma.listing.findUnique = originalPrisma.listingFindUnique;
   prisma.listing.update = originalPrisma.listingUpdate;
+  prisma.listing.delete = originalPrisma.listingDelete;
   prisma.listing.deleteMany = originalPrisma.listingDeleteMany;
   prisma.accommodation.count = originalPrisma.accommodationCount;
   prisma.accommodation.findMany = originalPrisma.accommodationFindMany;
@@ -173,7 +175,7 @@ test("getInactiveListings returns paginated inactive listings", async () => {
   assert.deepEqual(findArgs.where, { status: "inactive" });
   assert.equal(findArgs.skip, 0);
   assert.equal(findArgs.take, 10);
-  assert.deepEqual(findArgs.orderBy, { paymentDeadline: "asc" });
+  assert.deepEqual(findArgs.orderBy, { createdAt: "desc" });
 });
 
 test("getInactiveListings combines landlord, location, and date filters", async () => {
@@ -225,11 +227,11 @@ test("getInactiveListings combines landlord, location, and date filters", async 
     mode: "insensitive",
   });
   assert.equal(
-    countArgs.where.paymentDeadline.gte.toISOString(),
+    countArgs.where.expiresAt.gte.toISOString(),
     "2025-01-01T00:00:00.000Z"
   );
   assert.equal(
-    countArgs.where.paymentDeadline.lte.toISOString(),
+    countArgs.where.expiresAt.lte.toISOString(),
     "2025-01-31T00:00:00.000Z"
   );
   assert.equal(
@@ -242,7 +244,7 @@ test("getInactiveListings combines landlord, location, and date filters", async 
   );
   assert.equal(findArgs.skip, 5);
   assert.equal(findArgs.take, 5);
-  assert.deepEqual(findArgs.orderBy, { paymentDeadline: "asc" });
+  assert.deepEqual(findArgs.orderBy, { createdAt: "desc" });
 });
 
 test("getInactiveListings returns empty results when landlord search has no matches", async () => {
@@ -357,14 +359,112 @@ test("bulkReviveListings rejects oversized batches", async () => {
   assert.equal(findUniqueCalls, 0);
 });
 
+test("getAdminListings returns all statuses and filters derived categories", async () => {
+  const adminController = loadAdminController();
+  let countArgs = null;
+
+  prisma.listing.count = async (args) => {
+    countArgs = args;
+    return 1;
+  };
+  prisma.listing.findMany = async () => [
+    {
+      id: "listing_1",
+      name: "Student room",
+      status: "expired",
+      studentAccommodation: true,
+      province: "Harare",
+      city: "Avondale",
+      user: { id: "user_1", username: "owner", email: "owner@example.com" },
+    },
+  ];
+
+  const result = await invokeController(adminController.getAdminListings, {
+    query: { category: "student" },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(countArgs.where, { studentAccommodation: true });
+  assert.equal(result.body.data[0]._id, "listing_1");
+  assert.deepEqual(result.body.data[0].location, {
+    province: "Harare",
+    city: "Avondale",
+  });
+});
+
+test("deleteListing removes one listing and returns its id", async () => {
+  const adminController = loadAdminController();
+  let deletedId = null;
+
+  prisma.listing.findUnique = async () => ({
+    id: "listing_1",
+    name: "Old listing",
+    userId: "user_1",
+    user: { id: "user_1", email: "owner@example.com", username: "owner" },
+  });
+  prisma.listing.delete = async ({ where }) => {
+    deletedId = where.id;
+    return { id: where.id };
+  };
+
+  const result = await invokeController(adminController.deleteListing, {
+    params: { id: "listing_1" },
+    user: { id: "admin_1" },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(deletedId, "listing_1");
+  assert.equal(result.body.data.deletedId, "listing_1");
+});
+
+test("deleteListingsByOwner removes listings without deleting the user", async () => {
+  const adminController = loadAdminController();
+  let deleteArgs = null;
+
+  prisma.user.findUnique = async () => ({
+    id: "user_1",
+    email: "owner@example.com",
+    username: "owner",
+  });
+  prisma.listing.deleteMany = async (args) => {
+    deleteArgs = args;
+    return { count: 3 };
+  };
+
+  const result = await invokeController(adminController.deleteListingsByOwner, {
+    params: { userId: "user_1" },
+    user: { id: "admin_1" },
+  });
+
+  assert.deepEqual(deleteArgs, { where: { userId: "user_1" } });
+  assert.equal(result.body.data.deletedCount, 3);
+  assert.equal(result.body.data.user._id, "user_1");
+});
+
 test("purgeSeededListings deletes seeded landlord listings and reports counts", async () => {
   const adminController = loadAdminController();
 
   let deleteArgs = null;
+  const relatedCountArgs = [];
+  prisma.listing.findMany = async () => [
+    { id: "listing_1" },
+    { id: "listing_2" },
+    { id: "listing_3" },
+    { id: "listing_4" },
+  ];
   prisma.listing.count = async () => 4;
-  prisma.engagement.count = async () => 2;
-  prisma.listingRestoration.count = async () => 1;
-  prisma.payment.count = async () => 3;
+  prisma.engagement.count = async (args) => {
+    relatedCountArgs.push(args);
+    return 2;
+  };
+  prisma.listingRestoration.count = async (args) => {
+    relatedCountArgs.push(args);
+    return 1;
+  };
+  prisma.payment.count = async (args) => {
+    relatedCountArgs.push(args);
+    return 3;
+  };
   prisma.listing.deleteMany = async (args) => {
     deleteArgs = args;
     return { count: 4 };
@@ -488,6 +588,9 @@ test("purgeSeededListings deletes seeded landlord listings and reports counts", 
   assert.equal(result.body.status, "success");
   assert.equal(result.body.data.deletedCount, 4);
   assert.equal(result.body.data.matchedCount, 4);
+  assert.deepEqual(relatedCountArgs, Array(3).fill({
+    where: { listingId: { in: ["listing_1", "listing_2", "listing_3", "listing_4"] } },
+  }));
   assert.deepEqual(result.body.data.relatedCounts, {
     engagements: 2,
     restorations: 1,

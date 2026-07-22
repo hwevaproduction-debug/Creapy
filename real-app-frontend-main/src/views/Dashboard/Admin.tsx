@@ -20,10 +20,12 @@ import {
   TableRow,
   Tabs,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import ArchiveIcon from "@mui/icons-material/Archive";
+import DeleteIcon from "@mui/icons-material/Delete";
 import SearchOffIcon from "@mui/icons-material/SearchOff";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
@@ -44,7 +46,9 @@ import {
   useGetAllBookingsQuery,
   useGetLegalDocsQuery,
   useGetProvidersQuery,
-  useLazyGetInactiveListingsQuery,
+  useDeleteAdminListingMutation,
+  useDeleteListingsByOwnerMutation,
+  useLazyGetAdminListingsQuery,
   usePurgeSeededListingsMutation,
   useSettleBookingMutation,
   useUpdateLegalDocMutation,
@@ -54,6 +58,8 @@ import {
 import { convertToFormattedDate } from "../../utils";
 
 interface ExpiredListingFilters {
+  status: string;
+  category: string;
   province: string;
   city: string;
   expiredFrom: string;
@@ -213,6 +219,8 @@ const AdminDashboard: React.FC = () => {
   });
 
   const [expiredFilters, setExpiredFilters] = useState<ExpiredListingFilters>({
+    status: "",
+    category: "",
     province: "",
     city: "",
     expiredFrom: "",
@@ -269,7 +277,11 @@ const AdminDashboard: React.FC = () => {
   }>({ open: false, mode: "create", doc: null, slug: "", title: "", content: "" });
 
   const [triggerSearch, { data: inactiveData, isFetching: isFetchingInactive }] =
-    useLazyGetInactiveListingsQuery();
+    useLazyGetAdminListingsQuery();
+  const [deleteAdminListing, { isLoading: isDeletingAdminListing }] =
+    useDeleteAdminListingMutation();
+  const [deleteListingsByOwner, { isLoading: isDeletingOwnerListings }] =
+    useDeleteListingsByOwnerMutation();
   const [bulkRevive, { isLoading: isReviving }] = useBulkReviveListingsMutation();
   const [purgeSeededListings, { isLoading: isPurgingSeededListings }] =
     usePurgeSeededListingsMutation();
@@ -297,7 +309,9 @@ const AdminDashboard: React.FC = () => {
   const totalListings = inactiveData?.total ?? 0;
   const totalPages = Math.ceil(totalListings / ROWS_PER_PAGE);
   const paginationItems = buildPageArray(totalPages, expiredFilters.page);
-  const currentPageIds = listings.map((listing) => listing._id);
+  const currentPageIds = listings
+    .filter((listing) => listing.status === "inactive")
+    .map((listing) => listing._id);
   const selectedCount = Object.keys(selectedIds).length;
   const currentPageSelectedCount = currentPageIds.filter(
     (id) => selectedIds[id] === true
@@ -311,7 +325,7 @@ const AdminDashboard: React.FC = () => {
     [providersData?.data]
   );
   const allProviders = providerOptionsData?.data ?? [];
-  const bookings = bookingsData?.data ?? [];
+  const bookings = bookingsData?.data.bookings ?? [];
   const settledBookingsCount = bookings.filter(
     (booking) => booking.settlementStatus === "settled"
   ).length;
@@ -494,6 +508,52 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleDeleteListing = (listingId: string, listingName: string) => {
+    setActionDialog({
+      open: true,
+      title: "Delete Listing",
+      body: `Permanently delete "${listingName}"? This cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          await deleteAdminListing(listingId).unwrap();
+          setToast({ open: true, message: "Listing deleted.", type: "success" });
+          triggerSearch({ ...expiredFilters, limit: ROWS_PER_PAGE });
+        } catch (error) {
+          setToast({
+            open: true,
+            message: getErrorMessage(error, "Unable to delete listing."),
+            type: "error",
+          });
+        }
+      },
+    });
+  };
+
+  const handleDeleteOwnerListings = (userId: string, ownerLabel: string) => {
+    setActionDialog({
+      open: true,
+      title: "Delete Landlord Listings",
+      body: `Permanently delete every listing owned by ${ownerLabel}? The user account will remain.`,
+      onConfirm: async () => {
+        try {
+          const result = await deleteListingsByOwner(userId).unwrap();
+          setToast({
+            open: true,
+            message: `${result.data.deletedCount} landlord listings deleted.`,
+            type: "success",
+          });
+          triggerSearch({ ...expiredFilters, limit: ROWS_PER_PAGE });
+        } catch (error) {
+          setToast({
+            open: true,
+            message: getErrorMessage(error, "Unable to delete landlord listings."),
+            type: "error",
+          });
+        }
+      },
+    });
+  };
+
   const handleVerifyProvider = async (
     providerId: string,
     verificationStatus: "approved" | "rejected"
@@ -591,7 +651,7 @@ const AdminDashboard: React.FC = () => {
 
   const renderExpiredListings = () => (
     <>
-      <Heading sx={{ mb: "20px" }}>Admin - Expired Listings</Heading>
+      <Heading sx={{ mb: "20px" }}>Admin - All Listings</Heading>
 
       <AppCard
         elevation="flat"
@@ -604,6 +664,35 @@ const AdminDashboard: React.FC = () => {
         }}
       >
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "flex-end" }}>
+          <Box sx={{ minWidth: { xs: "100%", sm: 170 } }}>
+            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500 }}>Status</Typography>
+            <AppSelect
+              value={expiredFilters.status}
+              onChange={(event) => handleExpiredFilterChange("status", String(event.target.value))}
+              size="small"
+              options={[
+                { label: "All", value: "" },
+                { label: "Active", value: "active" },
+                { label: "Early Access", value: "early_access" },
+                { label: "Pending Payment", value: "pending_payment" },
+                { label: "Expired", value: "expired" },
+                { label: "Inactive", value: "inactive" },
+              ]}
+            />
+          </Box>
+          <Box sx={{ minWidth: { xs: "100%", sm: 170 } }}>
+            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500 }}>Category</Typography>
+            <AppSelect
+              value={expiredFilters.category}
+              onChange={(event) => handleExpiredFilterChange("category", String(event.target.value))}
+              size="small"
+              options={[
+                { label: "All", value: "" },
+                { label: "Rent", value: "rent" },
+                { label: "Student", value: "student" },
+              ]}
+            />
+          </Box>
           <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
             <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500 }}>
               Province
@@ -688,7 +777,7 @@ const AdminDashboard: React.FC = () => {
           </Box>
           <Box sx={{ minWidth: { xs: "100%", sm: 200 } }}>
             <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500 }}>
-              Landlord
+              Landlord email / username
             </Typography>
             <AppInput
               value={expiredFilters.landlord}
@@ -777,13 +866,13 @@ const AdminDashboard: React.FC = () => {
       )}
 
       {!hasSearchedExpired ? (
-        renderEmptyState("Use the filters above to find expired listings.")
+        renderEmptyState("Use the filters above to find listings.")
       ) : isFetchingInactive ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
           <CircularProgress />
         </Box>
       ) : listings.length === 0 ? (
-        renderEmptyState("No expired listings match your filters.")
+        renderEmptyState("No listings match your filters.")
       ) : (
         <AppCard
           sx={{
@@ -804,7 +893,7 @@ const AdminDashboard: React.FC = () => {
                       disabled={isReviving || isPurgingSeededListings}
                     />
                 </TableCell>
-                {["Listing", "Landlord", "Location", "Date Uploaded", "Date Expired"].map(
+                {["Listing", "Landlord", "Category", "Status", "Location", "Date Uploaded", "Expires", "Actions"].map(
                   (header) => (
                     <TableCell
                       key={header}
@@ -828,7 +917,9 @@ const AdminDashboard: React.FC = () => {
                     <Checkbox
                       checked={selectedIds[item._id] === true}
                       onChange={() => handleRowCheck(item._id)}
-                      disabled={isReviving || isPurgingSeededListings}
+                      disabled={
+                        item.status !== "inactive" || isReviving || isPurgingSeededListings
+                      }
                     />
                   </TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>{item.name}</TableCell>
@@ -838,6 +929,14 @@ const AdminDashboard: React.FC = () => {
                       {item.user?.email ?? ""}
                     </Box>
                   </TableCell>
+                  <TableCell>{item.studentAccommodation ? "Student" : "Rent"}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={formatStatusLabel(item.status)}
+                      size="small"
+                      sx={getStatusChipColor(item.status)}
+                    />
+                  </TableCell>
                   <TableCell sx={{ color: "#6b7280", fontSize: "14px" }}>
                     {formatLocation(item.location)}
                   </TableCell>
@@ -845,9 +944,36 @@ const AdminDashboard: React.FC = () => {
                     {item.createdAt ? convertToFormattedDate(item.createdAt) : "—"}
                   </TableCell>
                   <TableCell sx={{ color: "#6b7280", fontSize: "14px" }}>
-                    {item.paymentDeadline
-                      ? convertToFormattedDate(item.paymentDeadline)
+                    {item.expiresAt
+                      ? convertToFormattedDate(item.expiresAt)
                       : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title="Delete listing">
+                      <IconButton
+                        color="error"
+                        size="small"
+                        onClick={() => handleDeleteListing(item._id, item.name)}
+                        disabled={isDeletingAdminListing || isDeletingOwnerListings}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    {item.user?.id ? (
+                      <Button
+                        color="error"
+                        size="small"
+                        onClick={() =>
+                          handleDeleteOwnerListings(
+                            item.user!.id!,
+                            item.user?.email || item.user?.username || "this user"
+                          )
+                        }
+                        disabled={isDeletingAdminListing || isDeletingOwnerListings}
+                      >
+                        Remove by user
+                      </Button>
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))}
@@ -1492,7 +1618,7 @@ const AdminDashboard: React.FC = () => {
         >
           <Tab
             value="expired"
-            label="Expired Listings"
+            label="All Listings"
             sx={{ textTransform: "none", fontWeight: 600 }}
           />
           <Tab
@@ -1554,7 +1680,7 @@ const AdminDashboard: React.FC = () => {
             Cancel
           </AppButton>
           <AppButton
-            disabled={isVerifyingProvider || isSavingCommission || isSettlingBooking}
+            disabled={isVerifyingProvider || isSavingCommission || isSettlingBooking || isDeletingAdminListing || isDeletingOwnerListings}
             onClick={() => {
               actionDialog.onConfirm?.();
               setActionDialog({
