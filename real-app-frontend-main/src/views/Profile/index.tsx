@@ -204,10 +204,9 @@ const Profile = () => {
       const { uploadUrl, publicUrl } = result;
 
       const putRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
+  method: "PUT",
+  body: file
+});
 
       if (!putRes.ok) throw new Error("R2 upload failed");
 

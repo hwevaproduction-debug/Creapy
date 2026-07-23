@@ -215,10 +215,9 @@ const CreateListing = () => {
 
     // 2) Upload directly to R2
     const putRes = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": image.type },
-      body: image,
-    });
+  method: "PUT",
+  body: image,
+});
 
     if (!putRes.ok) throw new Error("R2 upload failed");
 
