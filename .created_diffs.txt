@@ -104,9 +104,9 @@ diff for: .env.development.example
 +# STRIPE_SECRET_KEY left commented in dev
 +# STRIPE_SECRET_KEY=
 ---
-diff for: real-app-backend-main/.env.example
+diff for: backend/.env.example
 --- /dev/null	2026-08-03 09:33:18.175514100 +0200
-+++ real-app-backend-main/.env.example	2026-08-03 10:11:06.669609100 +0200
++++ backend/.env.example	2026-08-03 10:11:06.669609100 +0200
 @@ -0,0 +1,61 @@
 +# Backend-specific environment variables (example)
 +# Sanitized example: DO NOT commit real secrets. Replace with values from your

@@ -9,7 +9,7 @@
 - Do not report completion before validation and changelog work are complete.
 
 ## Boundaries
-- This repository contains two independently installed/deployed apps: `real-app-frontend-main/` (React SPA) and `real-app-backend-main/` (Express/Prisma API). Run npm commands from the owning app directory; there is no root package manifest.
+- This repository contains two independently installed/deployed apps: `frontend/` (React SPA) and `backend/` (Express/Prisma API). Run npm commands from the owning app directory; there is no root package manifest.
 - Backend wiring starts at `server.js` -> `app.js` -> `routes/` -> `controllers/`; service-like code lives in `utils/`, not a `services/` directory.
 - Frontend routing starts in `src/App.tsx`; network contracts are RTK Query endpoints under `src/redux/api/`; pages live under `src/views/`.
 - `Listing` is the legacy rental model. `Accommodation`/`Room` is a separate stays subsystem; do not reuse its types or amenity categories for listing behavior.

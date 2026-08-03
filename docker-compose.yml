@@ -16,7 +16,7 @@ services:
       retries: 5
 
   backend:
-    build: ./real-app-backend-main
+    build: ./backend
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,7 +39,7 @@ services:
       retries: 5
 
   frontend:
-    build: ./real-app-frontend-main
+    build: ./frontend
     # Frontend is internal-only; nginx will expose port 80
     # ports removed to make service internal-only
     # Optional: if you want frontend to wait for backend at runtime, add depends_on below

@@ -1,8 +1,8 @@
 
 /leodits/
-real-app-backend-main/.env.example
+backend/.env.example
 *.example
-real-app-backend-main/.env.example
+backend/.env.example
 *.mdc
 *.md
 *.md
