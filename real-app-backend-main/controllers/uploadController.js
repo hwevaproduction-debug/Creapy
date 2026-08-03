@@ -1,59 +1,43 @@
-const crypto = require('crypto');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const AppError = require('../utils/appError');
-
-const s3ClientConfig = {
-  region: process.env.S3_REGION || process.env.AWS_REGION,
-  requestChecksumCalculation: 'WHEN_REQUIRED',
-};
-
-if (process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY) {
-  s3ClientConfig.credentials = {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
-  };
-}
-
-const s3 = new S3Client(s3ClientConfig);
+const storage = require('../utils/storage');
 
 exports.getSignedUploadUrl = async (req, res, next) => {
   try {
     const { contentType, folder = 'uploads' } = req.query;
-    const normalizedFolder = String(folder || "uploads").toLowerCase();
+    const normalizedFolder = String(folder || 'uploads').toLowerCase();
 
     if (!contentType) {
       return res.status(400).json({ status: 'fail', message: 'contentType is required' });
     }
 
-    if (normalizedFolder === "listings") {
-      if (!req.user || req.user.role !== "landlord") {
+    if (normalizedFolder === 'listings') {
+      if (!req.user || req.user.role !== 'landlord') {
         return res.status(403).json({
-          status: "fail",
-          message: "Landlord role required to publish listings",
+          status: 'fail',
+          message: 'Landlord role required to publish listings',
         });
       }
     }
 
-    const ext = (contentType.split('/')[1] || 'bin').replace(/[^a-z0-9]/gi, '');
-    const random = crypto.randomBytes(10).toString('hex');
-    const userId = req.user?._id?.toString() || 'anon';
+    // Delegate to the storage provider abstraction
+    const result = await storage.getSignedUploadUrl({ contentType, folder: normalizedFolder, user: req.user });
 
-    const key = `${normalizedFolder}/${userId}/${Date.now()}-${random}.${ext}`;
+    const uploadUrl = result?.uploadUrl;
+    const key = result?.key;
+    const publicUrl = result?.publicUrl;
 
-    const command = new PutObjectCommand({
-      Bucket: process.env.S3_BUCKET,
-      Key: key,
-      ContentType: contentType,
-    });
-
-    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 60 }); // 60 seconds
-
-    if (!process.env.S3_PUBLIC_BASE_URL) {
-      return next(new AppError('S3_PUBLIC_BASE_URL is not configured', 500));
+    // Maintain previous error behaviour for missing public URL
+    if (!publicUrl) {
+      return next(new AppError('Upload public URL is not configured', 500));
     }
 
-    const publicUrl = `${process.env.S3_PUBLIC_BASE_URL.replace(/\/$/, '')}/${key}`;
+    if (!key) {
+      return next(new AppError('Storage provider did not return upload key', 500));
+    }
+
+    if (!uploadUrl) {
+      return next(new AppError('Failed to create signed upload URL', 500));
+    }
 
     return res.status(200).json({
       status: 'success',

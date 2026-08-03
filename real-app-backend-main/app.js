@@ -140,6 +140,15 @@ app.get("/api/v1/legal-docs/:slug", legalDocController.getPublicDoc);
 app.get("/legal-docs/:slug", legalDocController.getPublicDoc);
 
 // PRODUCTION SETUP
+app.get('/health', (req, res) => {
+  // lightweight health endpoint for Docker healthchecks; no DB connections
+  res.status(200).json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get("/", (req, res) => {
   res.status(200).json({ status: "ok", message: "Town Ruins API is running." });
 });
