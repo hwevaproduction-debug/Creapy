@@ -15,7 +15,7 @@ import PrimaryInput from "../../components/PrimaryInput/PrimaryInput";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
-import HeroSlideshow from "../../views/Home/HeroSlideshow";
+import HeroSlideshow from "../Home/HeroSlideshow";
 import { useForgotPasswordMutation } from "../../redux/api/authApiSlice";
 import { FALLBACK_HERO_IMAGES, AUTH_CARD_SX, AUTH_PAGE_WRAPPER_SX } from "../auth/authShared";
 

@@ -1,5 +1,5 @@
 import { Button, ButtonProps } from "@mui/material";
-import DotLoader from "../../components/Spinner/dotLoader";
+import DotLoader from "../Spinner/dotLoader";
 
 interface AppButtonProps extends ButtonProps {
   loading?: boolean;

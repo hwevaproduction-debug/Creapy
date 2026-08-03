@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Box } from "@mui/material";
 import { Eye, EyeOff } from "lucide-react";
-import HeroSlideshow from "../../views/Home/HeroSlideshow";
+import HeroSlideshow from "../Home/HeroSlideshow";
 import { Heading, SubHeading } from "../../components/Heading";
 import DotLoader from "../../components/Spinner/dotLoader";
 import PrimaryInput from "../../components/PrimaryInput/PrimaryInput";

@@ -14,7 +14,7 @@ import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
 import AppSelect from "../../components/ui/AppSelect";
-import HeroSlideshow from "../../views/Home/HeroSlideshow";
+import HeroSlideshow from "../Home/HeroSlideshow";
 import { providerSignUpSchema } from "./components/validationSchema";
 import { ZIMBABWE_PROVINCES } from "../../config/zimbabweProvinces";
 
