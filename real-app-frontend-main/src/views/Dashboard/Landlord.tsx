@@ -338,6 +338,18 @@ const LandlordDashboard = () => {
     }
   };
 
+  const totalListings = listingsData?.data?.length ?? 0;
+  const activeCount =
+    listingsData?.data?.filter(
+      (l: any) => l.status === "active" || l.status === "early_access"
+    ).length ?? 0;
+  const pendingCount =
+    listingsData?.data?.filter((l: any) => l.status === "pending_payment").length ?? 0;
+  const totalRevenue =
+    paymentsData?.data
+      ?.filter((p: any) => p.status === "success")
+      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0) ?? 0;
+
   return (
     <Box sx={{ background: "background.default", minHeight: "100vh" }}>
       <Box sx={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)", pt: { xs: 8, md: 10 }, pb: { xs: 8, md: 10 }, px: 3, mb: -6 }}>
@@ -575,9 +587,7 @@ const LandlordDashboard = () => {
             }}
           >
             No listings yet. Create your first listing.
-            <AppButton onClick={() => navigate("/create-listing")}>
-              Create Listing
-            </AppButton>
+            <AppButton onClick={() => navigate("/create-listing")}>Create Listing</AppButton>
           </AppCard>
         ) : (
           <AppCard
@@ -734,8 +744,7 @@ const LandlordDashboard = () => {
 
         <Heading sx={{ mt: { xs: 4, md: 5 }, mb: "16px" }}>
           Payment History
-        </Heading>
-
+        </Typography>
         {paymentsLoading ? (
           <Box>Loading...</Box>
         ) : paymentsData?.data?.length === 0 ? (

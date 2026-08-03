@@ -111,8 +111,7 @@ const TenantDashboard = () => {
   const daysRemaining = premiumExpiry
     ? Math.ceil((new Date(premiumExpiry).getTime() - Date.now()) / 86_400_000)
     : null;
-  const showRenew =
-    premiumActive && daysRemaining !== null && daysRemaining <= 7;
+  const showRenew = premiumActive && daysRemaining !== null && daysRemaining <= 7;
   const formattedPremiumExpiry = premiumExpiry
     ? new Date(premiumExpiry).toLocaleDateString("en-GB", {
         day: "2-digit",
@@ -187,14 +186,19 @@ const TenantDashboard = () => {
       console.error("Delete Saved Search Error", error);
       setToast({
         message:
-          (error as any)?.data?.message ||
-          (error as any)?.message ||
+          (error as any)?.data?.message || (error as any)?.message ||
           "Something went wrong",
         appearence: true,
         type: "error",
       });
     }
   };
+
+  // derived for greeting
+  const username = useTypedSelector(selectedUserName);
+  const hours = new Date().getHours();
+  const greeting =
+    hours < 12 ? "Good morning" : hours < 17 ? "Good afternoon" : "Good evening";
 
   return (
     <Box sx={{ background: "background.default", minHeight: "100vh" }}>
