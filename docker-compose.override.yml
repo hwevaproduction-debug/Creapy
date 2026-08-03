@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  backend:
+    volumes:
+      - ./real-app-backend-main:/usr/src/app
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: development
+      # You can set development-only env vars here or in a .env file that is excluded from git
+
+  frontend:
+    # Mount frontend source for local development and enable file watching/live-reload if the dev server supports it.
+    # Adjust the container workdir/path to match your frontend Dockerfile or dev server expectations.
+    volumes:
+      - ./real-app-frontend-main:/app
+    ports:
+      # The production frontend image serves static files via nginx on port 80; map host 3000 to container 80 for local access.
+      - "3000:80"
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: '1'
+      # If using npm start for live reload, ensure your Dockerfile uses the dev command when NODE_ENV=development

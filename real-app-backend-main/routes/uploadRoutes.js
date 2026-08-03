@@ -7,6 +7,10 @@ const router = express.Router();
 router.use(authController.protect);
 
 // signed upload url
-router.get('/r2-sign', uploadController.getR2SignedUploadUrl);
+router.get('/r2-sign', uploadController.getSignedUploadUrl);
+
+// direct server-side upload (Base64 payload)
+// Body: { contentType, folder, fileBase64 }
+router.post('/direct', uploadController.uploadFile);
 
 module.exports = router;

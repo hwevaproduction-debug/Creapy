@@ -1,11 +1,12 @@
 {
-  "name": "client",
+  "name": "town-ruins",
   "version": "0.1.0",
   "private": true,
-  "proxy": "http://localhost:5000",
+  "proxy": "api.townruins.com",
   "dependencies": {
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.14.18",
     "@mui/material": "^5.14.18",
     "@mui/x-date-pickers": "^5.0.10",
     "@reduxjs/toolkit": "^1.9.7",
@@ -22,7 +23,8 @@
     "firebase": "^10.6.0",
     "formik": "^2.4.5",
     "libphonenumber-js": "^1.10.51",
-    
+    "lucide-react": "^0.344.0",
+
     "moment": "^2.29.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

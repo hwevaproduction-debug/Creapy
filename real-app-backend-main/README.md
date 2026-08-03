@@ -72,3 +72,42 @@ npm run test:home-feeds
 
 This validates the two home feed controller methods and their core query/pipeline
 behavior with mocked model calls.
+
+## Seeding via API
+
+`npm run seed` now seeds through the backend HTTP API instead of connecting to
+MongoDB directly. This keeps password hashing, auth, and listing validation on
+the normal application path.
+
+Use a local backend by default:
+
+```bash
+npm run seed
+```
+
+Or seed a deployed backend explicitly:
+
+```bash
+SEED_API_BASE=https://your-backend-url.amplifyapp.com npm run seed
+```
+
+The script is idempotent for reruns. It logs in existing demo users when
+possible, recreates any missing ones, and skips listing creation for landlords
+who already have an active listing.
+
+## Seeding directly with Prisma
+
+Keep the API-based flow with:
+
+```bash
+npm run seed
+```
+
+Or seed the database directly using `DATABASE_URL` from `real-app-backend-main/.env`:
+
+```bash
+npm run seed:db
+```
+
+This bypasses the HTTP API and writes demo data straight through Prisma into the
+configured PostgreSQL database.

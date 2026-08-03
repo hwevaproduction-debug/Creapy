@@ -1,5 +1,5 @@
 // React Imports
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 // Formik Imports
@@ -7,7 +7,6 @@ import { Form, Formik, FormikProps } from "formik";
 // MUI Imports
 import {
   Box,
-  Grid,
   FormControlLabel,
   RadioGroup,
   Checkbox,
@@ -22,9 +21,10 @@ import {
   useUpdateListingMutation,
 } from "../../redux/api/listingApiSlice";
 import {
-  selectedUserId,
-  selectedUserRole,
-} from "../../redux/auth/authSlice";
+  useGetR2SignedUrlMutation,
+  type R2SignedUrlData,
+} from "../../redux/api/uploadApiSlice";
+import { selectedUserId, selectedUserToken } from "../../redux/auth/authSlice";
 // Hooks Imports
 import useTypedSelector from "../../hooks/useTypedSelector";
 // Custom Imports
@@ -38,20 +38,29 @@ import PrimaryPhoneInput from "../../components/PhoneInput";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
+import { ZIMBABWE_PROVINCES } from "../../config/zimbabweProvinces";
+import AppSelect from "../../components/ui/AppSelect";
 
 interface listingForm {
   name: string;
   phoneNumber: string;
   description: string;
   address: string;
-  location: string;
+  location: {
+    province: string;
+    city: string;
+    addressLine: string;
+    country: string;
+  };
   regularPrice: number;
   discountedPrice: number;
   bathrooms: number;
-  bedrooms: number;
+  bedrooms: number | "";
+  totalRooms: number | "";
   furnished: boolean;
   type: string;
   offer: boolean;
+  studentAccommodation: boolean;
   amenities: {
     solar: boolean;
     borehole: boolean;
@@ -62,24 +71,51 @@ interface listingForm {
   files?: null | any[];
 }
 
+const LISTING_DRAFT_KEY = "listing_draft";
+const DRAFT_TTL_MS = 30 * 60 * 1000;
+
+const saveListingDraft = (formValues: listingForm) => {
+  const { files, ...form } = formValues;
+
+  sessionStorage.setItem(
+    LISTING_DRAFT_KEY,
+    JSON.stringify({
+      version: 1,
+      savedAt: new Date().toISOString(),
+      form,
+    })
+  );
+};
+
 const CreateListing = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const userId = useTypedSelector(selectedUserId);
-  const userRole = useTypedSelector(selectedUserRole);
+  const token = useTypedSelector(selectedUserToken);
+  const [getR2SignedUrl] = useGetR2SignedUrlMutation();
+  const has401FiredRef = useRef(false);
+  const restoredDraftRef = useRef(false);
+  const shouldClearStaleDraftRef = useRef(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [formValues, setFormValues] = useState<listingForm>({
     name: "",
     phoneNumber: "263",
     description: "",
     address: "",
-    location: "",
+    location: {
+      province: "",
+      city: "",
+      addressLine: "",
+      country: "Zimbabwe",
+    },
     regularPrice: 25000,
     discountedPrice: 0,
     bathrooms: 1,
-    bedrooms: 1,
+    bedrooms: "",
+    totalRooms: 1,
     furnished: false,
     offer: false,
+    studentAccommodation: false,
     type: "rent",
     amenities: {
       solar: false,
@@ -99,59 +135,83 @@ const CreateListing = () => {
     appearence: false,
     type: "",
   });
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const handleCloseToast = () => {
     setToast({ ...toast, appearence: false });
   };
 
-  const UploadHandler = () => {
+  const UploadHandler = (currentFormValues: listingForm) => {
     if (listingImages.length === 0)
       return setImageError("Please select an image");
 
-    if (listingImages.length + imageUrls.length < 7) {
-      setImageLoading(true);
-      const promises = [];
-      for (let i = 0; i < listingImages.length; i++) {
-        promises.push(UploadImage(listingImages[i]));
-      }
-
-      Promise.all(promises)
-        .then((urls: any) => {
-          // add more urls to previous ones
-          setImageUrls([...imageUrls, ...urls]);
-          setImageError(false);
-          setImageLoading(false);
-        })
-        .catch((error) => {
-          console.log(error);
-          setImageError("Image Upload Failed (2 mb max per image)");
-          setImageLoading(false);
-        });
-    } else {
-      setImageError("You can upload only 6 images per listing");
+    if (listingImages.length + imageUrls.length >= 7) {
+      return setImageError("You can upload only 6 images per listing");
     }
+
+    if (!token) {
+      if (!id) {
+        saveListingDraft(currentFormValues);
+      }
+      setToast({
+        ...toast,
+        message: "Session expired. Please log in again.",
+        appearence: true,
+        type: "error",
+      });
+      navigate("/login");
+      return;
+    }
+
+    has401FiredRef.current = false;
+    setImageLoading(true);
+    const promises = [];
+    for (let i = 0; i < listingImages.length; i++) {
+      promises.push(UploadImage(listingImages[i], currentFormValues));
+    }
+
+    Promise.all(promises)
+      .then((urls: any) => {
+        setImageUrls([...imageUrls, ...urls]);
+        setImageError(false);
+        setImageLoading(false);
+      })
+      .catch((error) => {
+        console.log(error);
+        setImageError("Image Upload Failed (2 mb max per image)");
+        setImageLoading(false);
+      });
   };
 
-  const UploadImage = async (image: File) => {
-    // get token from auth blob (it exists)
-    const token = JSON.parse(localStorage.getItem("user") || "null")?.token;
+  const UploadImage = async (image: File, currentFormValues: listingForm) => {
+    let result: R2SignedUrlData;
 
-    // 1) Ask backend for signed URL
-    const res = await fetch(
-      `${process.env.REACT_APP_BACKEND_URL}/api/v1/uploads/r2-sign?contentType=${encodeURIComponent(
-        image.type
-      )}&folder=listings`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    try {
+      result = await getR2SignedUrl({
+        contentType: image.type,
+        folder: "listings",
+      }).unwrap();
+    } catch (error: any) {
+      const errorStatus = error?.status || error?.originalStatus;
+
+      if (errorStatus === 401 && !has401FiredRef.current) {
+        has401FiredRef.current = true;
+        if (!id) {
+          saveListingDraft(currentFormValues);
+        }
+        setToast({
+          ...toast,
+          message: "Session expired. Please log in again.",
+          appearence: true,
+          type: "error",
+        });
+        navigate("/login");
       }
-    );
 
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.message || "Failed to get signed URL");
+      throw error;
+    }
 
-    const { uploadUrl, publicUrl } = json.data;
+    const { uploadUrl, publicUrl } = result;
 
     // 2) Upload directly to R2
     const putRes = await fetch(uploadUrl, {
@@ -162,7 +222,6 @@ const CreateListing = () => {
 
     if (!putRes.ok) throw new Error("R2 upload failed");
 
-    // 3) Return the public URL (same thing your DB already stores)
     return publicUrl as string;
   };
 
@@ -172,25 +231,8 @@ const CreateListing = () => {
   const [updateListing, { isLoading: updatingLoading }] =
     useUpdateListingMutation();
 
-  const resolveUserId = () => {
-    if (userId) return userId;
-    try {
-      const authBlob = JSON.parse(localStorage.getItem("user") || "null");
-      return (
-        authBlob?.data?.user?._id ||
-        authBlob?.user?._id ||
-        authBlob?._id ||
-        null
-      );
-    } catch (error) {
-      console.error("Failed to parse auth blob:", error);
-      return null;
-    }
-  };
-
   const listingHandler = async (data: listingForm) => {
-
-    const resolvedUserId = resolveUserId();
+    const resolvedUserId = userId;
 
     if (!resolvedUserId) {
       setToast({
@@ -227,14 +269,21 @@ const CreateListing = () => {
       // Backwards compat: server maps regularPrice -> monthlyRent
       regularPrice: Number(data.regularPrice),
       monthlyRent: Number(data.regularPrice),
-      location: data.location?.trim(),
+      location: {
+        addressLine: data.address?.trim() || "",
+        country: "Zimbabwe",
+        province: data.location.province?.trim(),
+        city: data.location.city?.trim() || "",
+      },
       amenities: data.amenities,
       discountedPrice: data.offer ? Number(data.discountedPrice || 0) : 0,
       bathrooms: Number(data.bathrooms),
-      bedrooms: Number(data.bedrooms),
+      bedrooms: data.bedrooms ? Number(data.bedrooms) : null,
+      totalRooms: Number(data.totalRooms),
       furnished: data.furnished,
       type: data.type,
       offer: data.offer,
+      studentAccommodation: data.studentAccommodation,
       phoneNumber: parsedPhone.number,
       imageUrls,
       user: resolvedUserId,
@@ -248,6 +297,7 @@ const CreateListing = () => {
       if (id) {
         const updatedListing: any = await updateListing({ id, payload });
         if (updatedListing?.data?.status) {
+          sessionStorage.removeItem(LISTING_DRAFT_KEY);
           setToast({
             ...toast,
             message: "Listing Updated Successfully",
@@ -269,14 +319,27 @@ const CreateListing = () => {
       // Create Listing
       const listing: any = await createListing(payload);
       if (listing?.data?.status) {
+        sessionStorage.removeItem(LISTING_DRAFT_KEY);
         setToast({
           ...toast,
           message: "Listing Created Successfully",
           appearence: true,
           type: "success",
         });
-        const newListingId = listing?.data?._id || listing?.data?.data?._id;
-        navigate(`/listings/${newListingId}/pay`);
+        const newListingId =
+          listing?.data?.data?.listing?._id ||
+          listing?.data?.data?._id ||
+          listing?.data?._id;
+        if (!newListingId) {
+          setToast({
+            ...toast,
+            message: "Could not determine listing ID. Please try again.",
+            appearence: true,
+            type: "error",
+          });
+          return;
+        }
+        navigate("/dashboard/landlord");
       }
       if (listing?.error) {
         setToast({
@@ -306,18 +369,37 @@ const CreateListing = () => {
 
   useEffect(() => {
     if (id && listingSuccess) {
+      const rawLocation = listingData?.data?.location;
+      const normalizedLocation =
+        rawLocation && typeof rawLocation === "object"
+          ? {
+              province: rawLocation.province || "",
+              city: rawLocation.city || "",
+              addressLine:
+                rawLocation.addressLine || listingData?.data?.address || "",
+              country: rawLocation.country || "Zimbabwe",
+            }
+          : {
+              province: rawLocation || "",
+              city: "",
+              addressLine: listingData?.data?.address || "",
+              country: "Zimbabwe",
+            };
+
       setFormValues({
         name: listingData?.data?.name,
         description: listingData?.data?.description,
         address: listingData?.data?.address,
-        location: listingData?.data?.location || "",
+        location: normalizedLocation,
         regularPrice: listingData?.data?.regularPrice || listingData?.data?.monthlyRent,
         discountedPrice: listingData?.data?.discountedPrice,
         bathrooms: listingData?.data?.bathrooms,
-        bedrooms: listingData?.data?.bedrooms,
+        bedrooms: listingData?.data?.bedrooms ?? "",
+        totalRooms: listingData?.data?.totalRooms ?? 1,
         furnished: listingData?.data?.furnished,
         type: listingData?.data?.type,
         offer: listingData?.data?.offer,
+        studentAccommodation: listingData?.data?.studentAccommodation ?? false,
         phoneNumber: listingData?.data?.phoneNumber,
         amenities: listingData?.data?.amenities || {
           solar: false,
@@ -329,16 +411,76 @@ const CreateListing = () => {
       });
       setImageUrls(listingData?.data?.imageUrls);
     }
-  }, [listingData, listingSuccess]);
+  }, [id, listingData, listingSuccess]);
+
+  useEffect(() => {
+    if (id) return;
+
+    const storedDraft = sessionStorage.getItem(LISTING_DRAFT_KEY);
+
+    if (!storedDraft) {
+      return;
+    }
+
+    try {
+      const draft = JSON.parse(storedDraft);
+      const savedAt = new Date(draft?.savedAt).getTime();
+      const isValidDraft =
+        draft?.version === 1 && Date.now() - savedAt <= DRAFT_TTL_MS;
+
+      if (isValidDraft) {
+        setFormValues(draft.form);
+        restoredDraftRef.current = true;
+        setDraftRestored(true);
+      } else {
+        shouldClearStaleDraftRef.current = true;
+      }
+    } catch (error) {
+      shouldClearStaleDraftRef.current = true;
+    }
+
+    return () => {
+      if (shouldClearStaleDraftRef.current && !restoredDraftRef.current) {
+        sessionStorage.removeItem(LISTING_DRAFT_KEY);
+      }
+    };
+  }, [id]);
 
   return (
-    <Box sx={{ marginTop: "50px" }}>
+    <Box sx={{ mt: { xs: 5, md: 6 } }}>
       {listingLoading && <OverlayLoader />}
       <AppContainer>
         <Box sx={{ textAlign: "center" }}>
           <Heading>{id ? "Update" : "Create"} a Listing</Heading>
         </Box>
-        <AppCard sx={{ margin: "30px 0", p: { xs: 2, md: 3 } }}>
+        {!id && draftRestored && (
+          <Box
+            sx={{
+              mb: 2,
+              p: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 2,
+              backgroundColor: "#f8fafc",
+              border: "1px solid #cbd5e1",
+              borderRadius: "10px",
+            }}
+          >
+            <Box>We restored your unsaved listing. Images must be re-uploaded.</Box>
+            <AppButton
+              variant="outlined"
+              color="inherit"
+              onClick={() => {
+                setDraftRestored(false);
+                sessionStorage.removeItem(LISTING_DRAFT_KEY);
+              }}
+            >
+              X
+            </AppButton>
+          </Box>
+        )}
+        <AppCard sx={{ my: { xs: 3, md: 4 }, p: { xs: 2, md: 3 } }}>
           <Formik
             initialValues={formValues}
             onSubmit={(values: listingForm) => {
@@ -366,7 +508,7 @@ const CreateListing = () => {
                       flexDirection: { xs: "column", md: "row" },
                     }}
                   >
-                      <Grid item xs={12} md={6} sx={{ width: { xs: "100%", md: "50%" } }}>
+                      <Box sx={{ width: { xs: "100%", md: "50%" } }}>
                         <Box
                           sx={{
                             minHeight:
@@ -476,22 +618,60 @@ const CreateListing = () => {
                         </Box>
                         <Box sx={{ width: "100%", marginTop: "10px" }}>
                           <SubHeading sx={{ marginBottom: "5px" }}>
-                            Location / Area
+                            Province
+                          </SubHeading>
+                          <AppSelect
+                            name="location.province"
+                            value={values.location.province}
+                            options={[
+                              {
+                                label: "Select a province",
+                                value: "",
+                              },
+                              ...ZIMBABWE_PROVINCES,
+                            ]}
+                            displayEmpty
+                            onChange={(e: any) =>
+                              setFieldValue("location.province", e.target.value)
+                            }
+                            onBlur={handleBlur}
+                            renderValue={(selected) => {
+                              const province = selected as string;
+                              return province || "Select a province";
+                            }}
+                            error={
+                              Boolean(
+                                touched.location &&
+                                  typeof errors.location === "object" &&
+                                  errors.location?.province
+                              )
+                            }
+                          />
+                          {touched.location &&
+                          typeof errors.location === "object" &&
+                          errors.location?.province ? (
+                            <Box
+                              sx={{
+                                color: "#d32f2f",
+                                fontSize: "0.75rem",
+                                marginTop: "3px",
+                                marginLeft: "14px",
+                              }}
+                            >
+                              {errors.location.province as string}
+                            </Box>
+                          ) : null}
+                        </Box>
+                        <Box sx={{ width: "100%", marginTop: "10px" }}>
+                          <SubHeading sx={{ marginBottom: "5px" }}>
+                            City / Area
                           </SubHeading>
                           <PrimaryInput
                             type="text"
                             label=""
-                            name="location"
-                            placeholder="e.g., Avondale"
-                            value={values.location}
-                            helperText={
-                              errors.location && touched.location
-                                ? (errors.location as string)
-                                : ""
-                            }
-                            error={
-                              errors.location && touched.location ? true : false
-                            }
+                            name="location.city"
+                            placeholder="City / Area"
+                            value={values.location.city}
                             onChange={handleChange}
                             onBlur={handleBlur}
                           />
@@ -506,20 +686,44 @@ const CreateListing = () => {
                             flexDirection: { xs: "column", sm: "row" },
                           }}
                         >
-                          <Box sx={{ width: "100%" }}>
+                          <Box sx={{ width: { xs: "100%", sm: "50%" } }}>
                             <SubHeading sx={{ marginBottom: "5px" }}>
-                              Beds
+                              Total Rooms *
+                            </SubHeading>
+                            <PrimaryInput
+                              type="number"
+                              label=""
+                              name="totalRooms"
+                              placeholder="e.g. 4"
+                              value={values.totalRooms}
+                              helperText={
+                                errors.totalRooms && touched.totalRooms
+                                  ? errors.totalRooms
+                                  : "Enter the total number of rooms in the property."
+                              }
+                              error={
+                                errors.totalRooms && touched.totalRooms
+                                  ? true
+                                  : false
+                              }
+                              onChange={handleChange}
+                              onBlur={handleBlur}
+                            />
+                          </Box>
+                          <Box sx={{ width: { xs: "100%", sm: "50%" } }}>
+                            <SubHeading sx={{ marginBottom: "5px" }}>
+                              Bedrooms (optional)
                             </SubHeading>
                             <PrimaryInput
                               type="number"
                               label=""
                               name="bedrooms"
-                              placeholder="Beds"
+                              placeholder="e.g. 2"
                               value={values.bedrooms}
                               helperText={
                                 errors.bedrooms && touched.bedrooms
                                   ? errors.bedrooms
-                                  : ""
+                                  : "Leave blank if the property does not have a separate bedroom count."
                               }
                               error={
                                 errors.bedrooms && touched.bedrooms
@@ -656,11 +860,6 @@ const CreateListing = () => {
                                 control={<Radio />}
                                 label="Rent"
                               />
-                              <FormControlLabel
-                                value="sale"
-                                control={<Radio />}
-                                label="Sale"
-                              />
                             </Box>
                           </RadioGroup>
                           <Box
@@ -683,6 +882,13 @@ const CreateListing = () => {
                               label="Offer"
                               name="offer"
                               checked={values.offer}
+                              onChange={handleChange}
+                            />
+                            <FormControlLabel
+                              control={<Checkbox />}
+                              label="Student Accommodation"
+                              name="studentAccommodation"
+                              checked={values.studentAccommodation}
                               onChange={handleChange}
                             />
                           </Box>
@@ -729,8 +935,8 @@ const CreateListing = () => {
                             </Box>
                           </Box>
                         </Box>
-                      </Grid>
-                      <Grid item xs={12} md={6} sx={{ width: { xs: "100%", md: "50%" } }}>
+                      </Box>
+                      <Box sx={{ width: { xs: "100%", md: "50%" } }}>
                         <Box sx={{ marginTop: "25px" }}>
                           <SubHeading sx={{ marginBottom: "10px" }}>
                             Images :
@@ -789,7 +995,7 @@ const CreateListing = () => {
                                 textTransform: "capitalize",
                                 width: { xs: "100%", sm: "120px" },
                               }}
-                              onClick={UploadHandler}
+                              onClick={() => UploadHandler(values)}
                               disabled={imageLoading}
                             >
                               {imageLoading ? (
@@ -875,7 +1081,7 @@ const CreateListing = () => {
                           <Box
                             sx={{
                               display: "flex",
-                              justifyContent: "end",
+                              justifyContent: "flex-end",
                               marginTop: "20px",
                             }}
                           >
@@ -893,7 +1099,7 @@ const CreateListing = () => {
                             </AppButton>
                           </Box>
                         </Box>
-                      </Grid>
+                      </Box>
                     </Box>
                 </Form>
               );

@@ -15,7 +15,7 @@ import { setUser } from "../../redux/auth/authSlice";
 // Custom Imports
 import DotLoader from "../Spinner/dotLoader";
 
-const GoogleOAuth = () => {
+const GoogleOAuth = ({ role }: { role?: string }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -31,15 +31,18 @@ const GoogleOAuth = () => {
         name: res.user.displayName,
         email: res.user.email,
         photo: res.user.photoURL,
+        role,
       };
       const user: any = await google(payload);
       dispatch(setUser(user.data));
       localStorage.setItem("user", JSON.stringify(user.data));
-      const role = user?.data?.data?.user?.role;
-      if (role === "landlord") {
+      const userRole = user?.data?.data?.user?.role;
+      if (userRole === "landlord") {
         navigate("/dashboard/landlord");
-      } else if (role === "tenant") {
+      } else if (userRole === "tenant") {
         navigate("/dashboard/tenant");
+      } else if (userRole === "admin") {
+        navigate("/dashboard/admin");
       } else {
         navigate("/");
       }

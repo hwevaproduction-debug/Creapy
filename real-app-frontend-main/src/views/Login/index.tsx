@@ -1,11 +1,10 @@
 // React Imports
 import { useState } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 // Material UI Imports
-import { Box, Grid } from "@mui/material";
-// React Icons
-import { AiOutlineEyeInvisible, AiOutlineEye } from "react-icons/ai";
+import { Box } from "@mui/material";
+import { Eye, EyeOff } from "lucide-react";
 // Formik Imports
 import { Form, Formik, FormikProps } from "formik";
 // Utils Imports
@@ -21,9 +20,11 @@ import PrimaryInput from "../../components/PrimaryInput/PrimaryInput";
 import ToastAlert from "../../components/ToastAlert/ToastAlert";
 // Google OAuth
 import GoogleOAuth from "../../components/OAuth";
-import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
 import AppButton from "../../components/ui/AppButton";
+import HeroSlideshow from "../../views/Home/HeroSlideshow";
+import { FALLBACK_HERO_IMAGES, AUTH_CARD_SX, AUTH_PAGE_WRAPPER_SX } from "../auth/authShared";
+
 
 interface ISLoginForm {
   email: string;
@@ -33,6 +34,7 @@ interface ISLoginForm {
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // states
   const [showPassword, setShowPassword] = useState(false);
@@ -70,13 +72,15 @@ const Login = () => {
       if (user?.data?.status) {
         dispatch(setUser(user?.data));
         localStorage.setItem("user", JSON.stringify(user?.data));
-        const role = user?.data?.data?.user?.role;
-        if (role === "landlord") {
-          navigate("/dashboard/landlord");
-        } else if (role === "tenant") {
-          navigate("/dashboard/tenant");
+        const from = (location.state as any)?.from;
+        const openContact = (location.state as any)?.openContact;
+        if (from && from !== "/login" && from !== "/signup") {
+          navigate(from, {
+            replace: true,
+            state: openContact ? { openContact } : undefined,
+          });
         } else {
-          navigate("/");
+          navigate("/", { replace: true });
         }
       }
       if (user?.error) {
@@ -99,11 +103,22 @@ const Login = () => {
   };
 
   return (
-    <Box sx={{ margin: "70px 0" }}>
-      <AppContainer>
-        <Grid container spacing={2} justifyContent="center">
-          <Grid item xs={12} md={6} lg={5}>
-            <AppCard sx={{ p: { xs: 2.5, md: 3.5 } }}>
+    <Box sx={AUTH_PAGE_WRAPPER_SX}>
+      <HeroSlideshow images={FALLBACK_HERO_IMAGES} />
+      <AppCard sx={AUTH_CARD_SX}>
+              <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
+                <Box
+                  component="img"
+                  src="/app-logo.png"
+                  alt="Town Ruins"
+                  sx={{
+                    height: { xs: 32, md: 40 },
+                    width: "auto",
+                    objectFit: "contain",
+                    display: "block",
+                  }}
+                />
+              </Box>
               <Box
                 sx={{
                   display: "flex",
@@ -175,12 +190,36 @@ const Login = () => {
                           onClick={hideShowPassword}
                           endAdornment={
                             showPassword ? (
-                              <AiOutlineEye color="disabled" />
+                              <Eye color="disabled" />
                             ) : (
-                              <AiOutlineEyeInvisible color="disabled" />
+                              <EyeOff color="disabled" />
                             )
                           }
                         />
+                      </Box>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "flex-end",
+                          marginTop: "8px",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            color: "#B8975A",
+                            cursor: "pointer",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            "&:hover": {
+                              textDecoration: "underline",
+                            },
+                          }}
+                          onClick={() => {
+                            navigate("/forgot-password");
+                          }}
+                        >
+                          Forgot password?
+                        </Box>
                       </Box>
                       <Box
                         sx={{
@@ -192,6 +231,7 @@ const Login = () => {
                         <AppButton
                           type="submit"
                           fullWidth
+                          size="large"
                           disabled={isLoading}
                           sx={{ margin: "0 0 16px 0" }}
                         >
@@ -202,7 +242,22 @@ const Login = () => {
                           )}
                         </AppButton>
                       </Box>
-                      <GoogleOAuth />
+                      <Box
+                        sx={{
+                          "& .MuiButton-root": {
+                            background: "var(--surface-card)",
+                            color: "var(--text-primary)",
+                            border: "1.5px solid var(--border-default)",
+                            borderRadius: "999px",
+                            lineHeight: 1.2,
+                            "&:hover": {
+                              background: "var(--surface-page)",
+                            },
+                          },
+                        }}
+                      >
+                        <GoogleOAuth />
+                      </Box>
                       <Box
                         sx={{
                           margin: "0 0 10px 0",
@@ -215,7 +270,7 @@ const Login = () => {
                         Don't Have an account?
                         <Box
                           sx={{
-                            color: "#1F4D3A",
+                            color: "#B8975A",
                             fontWeight: 600,
                             cursor: "pointer",
                             "&:hover": {
@@ -234,10 +289,7 @@ const Login = () => {
                 }}
               </Formik>
               </Box>
-            </AppCard>
-          </Grid>
-        </Grid>
-      </AppContainer>
+      </AppCard>
     <ToastAlert
       appearence={toast.appearence}
       type={toast.type}

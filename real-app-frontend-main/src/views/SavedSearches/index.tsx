@@ -1,5 +1,17 @@
 import { useMemo, useState } from "react";
-import { Box, Grid, FormControlLabel, Checkbox } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import {
+  Box,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  FormControlLabel,
+  Grid,
+} from "@mui/material";
+import { Bookmark, Lock } from "lucide-react";
 
 import { Heading, SubHeading } from "../../components/Heading";
 import useTypedSelector from "../../hooks/useTypedSelector";
@@ -16,6 +28,25 @@ import AppInput from "../../components/ui/AppInput";
 
 const SavedSearches = () => {
   const role = useTypedSelector(selectedUserRole);
+  const navigate = useNavigate();
+  const header = (
+    <Box
+      sx={{
+        background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)",
+        borderRadius: "20px",
+        p: { xs: 3, md: 4 },
+        mb: 4,
+        color: "#fff",
+      }}
+    >
+      <Box sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, fontWeight: 800 }}>
+        Saved Searches
+      </Box>
+      <Box sx={{ opacity: 0.75, mt: 0.5 }}>
+        Save your search criteria and get notified of new matches
+      </Box>
+    </Box>
+  );
 
   const { data: searchesData, refetch } = useGetMySavedSearchesQuery(undefined, {
     skip: role !== "tenant",
@@ -24,6 +55,10 @@ const SavedSearches = () => {
   const [createSavedSearch, { isLoading: creating }] =
     useCreateSavedSearchMutation();
   const [deleteSavedSearch] = useDeleteSavedSearchMutation();
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    searchId: string;
+  }>({ open: false, searchId: "" });
 
   const searches = useMemo(() => searchesData?.data || [], [searchesData]);
 
@@ -60,11 +95,23 @@ const SavedSearches = () => {
 
   if (role !== "tenant") {
     return (
-      <Box sx={{ marginTop: "50px" }}>
+      <Box sx={{ mt: { xs: 5, md: 6 } }}>
         <AppContainer>
-          <Heading>Saved Searches</Heading>
-          <AppCard sx={{ marginTop: "10px", p: 2 }}>
-            Only tenant accounts can use saved searches.
+          {header}
+          <AppCard
+            sx={{
+              p: { xs: 3, md: 4 },
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              color: "text.secondary",
+            }}
+          >
+            <Lock size={34} color="#B8975A" />
+            <Box>
+              Saved searches are available to tenant accounts. Sign up as a
+              tenant to get started.
+            </Box>
           </AppCard>
         </AppContainer>
       </Box>
@@ -72,9 +119,9 @@ const SavedSearches = () => {
   }
 
   return (
-    <Box sx={{ marginTop: "50px" }}>
+    <Box sx={{ mt: { xs: 5, md: 6 } }}>
       <AppContainer>
-        <Heading>Saved Searches</Heading>
+        {header}
 
         <AppCard sx={{ marginTop: "20px", p: 2 }}>
           <SubHeading sx={{ marginBottom: "10px" }}>Create</SubHeading>
@@ -93,7 +140,7 @@ const SavedSearches = () => {
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
               />
             </Grid>
-            <Grid item xs={6} md={2}>
+            <Grid item xs={12} sm={6} md={2}>
               <AppInput
                 label="Min Rent"
                 type="number"
@@ -101,7 +148,7 @@ const SavedSearches = () => {
                 onChange={(e) => setForm({ ...form, minRent: e.target.value })}
               />
             </Grid>
-            <Grid item xs={6} md={2}>
+            <Grid item xs={12} sm={6} md={2}>
               <AppInput
                 label="Max Rent"
                 type="number"
@@ -109,7 +156,7 @@ const SavedSearches = () => {
                 onChange={(e) => setForm({ ...form, maxRent: e.target.value })}
               />
             </Grid>
-            <Grid item xs={6} md={2}>
+            <Grid item xs={12} sm={6} md={2}>
               <AppInput
                 label="Min Beds"
                 type="number"
@@ -182,7 +229,30 @@ const SavedSearches = () => {
         <AppCard sx={{ marginTop: "20px", p: 2 }}>
           <SubHeading sx={{ marginBottom: "10px" }}>Your Saved Searches</SubHeading>
           {searches.length === 0 ? (
-            <Box>No saved searches yet.</Box>
+            <Box
+              sx={{
+                minHeight: 240,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+                px: 2,
+              }}
+            >
+              <Box>
+                <Bookmark size={42} color="#B8975A" />
+                <Heading sx={{ fontSize: "22px", mt: 1.5 }}>
+                  No saved searches yet
+                </Heading>
+                <SubHeading sx={{ color: "text.secondary", mt: 0.5, mb: 2 }}>
+                  Use the search page to save searches and get notified about new
+                  listings.
+                </SubHeading>
+                <AppButton onClick={() => navigate("/search")}>
+                  Start Searching
+                </AppButton>
+              </Box>
+            </Box>
           ) : (
             searches.map((s: any) => (
               <Box
@@ -193,6 +263,9 @@ const SavedSearches = () => {
                   alignItems: "center",
                   padding: "10px 0",
                   borderBottom: "1px solid #f1f5f9",
+                  "&:last-child": {
+                    borderBottom: "none",
+                  },
                 }}
               >
                 <Box>
@@ -206,10 +279,9 @@ const SavedSearches = () => {
                 </Box>
                 <AppButton
                   variant="outlined"
-                  onClick={async () => {
-                    await deleteSavedSearch(s._id);
-                    await refetch();
-                  }}
+                  onClick={() =>
+                    setConfirmDialog({ open: true, searchId: s._id })
+                  }
                 >
                   Delete
                 </AppButton>
@@ -218,6 +290,33 @@ const SavedSearches = () => {
           )}
         </AppCard>
       </AppContainer>
+      <Dialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ open: false, searchId: "" })}
+      >
+        <DialogTitle>Remove Saved Search</DialogTitle>
+        <DialogContent>
+          <DialogContentText>Remove this saved search?</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <AppButton
+            variant="outlined"
+            onClick={() => setConfirmDialog({ open: false, searchId: "" })}
+          >
+            Cancel
+          </AppButton>
+          <AppButton
+            color="error"
+            onClick={async () => {
+              await deleteSavedSearch(confirmDialog.searchId);
+              await refetch();
+              setConfirmDialog({ open: false, searchId: "" });
+            }}
+          >
+            Remove
+          </AppButton>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

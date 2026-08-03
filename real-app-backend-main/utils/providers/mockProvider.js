@@ -7,7 +7,7 @@
 
 const mockProvider = {
   /**
-   * Initiates a mock listing fee payment
+   * Legacy listing activation hook used by compatibility tests
    * @param {object} listing - Listing model
    * @param {object} landlord - Landlord user
    * @returns {object} Payment initiation response
@@ -17,12 +17,13 @@ const mockProvider = {
 
     return {
       transactionRef,
-      instructions: "Mock payment — approved immediately",
+      providerIntentId: transactionRef,
+      instructions: "Mock payment - approved immediately",
     };
   },
 
   /**
-   * Initiates a mock premium subscription payment
+   * Legacy premium access hook used by compatibility tests
    * @param {object} user - Tenant user
    * @returns {object} Payment initiation response
    */
@@ -31,9 +32,56 @@ const mockProvider = {
 
     return {
       transactionRef,
-      instructions: "Mock payment — approved immediately",
+      providerIntentId: transactionRef,
+      instructions: "Mock payment - approved immediately",
     };
   },
+
+  /**
+   * Initiates a mock booking payment
+   * @param {object} booking - Booking model
+   * @param {object} guest - Guest user
+   * @returns {object} Payment initiation response
+   */
+  initiateBookingPayment: async (booking, guest) => {
+    const transactionRef = `mock-booking-${booking._id || booking.id}`;
+
+    return {
+      transactionRef,
+      providerIntentId: transactionRef,
+      instructions: "Mock booking payment",
+    };
+  },
+
+  initiatePartialPayment: async (booking, guest, amount) => {
+    const transactionRef = `mock-partial-${Date.now()}`;
+
+    return {
+      transactionRef,
+      providerIntentId: transactionRef,
+      instructions: "Mock partial payment",
+    };
+  },
+
+  retryPayment: async (payment, guest) => {
+    const transactionRef = `mock-retry-${Date.now()}`;
+
+    return {
+      transactionRef,
+      providerIntentId: transactionRef,
+      instructions: "Mock retry",
+    };
+  },
+
+  issueRefund: async (payment, amount, reason) => ({
+    providerRefId: `mock-refund-${Date.now()}`,
+    status: "success",
+  }),
+
+  pollPaymentStatus: async (payment) => ({
+    status: "paid",
+    amountPaid: payment.amountDue,
+  }),
 
   /**
    * Verifies a mock webhook (always succeeds for testing)
@@ -42,8 +90,10 @@ const mockProvider = {
    */
   verifyWebhook: async (formFields) => ({
     valid: true,
+    eventId: formFields.eventId || `mock-${formFields.reference}-${formFields.status}`,
     transactionRef: formFields.reference,
     status: "paid",
+    amountPaid: formFields.amount ? Number.parseFloat(formFields.amount) : undefined,
   }),
 };
 

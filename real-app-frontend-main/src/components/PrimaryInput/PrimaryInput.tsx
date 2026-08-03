@@ -32,6 +32,7 @@ interface PrimaryInputProps {
   loading?: boolean;
   borderRadius?: string;
   ref?: React.RefObject<HTMLInputElement>;
+  inputProps?: any;
 }
 
 const PrimaryInput: React.FC<PrimaryInputProps> = ({
@@ -60,6 +61,7 @@ const PrimaryInput: React.FC<PrimaryInputProps> = ({
   loading = false,
   borderRadius,
   ref,
+  inputProps,
 }) => {
   return (
     <TextField
@@ -69,33 +71,37 @@ const PrimaryInput: React.FC<PrimaryInputProps> = ({
       required={required}
       autoFocus={autoFocus}
       ref={ref}
-      sx={[
-        {
-          "& input[type=number]": {
-            MozAppearance: "textfield",
-          },
-          "& input[type=number]::-webkit-outer-spin-button": {
-            WebkitAppearance: "none",
-            margin: 0,
-          },
-          "& input[type=number]::-webkit-inner-spin-button": {
-            WebkitAppearance: "none",
-            margin: 0,
-          },
-          "& .MuiFormHelperText-root": {
-            marginLeft: "2px !important",
-          },
-
-          // target the placeholder
-          "& .MuiInputBase-input::placeholder": {
-            fontSize: "14px",
-          },
-          "& .MuiOutlinedInput-input": {
-            cursor: readOnly ? "not-allowed" : "",
-          },
+      sx={{
+        "& input[type=number]": {
+          MozAppearance: "textfield",
         },
-        sx,
-      ]}
+        "& input[type=number]::-webkit-outer-spin-button": {
+          WebkitAppearance: "none",
+          margin: 0,
+        },
+        "& input[type=number]::-webkit-inner-spin-button": {
+          WebkitAppearance: "none",
+          margin: 0,
+        },
+        "& .MuiFormHelperText-root": {
+          marginLeft: "2px !important",
+        },
+
+        // target the placeholder
+        "& .MuiInputBase-input::placeholder": {
+          fontSize: "14px",
+        },
+        "& .MuiOutlinedInput-input": {
+          cursor: readOnly ? "not-allowed" : "",
+        },
+        "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+          borderColor: "#B8975A",
+        },
+        "& .MuiInputLabel-root.Mui-focused": {
+          color: "#B8975A",
+        },
+        ...(Array.isArray(sx) ? Object.assign({}, ...sx) : sx || {}),
+      }}
       onChange={onChange}
       name={name}
       type={type}
@@ -112,7 +118,8 @@ const PrimaryInput: React.FC<PrimaryInputProps> = ({
       InputProps={{
         sx: {
           borderRadius: borderRadius ? borderRadius : "12px",
-          background: "#fff",
+          background: "var(--surface-card)",
+          color: "var(--text-primary)",
           minHeight: multiline ? "auto" : "48px",
           border: "none",
         },
@@ -142,6 +149,7 @@ const PrimaryInput: React.FC<PrimaryInputProps> = ({
         ),
         inputProps: {
           min: 0,
+          ...inputProps,
           // restrict user to type -
           onKeyDown: (event: any) => {
             if (event.key === "-" && type === "number") {

@@ -7,6 +7,7 @@ const { createListingValidators } = require("../middleware/listingValidators");
 
 const router = express.Router();
 
+router.get("/stats", listingController.getPublicStats);
 router.get("/", authController.optionalAuth, listingController.getListings);
 router.get("/get", authController.optionalAuth, listingController.getListings);
 router.get("/home/highlighted", authController.optionalAuth, listingController.getHomeHighlighted);
@@ -37,6 +38,12 @@ router.get(
   listingController.getUsersListings
 );
 
+router.post(
+  "/:id/transition-to-pending-payment",
+  authController.requireRole("landlord"),
+  listingController.transitionListingToPendingPayment
+);
+
 router.delete(
   "/:id",
   authController.requireRole("landlord"),
@@ -47,5 +54,11 @@ router.put(
   "/:id",
   authController.requireRole("landlord"),
   listingController.updateListing
+);
+
+router.post(
+  "/:id/restore",
+  authController.requireRole("landlord"),
+  listingController.restoreListing
 );
 module.exports = router;

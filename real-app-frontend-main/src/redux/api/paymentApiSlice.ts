@@ -12,24 +12,31 @@ export const paymentApiSlice = apiSlice.injectEndpoints({
       providesTags: ["Payment"],
     }),
     initiateListingFee: builder.mutation({
-      query: ({ listingId, phone }) => {
+      query: ({ listingId, earlyAccess = false }) => {
         return {
           url: "payments/listing-fee",
           method: "POST",
-          body: { listingId, phone },
+          body: { listingId, earlyAccess },
         };
       },
-      invalidatesTags: ["Payment"],
+      invalidatesTags: [
+        "Payment",
+        { type: "WalletTransaction", id: "BALANCE" },
+        { type: "WalletTransaction", id: "LIST" },
+      ],
     }),
     initiateTenantPremium: builder.mutation({
-      query: ({ phone }) => {
+      query: () => {
         return {
           url: "payments/tenant-premium",
           method: "POST",
-          body: { phone },
         };
       },
-      invalidatesTags: ["Payment"],
+      invalidatesTags: [
+        "Payment",
+        { type: "WalletTransaction", id: "BALANCE" },
+        { type: "WalletTransaction", id: "LIST" },
+      ],
     }),
   }),
 });

@@ -41,15 +41,23 @@ export default function SearchBar({
     <TextField
       sx={{
         width: "100%",
-        borderRadius: "12px",
-        "& .MuiOutlinedInput-notchedOutline": {
-          borderColor: "#E5E7EB",
+        borderRadius: 999,
+        "& .MuiOutlinedInput-root": {
+          borderRadius: 999,
+          background: color ? color : "var(--surface-card)",
+          color: "var(--text-primary)",
+          "& .MuiOutlinedInput-notchedOutline": {
+            border: "1.5px solid var(--border-default)",
+          },
+          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+            borderColor: "#B8975A",
+          },
         },
       }}
       fullWidth
       onKeyDown={handleKeyDown}
       onChange={onChange}
-      value={searchText}
+      value={value ?? searchText ?? ""}
       id="outlined-basic"
       variant="outlined"
       placeholder={
@@ -59,16 +67,15 @@ export default function SearchBar({
       }
       InputProps={{
         sx: {
-          borderRadius: "12px",
-          background: color ? color : "#fff",
+          borderRadius: 999,
+          background: color ? color : "var(--surface-card)",
           minHeight: "48px",
-          border: "none",
         },
         endAdornment: (
           <InputAdornment position="start">
             <IoIosSearch
               style={{
-                color: "#334155",
+                color: "#B8975A",
                 fontWeight: "bold",
                 fontSize: "18px",
               }}

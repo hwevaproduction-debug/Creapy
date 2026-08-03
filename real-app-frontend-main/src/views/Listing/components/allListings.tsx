@@ -2,7 +2,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 // MUI Imports
-import { Box, Grid } from "@mui/material";
+import {
+  Box,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+} from "@mui/material";
 // Redux Imports
 import {
   useDeleteListingMutation,
@@ -11,19 +18,18 @@ import {
 import { selectedUserId } from "../../../redux/auth/authSlice";
 // Hook Imports
 import useTypedSelector from "../../../hooks/useTypedSelector";
-// React Icons
-import { CiEdit } from "react-icons/ci";
-import { MdDeleteOutline } from "react-icons/md";
+import { Home, Pencil, Trash2 } from "lucide-react";
 // Utils Imports
 import { convertToFormattedDate } from "../../../utils";
 // Component Imports
-import { Heading } from "../../../components/Heading";
+import { Heading, SubHeading } from "../../../components/Heading";
 import OverlayLoader from "../../../components/Spinner/OverlayLoader";
 import ToastAlert from "../../../components/ToastAlert/ToastAlert";
 import DotLoader from "../../../components/Spinner/dotLoader";
 import AppContainer from "../../../components/ui/AppContainer";
 import AppCard from "../../../components/ui/AppCard";
 import AppButton from "../../../components/ui/AppButton";
+import { studentAccommodationBadgeSx } from "../../../styles/listingBadges";
 
 const getListingStatusBadge = (status: string) => {
   if (status === "pending_payment") {
@@ -48,8 +54,8 @@ const getListingStatusBadge = (status: string) => {
     return (
       <Box
         sx={{
-          background: "#dbeafe",
-          color: "#1e40af",
+          background: "#FDF8F0",
+          color: "#9E7E45",
           borderRadius: "999px",
           padding: "6px 12px",
           fontSize: "12px",
@@ -66,8 +72,8 @@ const getListingStatusBadge = (status: string) => {
     return (
       <Box
         sx={{
-          background: "#dcfce7",
-          color: "#166534",
+          background: "#D1EAE0",
+          color: "#1F4D3A",
           borderRadius: "999px",
           padding: "6px 12px",
           fontSize: "12px",
@@ -107,6 +113,10 @@ const AllListings = () => {
     appearence: false,
     type: "",
   });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    listingId: string;
+  }>({ open: false, listingId: "" });
 
   const handleCloseToast = () => {
     setToast({ ...toast, appearence: false });
@@ -147,19 +157,24 @@ const AllListings = () => {
   };
 
   return (
-    <Box sx={{ marginTop: "50px" }}>
+    <Box sx={{ mt: { xs: 5, md: 6 } }}>
       {isLoading && <OverlayLoader />}
       <AppContainer>
         <Box
           sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            flexDirection: "column",
-            gap: 2,
+            background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)",
+            borderRadius: "20px",
+            p: { xs: 3, md: 4 },
+            mb: 4,
+            color: "#fff",
           }}
         >
-          <Heading>Your Listings</Heading>
+          <Box sx={{ fontSize: { xs: "1.5rem", md: "2rem" }, fontWeight: 800 }}>
+            Your Listings
+          </Box>
+          <Box sx={{ opacity: 0.75, mt: 0.5 }}>
+            Manage and track your property listings.
+          </Box>
         </Box>
           {isSuccess && data?.data?.length === 0 ? (
             <AppCard
@@ -167,20 +182,27 @@ const AllListings = () => {
                 display: "flex",
                 alignItems: "center",
                 width: "100%",
-                padding: "20px",
+                p: { xs: 3, md: 4 },
                 margin: "20px 0",
                 justifyContent: "center",
                 flexDirection: "column",
+                textAlign: "center",
               }}
             >
-              No Listings to show
+              <Home size={40} color="#B8975A" />
+              <Heading sx={{ fontSize: "22px", mt: 1.5 }}>
+                No listings yet
+              </Heading>
+              <SubHeading sx={{ color: "text.secondary", mt: 0.5, mb: 2 }}>
+                You haven't created any listings. Get started by creating your
+                first property listing.
+              </SubHeading>
               <AppButton
                 onClick={() => {
                   navigate("/create-listing");
                 }}
-                sx={{ margin: "10px 0 0" }}
               >
-                Create Listing
+                Create your first listing
               </AppButton>
             </AppCard>
           ) : (
@@ -190,8 +212,14 @@ const AllListings = () => {
                   <AppCard
                     sx={{
                       width: "100%",
-                      padding: "20px",
-                      margin: "20px 0",
+                      p: { xs: 2, md: 2.5 },
+                      my: { xs: 2, md: 2.5 },
+                      borderRadius: "16px",
+                      transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                      "&:hover": {
+                        transform: "translateY(-2px)",
+                        boxShadow: "0 12px 32px rgba(31,41,55,0.12)",
+                      },
                     }}
                     key={item?._id}
                   >
@@ -202,16 +230,16 @@ const AllListings = () => {
                         flexDirection: { xs: "column", sm: "row" },
                       }}
                     >
-                      <Grid item xs={12} sm={3} md={2}>
+                      <Box sx={{ width: { xs: "100%", sm: "160px" } }}>
                         <img
                           src={item?.imageUrls[0]}
                           width="100%"
                           height={140}
                           alt="listing"
-                          style={{ borderRadius: "5px" }}
+                          style={{ borderRadius: "12px", objectFit: "cover" }}
                         />
-                      </Grid>
-                      <Grid item xs={12} sm={9} md={10}>
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
                         <Box
                           sx={{
                             display: "flex",
@@ -234,10 +262,10 @@ const AllListings = () => {
                                 sx={{
                                   fontSize: "18px",
                                   fontWeight: 600,
-                                  color: "#49454F",
+                                  color: "text.primary",
                                   "&:hover": {
                                     cursor: "pointer",
-                                    textDecoration: "underline",
+                                    color: "#B8975A",
                                   },
                                 }}
                                 onClick={() => {
@@ -247,10 +275,15 @@ const AllListings = () => {
                                 {item?.name}
                               </Box>
                               {getListingStatusBadge(item?.status)}
+                              {item?.studentAccommodation ? (
+                                <Box sx={studentAccommodationBadgeSx}>
+                                  Student Accommodation
+                                </Box>
+                              ) : null}
                             </Box>
                             <Box
                               sx={{
-                                color: "#1e293b",
+                                color: "text.secondary",
                                 marginTop: "8px",
                               }}
                             >
@@ -274,7 +307,20 @@ const AllListings = () => {
                                   navigate(`/listings/${item?._id}/pay`);
                                 }}
                               >
-                                Pay Now
+                                Activate with TR Tokens
+                              </AppButton>
+                            ) : item?.status === "inactive" ? (
+                              <AppButton
+                                variant="contained"
+                                sx={{
+                                  background: "#6b7280",
+                                  "&:hover": { background: "#4b5563" },
+                                }}
+                                onClick={() => {
+                                  navigate(`/listings/${item?._id}/pay`);
+                                }}
+                              >
+                                Revive (Restore with TR Tokens)
                               </AppButton>
                             ) : (
                               <>
@@ -284,13 +330,16 @@ const AllListings = () => {
                                   startIcon={
                                     selectedListing === item?._id &&
                                     isDeleting ? null : (
-                                      <MdDeleteOutline />
+                                      <Trash2 size={16} />
                                     )
                                   }
                                   disabled={isDeleting}
                                   onClick={() => {
-                                    DeleteListingHandler(item?._id);
                                     setSelectedListing(item?._id);
+                                    setConfirmDialog({
+                                      open: true,
+                                      listingId: item?._id,
+                                    });
                                   }}
                                 >
                                   {selectedListing === item?._id && isDeleting ? (
@@ -312,8 +361,7 @@ const AllListings = () => {
 
                                 <AppButton
                                   variant="outlined"
-                                  color="success"
-                                  startIcon={<CiEdit />}
+                                  startIcon={<Pencil size={16} />}
                                   onClick={() => {
                                     navigate(`/listings/${item?._id}`);
                                   }}
@@ -325,10 +373,10 @@ const AllListings = () => {
                           </Box>
                         </Box>
                         <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: { xs: "flex-start", sm: "end" },
-                            gap: 1,
+                            sx={{
+                              display: "flex",
+                              justifyContent: { xs: "flex-start", sm: "flex-end" },
+                              gap: 1,
                             marginTop: "5px",
                             alignItems: "center",
                             flexWrap: "wrap",
@@ -339,36 +387,21 @@ const AllListings = () => {
                             {convertToFormattedDate(item?.publishedAt ?? item?.createdAt)}
                           </Box>
                           <Box>
-                            {item?.type === "rent" ? (
-                              <Box
-                                sx={{
-                                  background: "#2B6A50",
-                                  fontSize: "12px",
-                                  color: "#fff",
-                                  borderRadius: "999px",
-                                  padding: "6px 12px",
-                                  display: "inline-block",
-                                }}
-                              >
-                                Rent
-                              </Box>
-                            ) : (
-                              <Box
-                                sx={{
-                                  background: "#6B8A7A",
-                                  fontSize: "12px",
-                                  color: "#fff",
-                                  borderRadius: "999px",
-                                  padding: "6px 12px",
-                                  display: "inline-block",
-                                }}
-                              >
-                                Sale
-                              </Box>
-                            )}
+                            <Box
+                              sx={{
+                                background: "#B8975A",
+                                fontSize: "12px",
+                                color: "#fff",
+                                borderRadius: "999px",
+                                padding: "6px 12px",
+                                display: "inline-block",
+                              }}
+                            >
+                              Rent
+                            </Box>
                           </Box>{" "}
                         </Box>
-                      </Grid>
+                      </Box>
                     </Box>
                   </AppCard>
                 );
@@ -382,6 +415,34 @@ const AllListings = () => {
         message={toast.message}
         handleClose={handleCloseToast}
       />
+      <Dialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ open: false, listingId: "" })}
+      >
+        <DialogTitle>Delete Listing</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Delete this listing? This cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <AppButton
+            variant="outlined"
+            onClick={() => setConfirmDialog({ open: false, listingId: "" })}
+          >
+            Cancel
+          </AppButton>
+          <AppButton
+            color="error"
+            onClick={() => {
+              DeleteListingHandler(confirmDialog.listingId);
+              setConfirmDialog({ open: false, listingId: "" });
+            }}
+          >
+            Delete
+          </AppButton>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

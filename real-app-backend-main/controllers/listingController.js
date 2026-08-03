@@ -1,36 +1,159 @@
 // Custom Imports
 const catchAsync = require("../utils/catchAsync");
-const Listing = require("../models/listingModel");
 const AppError = require("../utils/appError");
-const SavedSearch = require("../models/savedSearchModel");
-const User = require("../models/userModel");
+const prisma = require("../utils/prisma");
 const { sendEmail } = require("../utils/email");
-const mongoose = require("mongoose");
 const { isPremiumTenant } = require("../utils/monetization");
+const walletService = require("../utils/walletService");
+const listingConfig = require("../utils/listingConfig");
 
-const promoteExpiredEarlyAccess = async () => {
-  // Update any early_access listings where earlyAccessUntil has passed to active
-  const now = new Date();
-  await Listing.updateMany(
-    {
-      status: "early_access",
-      earlyAccessUntil: { $lt: now },
-    },
-    {
-      $set: { status: "active" },
+const SINGLE_ACTIVE_LISTING_MESSAGE =
+  "You already have an active listing. You can only have one listing at a time.";
+
+const mapLegacyLocation = (listing) => ({
+  province: listing?.province || "",
+  city: listing?.city || "",
+  addressLine: listing?.addressLine || "",
+  country: "Zimbabwe",
+});
+
+const mapListingId = (listing) =>
+  listing
+    ? {
+        ...listing,
+        _id: listing.id,
+        location: mapLegacyLocation(listing),
+      }
+    : listing;
+
+const mapListingWithUser = (listing) =>
+  listing
+    ? {
+        ...mapListingId(listing),
+        user: listing.userId,
+      }
+    : listing;
+
+const sanitizeListingForPublic = (listing, options = {}) => {
+  if (!listing) return listing;
+
+  const { phoneNumber, address, addressLine, ...publicListing } = listing;
+  if (publicListing.addressLine !== undefined) {
+    delete publicListing.addressLine;
+  }
+  if (
+    options.stripLocationAddressLine !== false &&
+    publicListing.location &&
+    typeof publicListing.location === "object" &&
+    !Array.isArray(publicListing.location)
+  ) {
+    const location = { ...publicListing.location };
+    delete location.addressLine;
+    publicListing.location = location;
+  }
+
+  return publicListing;
+};
+
+const getListingImage = (imageUrls) => {
+  if (Array.isArray(imageUrls)) {
+    return imageUrls[0] || null;
+  }
+
+  if (typeof imageUrls === "string") {
+    try {
+      const parsed = JSON.parse(imageUrls);
+      return Array.isArray(parsed) ? parsed[0] || null : null;
+    } catch (error) {
+      return null;
     }
-  );
+  }
+
+  return null;
+};
+
+const getNormalizedProvinceValue = (listing) => listing?.province || "";
+
+const applyListingLifecycle = async () => {
+  const now = new Date();
+
+  await prisma.listing.updateMany({
+    where: {
+      status: "early_access",
+      earlyAccessUntil: { lt: now },
+    },
+    data: { status: "active" },
+  });
+
+  await prisma.listing.updateMany({
+    where: {
+      status: "active",
+      expiresAt: { lt: now },
+    },
+    data: { status: "expired" },
+  });
+};
+
+exports.getPublicStats = async (req, res) => {
+  try {
+    const [activeListings, landlords, provinceRows, ratingAggregate] = await Promise.all([
+      prisma.listing.count({ where: { status: "active" } }),
+      prisma.user.count({ where: { role: "landlord" } }),
+      prisma.listing.findMany({
+        where: { status: "active", province: { not: "" } },
+        distinct: ["province"],
+        select: { province: true },
+      }),
+      prisma.review.aggregate({
+        where: {
+          isPublished: true,
+          deletedAt: null,
+          accommodation: {
+            isPublished: true,
+            deletedAt: null,
+          },
+        },
+        _avg: { overallRating: true },
+      }),
+    ]);
+
+    const reviewAverageRating = ratingAggregate?._avg?.overallRating;
+    const avgRating =
+      reviewAverageRating == null ? null : Math.round(Number(reviewAverageRating) * 10) / 10;
+
+    return res.status(200).json({
+      status: true,
+      data: {
+        activeListings,
+        landlords,
+        provinces: provinceRows.length,
+        avgRating,
+      },
+    });
+  } catch {
+    return res.status(500).json({
+      status: false,
+      message: "Unable to load public stats",
+    });
+  }
 };
 
 const normalizeListingPayload = (body) => {
-  // Backwards compat: frontend may send regularPrice/discountedPrice.
   const payload = { ...body };
   if (payload.regularPrice != null && payload.monthlyRent == null) {
     payload.monthlyRent = payload.regularPrice;
   }
+  delete payload.regularPrice;
+  delete payload.discountedPrice;
+  delete payload.id;
+  delete payload.user;
+  delete payload.userRef;
+  delete payload.userId;
+  delete payload.createdAt;
+  delete payload.updatedAt;
+  delete payload.payments;
+  delete payload.engagements;
 
-  // Source-of-truth for parking is amenities.parking.
-  // Backwards compat: older UI may send parking as a top-level boolean.
   if (payload.parking != null) {
     payload.amenities = payload.amenities || {};
     if (payload.amenities.parking == null) {
@@ -39,16 +162,80 @@ const normalizeListingPayload = (body) => {
     delete payload.parking;
   }
 
-  // Do not persist discountedPrice if not needed; keep if present.
+  if (typeof payload.location === "string") {
+    payload.location = {
+      province: payload.location,
+      country: "Zimbabwe",
+      addressLine: payload.address || "",
+      city: "",
+    };
+  } else if (payload.location && typeof payload.location === "object") {
+    payload.location = {
+      addressLine: payload.location.addressLine || payload.address || "",
+      country: payload.location.country || "Zimbabwe",
+      province: payload.location.province || "",
+      city: payload.location.city || "",
+      coordinates: payload.location.coordinates || {
+        lat: null,
+        lng: null,
+      },
+    };
+  }
+
+  const location = payload.location || {};
+  payload.province = location.province || "";
+  payload.city = location.city || "";
+  payload.addressLine = location.addressLine || "";
+  payload.lat = location.coordinates?.lat ?? null;
+  payload.lng = location.coordinates?.lng ?? null;
+  delete payload.location;
+
   return payload;
+};
+
+const buildListingCreateData = (body) => {
+  const payload = normalizeListingPayload(body);
+
+  return {
+    name: payload.name,
+    description: payload.description,
+    address: payload.address,
+    phoneNumber: payload.phoneNumber,
+    monthlyRent:
+      payload.monthlyRent != null ? Number(payload.monthlyRent) : payload.monthlyRent,
+    province: payload.province || "",
+    city: payload.city || "",
+    addressLine: payload.addressLine || "",
+    lat: payload.lat ?? null,
+    lng: payload.lng ?? null,
+    amenities: payload.amenities || {},
+    bathrooms: Number(payload.bathrooms),
+    bedrooms: payload.bedrooms == null ? null : Number(payload.bedrooms),
+    totalRooms: Number(payload.totalRooms),
+    furnished: Boolean(payload.furnished),
+    type: payload.type || "rent",
+    offer: Boolean(payload.offer),
+    studentAccommodation: Boolean(payload.studentAccommodation),
+    imageUrls: payload.imageUrls || [],
+  };
 };
 
 const matchesSavedSearch = (search, listing) => {
   const c = search.criteria || {};
   const loc = (c.location || "").trim().toLowerCase();
   if (loc) {
-    const listingLoc = (listing.location || "").toLowerCase();
-    if (!listingLoc.includes(loc)) return false;
+    const listingLocs = [];
+    if (listing.province) {
+      listingLocs.push(listing.province.toLowerCase());
+    }
+    if (listing.city) {
+      listingLocs.push(listing.city.toLowerCase());
+    }
+    if (listing.addressLine) {
+      listingLocs.push(listing.addressLine.toLowerCase());
+    }
+    const locationMatches = listingLocs.some((value) => value.includes(loc));
+    if (!locationMatches) return false;
   }
 
   const rent = Number(listing.monthlyRent || 0);
@@ -61,7 +248,11 @@ const matchesSavedSearch = (search, listing) => {
   const minBeds = Number(c.minBedrooms || 0);
   if (minBeds && beds < minBeds) return false;
 
-  const wantedAmenities = (c.amenities || {});
+  const rooms = Number(listing.totalRooms || 0);
+  const minRooms = Number(c.minTotalRooms || 0);
+  if (minRooms && rooms < minRooms) return false;
+
+  const wantedAmenities = c.amenities || {};
   const listingAmenities = listing.amenities || {};
   for (const key of Object.keys(wantedAmenities)) {
     if (wantedAmenities[key] === true && listingAmenities[key] !== true) {
@@ -72,111 +263,143 @@ const matchesSavedSearch = (search, listing) => {
 };
 
 exports.createListing = catchAsync(async (req, res, next) => {
-  // 1) Create a listing
-  const payload = normalizeListingPayload(req.body);
-  payload.user = req.user.id;
-  const newListing = await Listing.create(payload);
+  const existingCount = await prisma.listing.count({
+    where: {
+      userId: req.user.id,
+      status: { not: "inactive" },
+    },
+  });
+  if (existingCount >= 1) {
+    return res.status(400).json({
+      message: SINGLE_ACTIVE_LISTING_MESSAGE,
+    });
+  }
 
-  // 1b) Trigger saved-search alerts (email) for tenants
+  const data = {
+    ...buildListingCreateData(req.body),
+    userId: req.user.id,
+    status: "active",
+    publishedAt: new Date(),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  };
+
+  let newListing;
   try {
-    const activeSearches = await SavedSearch.find({ isActive: true }).populate(
-      "user",
-      "email role"
-    );
+    newListing = await prisma.listing.create({ data });
+  } catch (error) {
+    if (error.code === "P2002") {
+      return res.status(400).json({
+        message: SINGLE_ACTIVE_LISTING_MESSAGE,
+      });
+    }
+    throw error;
+  }
+
+  try {
+    const activeSearches = await prisma.savedSearch.findMany({
+      where: { isActive: true },
+      include: {
+        user: {
+          select: {
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
     const matches = activeSearches.filter(
       (s) => s.user && s.user.role === "tenant" && matchesSavedSearch(s, newListing)
     );
-    // Fire-and-forget style (but awaited in try for simplicity)
     for (const s of matches) {
-      const to = s.user.email;
       await sendEmail({
-        to,
+        to: s.user.email,
         subject: "New property matching your saved search",
-        text: `A new property was listed in ${newListing.location} for ${newListing.monthlyRent}. Open the app to view details.`,
+        text: `A new property was listed in ${getNormalizedProvinceValue(
+          newListing
+        )} for ${newListing.monthlyRent}. Open the app to view details.`,
       });
-      s.lastNotifiedAt = new Date();
-      await s.save({ validateBeforeSave: false });
+      await prisma.savedSearch.update({
+        where: { id: s.id },
+        data: { lastNotifiedAt: new Date() },
+      });
     }
   } catch (e) {
     // eslint-disable-next-line no-console
     console.log("[saved-search-alerts]", e?.message || e);
   }
 
-  // 2) Send the response
   res.status(201).json({
     status: "success",
     data: {
-      listing: newListing,
+      listing: mapListingWithUser(newListing),
     },
   });
 });
 
 exports.getUsersListings = catchAsync(async (req, res, next) => {
-  // 1) Find all listings based on user id
-  const listings = await Listing.find({ user: req.params.id });
+  const listings = await prisma.listing.findMany({
+    where: { userId: req.params.id },
+  });
 
-  // 2) Send the response
   res.status(200).json({
     status: "success",
     results: listings.length,
-    data: listings,
+    data: listings.map(mapListingId),
   });
 });
 
 exports.getListing = catchAsync(async (req, res, next) => {
-  // 1) Find the listing
-  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-    return next(new AppError("Invalid listing id", 400));
-  }
-  const listing = await Listing.findById(req.params.id);
+  const listing = await prisma.listing.findUnique({
+    where: { id: req.params.id },
+  });
 
-  // 2) Check if the listing exists
   if (!listing) {
     return next(new AppError("No listing found with that ID", 404));
   }
 
-  // 3) Owners can always view their own listing (including pending_payment/early_access)
-  if (req.user && listing.user.toString() === req.user.id) {
+  if (req.user && listing.userId === req.user.id) {
     return res.status(200).json({
       status: "success",
-      data: listing,
+      data: mapListingId(listing),
     });
   }
 
-  // 4) Check visibility: conceal pending_payment and early_access (unless premium)
-  const isPremium = req.user ? isPremiumTenant(req.user) : false;
   if (listing.status === "pending_payment") {
     return next(new AppError("No listing found with that ID", 404));
   }
+
+  if (listing.status === "expired") {
+    return next(new AppError("No listing found with that ID", 404));
+  }
+
+  const isPremium = req.user ? isPremiumTenant(req.user) : false;
   if (listing.status === "early_access" && !isPremium) {
     return next(new AppError("No listing found with that ID", 404));
   }
 
-  // 5) Send the response
   res.status(200).json({
     status: "success",
-    data: listing,
+    data: sanitizeListingForPublic(mapListingId(listing)),
   });
 });
 
 exports.deleteListing = catchAsync(async (req, res, next) => {
-  // 1) Find the listing
-  const listing = await Listing.findById(req.params.id);
+  const listing = await prisma.listing.findUnique({
+    where: { id: req.params.id },
+  });
 
-  // 2) Check if the listing exists
   if (!listing) {
     return next(new AppError("No listing found with that ID", 404));
   }
 
-  // 3) Check if the user owns the listing
-  if (listing.user.toString() !== req.user.id) {
+  if (listing.userId !== req.user.id) {
     return next(new AppError("You do not own this listing", 403));
   }
 
-  // 4) Delete the listing
-  await Listing.findByIdAndDelete(req.params.id);
+  await prisma.listing.delete({
+    where: { id: req.params.id },
+  });
 
-  // 4) Send the response
   res.status(204).json({
     status: "success",
     data: null,
@@ -184,244 +407,387 @@ exports.deleteListing = catchAsync(async (req, res, next) => {
 });
 
 exports.updateListing = catchAsync(async (req, res, next) => {
-  // 1) Find the listing
-  const listing = await Listing.findById(req.params.id);
+  const listing = await prisma.listing.findUnique({
+    where: { id: req.params.id },
+  });
 
-  // 2) Check if the listing exists
   if (!listing) {
     return next(new AppError("No listing found with that ID", 404));
   }
 
-  // 3) Check if the user owns the listing
-  if (listing.user.toString() !== req.user.id) {
+  if (listing.userId !== req.user.id) {
     return next(new AppError("You do not own this listing", 403));
   }
 
-  // 4) Update the listing
-  const updatedListing = await Listing.findByIdAndUpdate(
-    req.params.id,
-    normalizeListingPayload(req.body),
-    {
-      new: true,
-      runValidators: true,
-    }
+  const lifecycleControlledFields = [
+    "status",
+    "paymentDeadline",
+    "publishedAt",
+    "earlyAccessUntil",
+  ];
+  const attemptedLifecycleFields = lifecycleControlledFields.filter((field) =>
+    Object.prototype.hasOwnProperty.call(req.body, field)
   );
+  if (attemptedLifecycleFields.length > 0) {
+    return next(
+      new AppError(
+        "Listing lifecycle fields cannot be updated from this endpoint.",
+        400
+      )
+    );
+  }
 
-  // 5) Send the response
+  const updatedListing = await prisma.listing.update({
+    where: { id: req.params.id },
+    data: normalizeListingPayload(req.body),
+  });
+
   res.status(200).json({
     status: "success",
-    data: updatedListing,
+    data: mapListingId(updatedListing),
+  });
+});
+
+exports.transitionListingToPendingPayment = catchAsync(async (req, res, next) => {
+  const listing = await prisma.listing.findUnique({
+    where: { id: req.params.id },
+  });
+
+  if (!listing) {
+    return next(new AppError("No listing found with that ID", 404));
+  }
+
+  if (listing.userId !== req.user.id) {
+    return next(new AppError("You do not own this listing", 403));
+  }
+
+  if (listing.status !== "active") {
+    return next(
+      new AppError("Only active listings can be transitioned to pending payment.", 400)
+    );
+  }
+
+  if (!(listing.paymentDeadline instanceof Date) || listing.paymentDeadline <= new Date()) {
+    return next(
+      new AppError(
+        "Only listings still within the payment window can be transitioned to pending payment.",
+        400
+      )
+    );
+  }
+
+  const updatedListing = await prisma.listing.update({
+    where: { id: req.params.id },
+    data: { status: "pending_payment" },
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: mapListingId(updatedListing),
   });
 });
 
 exports.getListings = catchAsync(async (req, res, next) => {
-  // 0) Promote expired early_access listings to active
-  await promoteExpiredEarlyAccess();
+  await applyListingLifecycle();
 
-  // 1) Pagination
   const page = req.query.page * 1 || 1;
   const limit = req.query.limit * 1 || 6;
   const skip = (page - 1) * limit;
 
-  // 2) Sorting
-  // i) regularPrice_asc
-  // ii) regularPrice_desc
-  // iii) createdAt_desc
-  // iv) createdAt_asc
-  let sort = {};
+  let orderBy = { createdAt: "asc" };
   if (req.query.sort) {
     const sortQuery = req.query.sort.split("_");
-    // Backwards compat: UI may request regularPrice sorting.
     if (sortQuery[0] === "regularPrice") sortQuery[0] = "monthlyRent";
-    if (sortQuery[1] === "desc") {
-      sort[sortQuery[0]] = -1;
-    } else {
-      sort[sortQuery[0]] = 1;
-    }
-  } else {
-    sort = { createdAt: 1 };
+    orderBy = {
+      [sortQuery[0]]: sortQuery[1] === "desc" ? "desc" : "asc",
+    };
   }
 
-  // 3) Base filter: determine premium status and set status filter accordingly
   const isPremium = req.user ? isPremiumTenant(req.user) : false;
-  const filter = {
-    status: isPremium ? { $in: ["active", "early_access"] } : "active",
+  const where = {
+    status: isPremium ? { in: ["active", "early_access"] } : "active",
   };
+  const AND = [];
 
-  // 3a) Text search (name/description)
   const searchTerm = (req.query.searchTerm || "").toString().trim();
   if (searchTerm) {
-    const regex = new RegExp(searchTerm, "i");
-    filter.$or = [{ name: regex }, { description: regex }];
+    AND.push({
+      OR: [
+        { name: { contains: searchTerm, mode: "insensitive" } },
+        { description: { contains: searchTerm, mode: "insensitive" } },
+      ],
+    });
   }
 
-  // 3b) Location/area search
+  const province = (req.query.province || "").toString().trim();
   const location = (req.query.location || "").toString().trim();
-  if (location) {
-    filter.location = new RegExp(location, "i");
+  const city = (req.query.city || "").toString().trim();
+  const neighborhood = (req.query.neighborhood || "").toString().trim();
+  if (province) {
+    AND.push({
+      province: { contains: province, mode: "insensitive" },
+    });
+  } else if (location) {
+    AND.push({
+      province: { contains: location, mode: "insensitive" },
+    });
+  }
+  if (city) {
+    AND.push({
+      OR: [
+        { province: { contains: city, mode: "insensitive" } },
+        { city: { contains: city, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (neighborhood) {
+    AND.push({
+      OR: [
+        { city: { contains: neighborhood, mode: "insensitive" } },
+        { addressLine: { contains: neighborhood, mode: "insensitive" } },
+      ],
+    });
   }
 
-  // 3c) Price range (monthlyRent)
   const minRent = Number(req.query.minRent || 0);
   const maxRent = Number(req.query.maxRent || 0);
   if (minRent || maxRent) {
-    filter.monthlyRent = {};
-    if (minRent) filter.monthlyRent.$gte = minRent;
-    if (maxRent) filter.monthlyRent.$lte = maxRent;
+    where.monthlyRent = {};
+    if (minRent) where.monthlyRent.gte = minRent;
+    if (maxRent) where.monthlyRent.lte = maxRent;
   }
 
-  // 3d) Minimum bedrooms
   const minBedrooms = Number(req.query.minBedrooms || 0);
   if (minBedrooms) {
-    filter.bedrooms = { $gte: minBedrooms };
+    where.bedrooms = { gte: minBedrooms };
   }
 
-  // 3e) Amenities (solar, borehole, security, parking, internet)
+  const minTotalRooms = Number(req.query.minTotalRooms || 0);
+  if (minTotalRooms) {
+    where.totalRooms = { gte: minTotalRooms };
+  }
+
   const amenityKeys = ["solar", "borehole", "security", "parking", "internet"];
   for (const key of amenityKeys) {
     if (req.query[key] === "true") {
-      filter[`amenities.${key}`] = true;
+      AND.push({
+        amenities: {
+          path: [key],
+          equals: true,
+        },
+      });
     }
   }
 
-  // 4) Find all listings based on type "all" or "sale" or "rent"
   if (req.query.type && req.query.type !== "all") {
-    filter.type = req.query.type;
+    where.type = req.query.type;
   }
 
-  // 5) Find all listings based on furnished true or false
-  if (req.query.furnished) {
-    if (req.query.furnished === "false") {
-      filter.furnished = { $in: [true, false] };
-    } else {
-      filter.furnished = req.query.furnished;
-    }
+  if (req.query.furnished === "true") {
+    where.furnished = true;
   }
 
-  // 6) Find all listings based on offer true or false
-  if (req.query.offer) {
-    if (req.query.offer === "false") {
-      filter.offer = { $in: [true, false] };
-    } else {
-      filter.offer = req.query.offer;
-    }
+  if (req.query.offer === "true") {
+    where.offer = true;
   }
 
-  // 4) Find all listings
-  const listings = await Listing.find(filter)
-    .skip(skip)
-    .limit(limit)
-    .sort(sort);
+  if (req.query.studentAccommodation === "true") {
+    where.studentAccommodation = true;
+  }
 
-  // 5) Send the response
+  if (AND.length) {
+    where.AND = AND;
+  }
+
+  const listings = await prisma.listing.findMany({
+    where,
+    skip,
+    take: limit,
+    orderBy,
+  });
+
   res.status(200).json({
     status: "success",
     results: listings.length,
-    data: listings,
+    data: listings.map((listing) =>
+      sanitizeListingForPublic(mapListingId(listing))
+    ),
+  });
+});
+
+exports.restoreListing = catchAsync(async (req, res, next) => {
+  const listing = await prisma.listing.findUnique({ where: { id: req.params.id } });
+
+  if (!listing) {
+    return next(new AppError("No listing found with that ID", 404));
+  }
+
+  if (listing.userId !== req.user.id) {
+    return next(new AppError("You do not own this listing", 403));
+  }
+
+  if (listing.deletedAt) {
+    return next(new AppError("Cannot restore a deleted listing", 400));
+  }
+
+  if (listing.status !== "expired") {
+    return next(new AppError("Only expired listings can be restored", 400));
+  }
+
+  const days = parseInt(req.body.days, 10);
+  if (!listingConfig.isValidRestorationDuration(days)) {
+    const validDurations = listingConfig.RESTORATION_DURATIONS.map((d) => d.days);
+    return next(new AppError(`Days must be one of: ${validDurations.join(", ")}`, 400));
+  }
+
+  const tokensToDeduct = listingConfig.calculateRestorationCost(days);
+  const now = new Date();
+  const newExpiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+  let updatedListing;
+  let restoration;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await walletService.deductTokens(
+        req.user.id,
+        tokensToDeduct,
+        "listing_renewal",
+        `Listing restored — ${days} day${days === 1 ? "" : "s"}`,
+        tx
+      );
+
+      updatedListing = await tx.listing.update({
+        where: { id: req.params.id },
+        data: {
+          status: "active",
+          expiresAt: newExpiresAt,
+        },
+      });
+
+      restoration = await tx.listingRestoration.create({
+        data: {
+          listingId: req.params.id,
+          userId: req.user.id,
+          durationDays: days,
+          tokensSpent: tokensToDeduct,
+          restoredAt: now,
+          expiresAt: newExpiresAt,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId: req.user.id,
+          event: "listing.restored",
+          title: "Listing restored",
+          body: `Your listing "${listing.name}" was restored for ${days} day${days === 1 ? "" : "s"} using ${tokensToDeduct} TR tokens.`,
+          metadata: { listingId: req.params.id, restorationId: restoration.id, days, tokensSpent: tokensToDeduct },
+        },
+      });
+    });
+  } catch (err) {
+    if (err.statusCode === 402) {
+      return next(new AppError("Insufficient TR token balance to restore this listing", 402));
+    }
+    throw err;
+  }
+
+  res.status(200).json({ 
+    status: "success", 
+    data: { 
+      listing: mapListingId(updatedListing),
+      restoration: {
+        id: restoration.id,
+        durationDays: restoration.durationDays,
+        tokensSpent: restoration.tokensSpent,
+        restoredAt: restoration.restoredAt,
+        expiresAt: restoration.expiresAt,
+      }
+    },
+    message: `Listing restored for ${days} days`
   });
 });
 
 exports.getHomeHighlighted = catchAsync(async (req, res, next) => {
-  // 0) Promote expired early_access listings to active
-  await promoteExpiredEarlyAccess();
+  await applyListingLifecycle();
 
   const limit = Math.max(1, Number(req.query.limit) || 9);
   const isPremium = req.user ? isPremiumTenant(req.user) : false;
-  const statusFilter = isPremium ? { $in: ["active", "early_access"] } : "active";
+  const statusFilter = isPremium ? { in: ["active", "early_access"] } : "active";
 
-  const listings = await Listing.find({ status: statusFilter })
-    .sort({ createdAt: -1 })
-    .limit(limit);
+  const listings = await prisma.listing.findMany({
+    where: { status: statusFilter },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
 
   res.status(200).json({
     status: "success",
     results: listings.length,
-    data: listings,
+    data: listings.map((listing) => sanitizeListingForPublic(mapListingId(listing))),
   });
 });
 
 exports.getHomeGroupedByLocation = catchAsync(async (req, res, next) => {
-  // 0) Promote expired early_access listings to active
-  await promoteExpiredEarlyAccess();
+  await applyListingLifecycle();
 
   const locationsLimit = Math.max(1, Number(req.query.locationsLimit) || 6);
   const perLocation = Math.max(1, Number(req.query.perLocation) || 6);
   const isPremium = req.user ? isPremiumTenant(req.user) : false;
-  const statusFilter = isPremium ? { $in: ["active", "early_access"] } : "active";
+  const statusFilter = isPremium ? { in: ["active", "early_access"] } : "active";
 
-  // Group active listings by a normalized location key (trim + lower-case),
-  // then sort listings/groups by recency for the home location slider.
-  const grouped = await Listing.aggregate([
-    {
-      $match: {
-        status: statusFilter,
-        location: { $exists: true, $type: "string", $ne: "" },
-      },
+  const listings = await prisma.listing.findMany({
+    where: {
+      status: statusFilter,
+      province: { not: "" },
     },
-    {
-      $addFields: {
-        _locationTrimmed: { $trim: { input: "$location" } },
-      },
-    },
-    {
-      $match: {
-        _locationTrimmed: { $ne: "" },
-      },
-    },
-    {
-      $addFields: {
-        _normalizedLocation: { $toLower: "$_locationTrimmed" },
-        _fallbackImage: {
-          $ifNull: [
-            "$image",
-            {
-              $ifNull: [
-                { $arrayElemAt: ["$images", 0] },
-                { $ifNull: [{ $arrayElemAt: ["$imageUrls", 0] }, null] },
-              ],
-            },
-          ],
-        },
-      },
-    },
-    { $sort: { createdAt: -1 } },
-    {
-      $group: {
-        _id: "$_normalizedLocation",
-        location: { $first: "$_locationTrimmed" },
-        mostRecentListing: { $first: "$createdAt" },
-        listings: {
-          $push: {
-            _id: "$_id",
-            name: "$name",
-            location: "$_locationTrimmed",
-            monthlyRent: "$monthlyRent",
-            bedrooms: "$bedrooms",
-            amenities: "$amenities",
-            image: "$_fallbackImage",
-            images: { $ifNull: ["$images", "$imageUrls"] },
-            createdAt: "$createdAt",
-          },
-        },
-      },
-    },
-    {
-      $project: {
-        _id: 0,
-        location: 1,
-        mostRecentListing: 1,
-        listings: { $slice: ["$listings", perLocation] },
-      },
-    },
-    { $sort: { mostRecentListing: -1 } },
-    { $limit: locationsLimit },
-    {
-      $project: {
-        location: 1,
-        listings: 1,
-      },
-    },
-  ]);
+    orderBy: { createdAt: "desc" },
+  });
+
+  const groups = new Map();
+  for (const listing of listings) {
+    const provinceKey = listing.province;
+    if (!groups.has(provinceKey)) {
+      groups.set(provinceKey, []);
+    }
+    groups.get(provinceKey).push(listing);
+  }
+
+  const grouped = Array.from(groups.entries())
+    .map(([locationName, groupedListings]) => ({
+      location: locationName,
+      mostRecentListing: groupedListings[0]?.createdAt || null,
+      listings: groupedListings
+        .slice(0, perLocation)
+        .map((listing) =>
+          sanitizeListingForPublic({
+            _id: listing.id,
+            name: listing.name,
+            monthlyRent: listing.monthlyRent,
+            bedrooms: listing.bedrooms,
+            totalRooms: listing.totalRooms,
+            amenities: listing.amenities,
+            status: listing.status,
+            studentAccommodation: listing.studentAccommodation,
+            createdAt: listing.createdAt,
+            location: listing.province,
+            image: getListingImage(listing.imageUrls),
+          })
+        ),
+    }))
+    .sort((left, right) => {
+      const leftTime = left.mostRecentListing ? new Date(left.mostRecentListing).getTime() : 0;
+      const rightTime = right.mostRecentListing
+        ? new Date(right.mostRecentListing).getTime()
+        : 0;
+      return rightTime - leftTime;
+    })
+    .slice(0, locationsLimit)
+    .map(({ location: locationName, listings: locationListings }) => ({
+      location: locationName,
+      listings: locationListings,
+    }));
 
   res.status(200).json({
     status: "success",
@@ -429,3 +795,11 @@ exports.getHomeGroupedByLocation = catchAsync(async (req, res, next) => {
     data: grouped,
   });
 });
+
+exports.__testables = {
+  matchesSavedSearch,
+  buildListingCreateData,
+  normalizeListingPayload,
+  sanitizeListingForPublic,
+  applyListingLifecycle,
+};

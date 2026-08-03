@@ -5,12 +5,12 @@ import TableCell, { tableCellClasses } from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
-import Paper from "@mui/material/Paper";
+import AppCard from "../ui/AppCard";
 
 export const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: "#eff1f7",
-    color: "#49454f",
+    backgroundColor: theme.palette.background.paper,
+    color: theme.palette.text.secondary,
   },
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
@@ -30,8 +30,8 @@ interface MUITableProps {
 
 const MUITable: React.FC<MUITableProps> = ({ tableHead, children }) => {
   return (
-    <>
-      <TableContainer component={Paper} sx={{ width: "100%", overflowX: "auto" }}>
+    <AppCard sx={{ width: "100%", overflow: "hidden" }}>
+      <TableContainer sx={{ width: "100%", overflowX: "auto" }}>
         <Table sx={{ minWidth: 600, width: "100%" }} aria-label="customized table">
           <TableHead>
             <TableRow>
@@ -45,7 +45,7 @@ const MUITable: React.FC<MUITableProps> = ({ tableHead, children }) => {
           <TableBody>{children}</TableBody>
         </Table>
       </TableContainer>
-    </>
+    </AppCard>
   );
 };
 

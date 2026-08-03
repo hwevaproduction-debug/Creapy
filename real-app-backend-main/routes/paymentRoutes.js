@@ -5,6 +5,7 @@ const { paymentLimiter } = require("../middleware/rateLimiter");
 const validate = require("../middleware/validate");
 const {
   listingFeeValidators,
+  retryValidators,
   tenantPremiumValidators,
 } = require("../middleware/paymentValidators");
 
@@ -30,5 +31,17 @@ router.post(
 );
 
 router.get("/mine", paymentController.getMyPayments);
+router.post(
+  "/:id/retry",
+  paymentController.requireBookingPaymentForProviderActions,
+  ...retryValidators,
+  validate,
+  paymentController.retryPayment
+);
+router.get(
+  "/:id/status",
+  paymentController.requireBookingPaymentForProviderActions,
+  paymentController.getPaymentStatus
+);
 
 module.exports = router;

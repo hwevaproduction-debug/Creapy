@@ -1,128 +1,334 @@
 // MUI Imports
-import { Box } from "@mui/material";
+import { Box, Grid, Link, Typography } from "@mui/material";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Eye, FileText, Home, Key, Search, Shield, Smartphone, UserX, Users } from "lucide-react";
 // Custom Imports
-import { Heading, SubHeading } from "../../components/Heading";
+import { SubHeading } from "../../components/Heading";
 import AppContainer from "../../components/ui/AppContainer";
 import AppCard from "../../components/ui/AppCard";
+import AppButton from "../../components/ui/AppButton";
+import { useGetPublicStatsQuery } from "../../redux/api/listingApiSlice";
+
+const fallbackStats = [
+  { value: "Curated", label: "Premium Listings" },
+  { value: "Trusted", label: "Verified Landlords" },
+  { value: "10", label: "Provinces Covered" },
+  { value: "Top Rated", label: "Verified Stays" },
+];
+
+const computeStats = (data: any) => {
+  if (!data) {
+    return fallbackStats;
+  }
+
+  const activeListings = Number(data.activeListings || 0);
+  const landlords = Number(data.landlords || 0);
+  const provinces = Number(data.provinces || 0);
+  const avgRating = Number(data.avgRating || 0);
+  const hasAvgRating = Number.isFinite(avgRating) && avgRating > 0;
+
+  return [
+    activeListings >= 100
+      ? { value: `${activeListings}+`, label: "Active Listings" }
+      : { value: "Growing", label: "Curated Listings" },
+    landlords >= 50
+      ? { value: `${landlords}+`, label: "Verified Landlords" }
+      : { value: "Growing Network", label: "Trusted Landlords" },
+    { value: String(provinces || 10), label: "Provinces Covered" },
+    hasAvgRating && avgRating >= 4.0
+      ? { value: `${avgRating.toFixed(1)}★`, label: "Average Rating" }
+      : { value: "Highly Rated", label: "Verified Stays" },
+  ];
+};
+
+const stepCards = [
+  {
+    Icon: Search,
+    title: "Browse Freely",
+    body: "Explore verified listings without creating an account",
+  },
+  {
+    Icon: Home,
+    title: "Connect Directly",
+    body: "Contact landlords directly — no agent fees",
+  },
+  {
+    Icon: Shield,
+    title: "Move In Confidently",
+    body: "Verified listings, structured data, trusted platform",
+  },
+];
+
+const valueCards = [
+  {
+    Icon: Eye,
+    title: "Transparency",
+    body: "Every listing shows real data — rooms, amenities, price",
+  },
+  {
+    Icon: UserX,
+    title: "No Middlemen",
+    body: "Direct landlord-to-tenant connections",
+  },
+  {
+    Icon: Smartphone,
+    title: "Mobile First",
+    body: "Built for Zimbabwe's mobile-first reality",
+  },
+  {
+    Icon: Key,
+    title: "Landlord Control",
+    body: "Landlords own their listings, set their terms",
+  },
+];
 
 const About = () => {
-  return (
-    <Box sx={{ margin: "65px 0 0 0" }}>
-      <AppContainer>
-        <Heading>About RealEstate</Heading>
-        <AppCard sx={{ marginTop: "20px", p: { xs: 2, md: 3 } }}>
-        <Box sx={{ color: "#334155", fontSize: "16px", lineHeight: 1.7 }}>
-  This platform is an agent-free rental housing marketplace built to connect
-  tenants and landlords directly — no middlemen, no inflated fees, no wasted
-  time.
-  <br />
-  <br />
-  In many rental markets, agents slow things down, reduce transparency, and
-  increase costs for tenants while limiting landlords’ control over their own
-  listings. This platform exists to remove that friction entirely by offering a
-  simple, digital way to discover and list rental properties based on real,
-  structured data.
-  <br />
-  <br />
-  Tenants can browse public listings without creating an account, filter homes
-  by location, price, rooms, and amenities, and view clear property details
-  including room breakdowns and available features such as solar power,
-  boreholes, security, parking, and internet availability.
-  <br />
-  <br />
-  Landlords list and manage their properties directly, keeping full ownership
-  of their listings while reaching tenants faster and more efficiently.
-  <br />
-  <br />
-  The platform follows a landlord-paid publishing model. Basic access —
-  browsing listings, viewing property details, and contacting landlords — is
-  always free for everyone. Tenants never pay, while landlords subscribe only
-  when they want to publish listings.
-  <br />
-  <br />
-  Built as a mobile-first web application, the goal is speed, clarity, and trust
-  — making it easier to find a home or rent one out without unnecessary
-  intermediaries.
-</Box>
+  const navigate = useNavigate();
+  const { data: statsData } = useGetPublicStatsQuery(undefined);
 
-        </AppCard>
+  return (
+    <>
+      <Box
+        sx={{
+          background: "linear-gradient(135deg, #1F2937 0%, #1F4D3A 100%)",
+          pt: { xs: 12, md: 14 },
+          pb: { xs: 6, md: 8 },
+          textAlign: "center",
+          px: 2,
+        }}
+      >
         <Box
           sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            margin: "50px 0 75px 0",
-            flexWrap: "wrap",
-            gap: 3,
+            fontSize: "11px",
+            fontWeight: 700,
+            letterSpacing: "0.15em",
+            color: "#B8975A",
+            textTransform: "uppercase",
+            mb: 2,
           }}
         >
-          <AppCard
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              flexDirection: "column",
-              width: { xs: "100%", sm: "260px", md: "300px" },
-              p: 2,
-            }}
-          >
-            <Box sx={{ width: { xs: "64px", sm: "72px" }, height: { xs: "64px", sm: "72px" } }}>
-              <img
-                src="https://firebasestorage.googleapis.com/v0/b/real-estate-54ca1.appspot.com/o/1701424117897salman%20passport.jpg?alt=media&token=a903aba6-b78e-4442-b0c0-f07c0dfa145f"
-                alt="salman"
-                style={{ width: "100%", height: "100%", borderRadius: "50%" }}
+          OUR STORY
+        </Box>
+        <Box
+          component="h1"
+          sx={{
+            fontSize: { xs: "2rem", md: "3rem" },
+            fontWeight: 800,
+            color: "#fff",
+            m: 0,
+            mb: 2,
+          }}
+        >
+          Reimagining Property Discovery in Zimbabwe
+        </Box>
+        <Box
+          sx={{
+            fontSize: "1.1rem",
+            color: "rgba(255,255,255,0.75)",
+            maxWidth: 560,
+            mx: "auto",
+            lineHeight: 1.6,
+          }}
+        >
+          Agent-free. Transparent. Built for real people.
+        </Box>
+      </Box>
+
+      <AppContainer sx={{ py: { xs: 6, md: 8 } }}>
+        <Grid container spacing={6} alignItems="center">
+          <Grid item xs={12} md={6}>
+            <Box
+              sx={{
+                borderRadius: "20px",
+                overflow: "hidden",
+                height: { xs: 240, md: 360 },
+              }}
+            >
+              <Box
+                component="img"
+                src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80"
+                alt="Luxury property"
+                sx={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             </Box>
-            <SubHeading sx={{ marginTop: "10px" }}>Salman Muazam</SubHeading>
-            <Box>0323 4910955</Box>
-            <Heading sx={{ fontSize: "14px", marginTop: "10px" }}>CEO</Heading>
-          </AppCard>
-          <AppCard
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              flexDirection: "column",
-              width: { xs: "100%", sm: "260px", md: "300px" },
-              p: 2,
-            }}
-          >
-            <Box sx={{ width: { xs: "64px", sm: "72px" }, height: { xs: "64px", sm: "72px" } }}>
-              <img
-                src="https://firebasestorage.googleapis.com/v0/b/real-estate-54ca1.appspot.com/o/1701198186809Hassan.jpg?alt=media&token=881f2f1b-b0d4-4933-9b4a-79259d313f42"
-                alt="hassan"
-                style={{ width: "100%", height: "100%", borderRadius: "50%" }}
-              />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Box sx={{ color: "#B8975A", fontSize: "2rem", fontWeight: 800, mb: 2 }}>
+              Our Mission
             </Box>
-            <SubHeading sx={{ marginTop: "10px" }}>Hassan Raza</SubHeading>
-            <Box>0300 0315440</Box>
-            <Heading sx={{ fontSize: "14px", marginTop: "10px" }}>
-              President
-            </Heading>
-          </AppCard>
-          <AppCard
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              flexDirection: "column",
-              width: { xs: "100%", sm: "260px", md: "300px" },
-              p: 2,
-            }}
-          >
-            <Box sx={{ width: { xs: "64px", sm: "72px" }, height: { xs: "64px", sm: "72px" } }}>
-              <img
-                src="https://firebasestorage.googleapis.com/v0/b/real-estate-54ca1.appspot.com/o/1701198124445Faizan.jpg?alt=media&token=560ccfc3-f5f4-430c-b55d-d6a0357c7be2"
-                alt="salman"
-                style={{ width: "100%", height: "100%", borderRadius: "50%" }}
-              />
-            </Box>
-            <SubHeading sx={{ marginTop: "10px" }}>Ch Faizan</SubHeading>
-            <Box>0355 5032437</Box>
-            <Heading sx={{ fontSize: "14px", marginTop: "10px" }}>
-              Marketing Manager
-            </Heading>
-          </AppCard>
+            <SubHeading sx={{ color: "text.secondary", lineHeight: 1.8, mb: 2 }}>
+              We built Town Ruins because finding a home in Zimbabwe shouldn't require
+              an agent, inflated fees, or wasted weekends. Direct connections. Real
+              listings. Zero middlemen.
+            </SubHeading>
+            <SubHeading sx={{ color: "text.secondary", lineHeight: 1.8 }}>
+              Tenants browse freely. Landlords list directly. No intermediaries. No
+              hidden costs. Just transparent, structured property data for everyone.
+            </SubHeading>
+          </Grid>
+        </Grid>
+
+        <Box sx={{ mt: { xs: 6, md: 8 } }}>
+          <Grid container spacing={3}>
+            {stepCards.map(({ Icon, title, body }) => (
+              <Grid item xs={12} md={4} key={title}>
+                <AppCard sx={{ p: 3, textAlign: "center", height: "100%" }}>
+                  <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                    <Icon size={28} color="#B8975A" />
+                  </Box>
+                  <Box sx={{ fontWeight: 800, fontSize: "18px", mb: 1 }}>{title}</Box>
+                  <SubHeading sx={{ color: "text.secondary" }}>{body}</SubHeading>
+                </AppCard>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        <Box sx={{ mt: { xs: 6, md: 8 } }}>
+          <Grid container spacing={3}>
+            {valueCards.map(({ Icon, title, body }) => (
+              <Grid item xs={12} sm={6} key={title}>
+                <AppCard sx={{ p: 2.5, height: "100%" }}>
+                  <Box sx={{ mb: 1.5 }}>
+                    <Icon size={24} color="#B8975A" />
+                  </Box>
+                  <Box sx={{ fontWeight: 800, fontSize: "17px", mb: 0.75 }}>
+                    {title}
+                  </Box>
+                  <SubHeading sx={{ color: "text.secondary" }}>{body}</SubHeading>
+                </AppCard>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        <Box sx={{ mt: { xs: 6, md: 8 }, mb: 8 }}>
+          <Box sx={{ textAlign: "center", mb: 4 }}>
+            <Box sx={{ color: "#B8975A", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", mb: 1 }}>Safety First</Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: "text.primary" }}>Trust & Safety</Typography>
+          </Box>
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={6}>
+              <AppCard sx={{ p: 3, height: "100%", boxShadow: "0 4px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <Shield size={32} color="#B8975A" style={{ marginBottom: 12 }} />
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Landlord Verification</Typography>
+                <Typography sx={{ color: "text.secondary", fontSize: 14, mb: 2 }}>All landlords on Town Ruins go through identity and document verification before listing properties.</Typography>
+                <Link component={RouterLink} to="/trust-safety" sx={{ color: "#B8975A", fontWeight: 600, fontSize: 14 }}>Learn more →</Link>
+              </AppCard>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <AppCard sx={{ p: 3, height: "100%", boxShadow: "0 4px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <Users size={32} color="#B8975A" style={{ marginBottom: 12 }} />
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Community Standards</Typography>
+                <Typography sx={{ color: "text.secondary", fontSize: 14, mb: 2 }}>Our community guidelines ensure respectful, safe interactions for every tenant and landlord on the platform.</Typography>
+                <Link component={RouterLink} to="/community-guidelines" sx={{ color: "#B8975A", fontWeight: 600, fontSize: 14 }}>Read guidelines →</Link>
+              </AppCard>
+            </Grid>
+          </Grid>
+        </Box>
+
+        <Box sx={{ mb: 8 }}>
+          <Box sx={{ textAlign: "center", mb: 4 }}>
+            <Box sx={{ color: "#B8975A", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", mb: 1 }}>Transparency</Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: "text.primary" }}>Legal & Compliance</Typography>
+          </Box>
+          <Grid container spacing={2}>
+            {[
+              { title: "Terms of Use", desc: "Rules governing use of the platform", path: "/terms" },
+              { title: "Privacy Policy", desc: "How we collect and protect your data", path: "/privacy" },
+              { title: "Refund Policy", desc: "Cancellation and refund procedures", path: "/refund-policy" },
+              { title: "Landlord Agreement", desc: "Terms for hosting on Town Ruins", path: "/landlord-terms" },
+            ].map((doc) => (
+              <Grid item xs={12} sm={6} md={3} key={doc.path}>
+                <AppCard sx={{ p: 2.5, boxShadow: "0 4px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <FileText size={24} color="#B8975A" style={{ marginBottom: 8 }} />
+                  <Typography sx={{ fontWeight: 700, mb: 0.5 }}>{doc.title}</Typography>
+                  <Typography sx={{ color: "text.secondary", fontSize: 13, mb: 1.5 }}>{doc.desc}</Typography>
+                  <Link component={RouterLink} to={doc.path} sx={{ color: "#B8975A", fontWeight: 600, fontSize: 13 }}>Read →</Link>
+                </AppCard>
+              </Grid>
+            ))}
+          </Grid>
         </Box>
       </AppContainer>
-    </Box>
+
+      <Box sx={{ background: "#1F2937", py: 5 }}>
+        <AppContainer>
+          <Grid container spacing={4}>
+            {computeStats(statsData?.data).map((stat) => (
+              <Grid item xs={6} md={3} key={stat.label}>
+                <Box sx={{ textAlign: "center" }}>
+                  <Box
+                    sx={{
+                      fontSize: { xs: "2rem", md: "2.5rem" },
+                      fontWeight: 800,
+                      color: "#B8975A",
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {stat.value}
+                  </Box>
+                  <Box
+                    sx={{
+                      fontSize: "14px",
+                      color: "rgba(255,255,255,0.65)",
+                      fontWeight: 500,
+                      marginTop: 0.75,
+                    }}
+                  >
+                    {stat.label}
+                  </Box>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+        </AppContainer>
+      </Box>
+
+      <Box
+        sx={{
+          background: "linear-gradient(135deg, #B8975A, #9E7E45)",
+          py: { xs: 6, md: 8 },
+          textAlign: "center",
+          px: 2,
+        }}
+      >
+        <Box
+          sx={{
+            color: "#fff",
+            fontSize: { xs: "1.75rem", md: "2.25rem" },
+            fontWeight: 800,
+            mb: 3,
+          }}
+        >
+          Ready to find your next home?
+        </Box>
+        <Box sx={{ display: "flex", justifyContent: "center", gap: 2, flexWrap: "wrap" }}>
+          <AppButton
+            variant="outlined"
+            onClick={() => navigate("/search")}
+            sx={{
+              color: "#fff",
+              borderColor: "rgba(255,255,255,0.6)",
+              "&:hover": { borderColor: "#fff", background: "rgba(255,255,255,0.1)" },
+            }}
+          >
+            Browse Properties
+          </AppButton>
+          <AppButton
+            variant="outlined"
+            onClick={() => navigate("/provider-signup")}
+            sx={{
+              color: "#fff",
+              borderColor: "rgba(255,255,255,0.6)",
+              "&:hover": { borderColor: "#fff", background: "rgba(255,255,255,0.1)" },
+            }}
+          >
+            List Your Property
+          </AppButton>
+        </Box>
+      </Box>
+    </>
   );
 };
 

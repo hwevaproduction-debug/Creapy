@@ -1,56 +1,104 @@
-const mongoose = require("mongoose");
 require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
+const { execFileSync } = require("child_process");
+
+const ensurePrismaClientForRuntime = () => {
+  if (process.env.SKIP_PRISMA_GENERATE_ON_START === "true") {
+    return;
+  }
+
+  if (process.platform !== "linux" && process.platform !== "win32") {
+    return;
+  }
+
+  const generatedClientEntry = path.join(
+    __dirname,
+    "node_modules",
+    ".prisma",
+    "client",
+    "default.js"
+  );
+
+  if (fs.existsSync(generatedClientEntry)) {
+    return;
+  }
+
+  console.log("Generating Prisma Client for the deployment runtime...");
+  execFileSync(
+    "npx",
+    ["prisma", "generate", "--schema=prisma/schema.prisma"],
+    {
+      cwd: __dirname,
+      stdio: "inherit",
+    }
+  );
+};
+
+ensurePrismaClientForRuntime();
 // Custom Imports
 const app = require("./app");
+const prisma = require("./utils/prisma");
 
 process.on("uncaughtException", (err) => {
   console.log("UNCAUGHT EXCEPTION! 💥 Shutting down...");
   console.log(err.name, err.message);
-  process.exit(1);
+  prisma.$disconnect().finally(() => {
+    process.exit(1);
+  });
 });
 
-/**
- * IMPORTANT:
- * If MongoDB is unreachable, Mongoose will buffer queries by default and your API
- * routes may appear to "hang" forever.
- *
- * We fail fast here so the frontend doesn't get stuck on infinite loaders.
- */
-mongoose.set("bufferCommands", false);
-
 const port = process.env.PORT || 5000;
-const dbURI = process.env.MONGO_URI;
 
 async function start() {
-  if (!dbURI) {
-    console.error(
-      "Missing MONGO_URI in server/.env. Add your Mongo connection string and restart."
-    );
-    process.exit(1);
-  }
+  let databaseConnected = false;
 
   try {
-    await mongoose.connect(dbURI, {
-      serverSelectionTimeoutMS: 5000,
-    });
-    console.log("Connected to MongoDB".cyan.underline.bold);
+    await prisma.$connect();
+    databaseConnected = true;
+    console.log("Connected to Aurora PostgreSQL".cyan.underline.bold);
     console.log("Environment:", `${process.env.NODE_ENV || "development"}`.yellow);
   } catch (err) {
-    console.error("Failed to connect to MongoDB:", err.message);
-    process.exit(1);
+    console.error(
+      "Failed to connect to Aurora PostgreSQL. Starting in degraded mode:",
+      err.message
+    );
+    console.log(
+      "Environment:",
+      `${process.env.NODE_ENV || "development"}`.yellow
+    );
   }
 
   const server = app.listen(port, () => {
     console.log(`Server running on port ${port}`);
+    if (!databaseConnected) {
+      console.log(
+        "Database connection unavailable at startup; requests that require PostgreSQL may fail."
+      );
+    }
+
+    if (process.env.NODE_ENV !== "test") {
+      const { startReconciliationJob } = require("./utils/reconciliationJob");
+      const { startNotificationWorker } = require("./utils/notificationWorker");
+      const { startReminderScanner } = require("./utils/reminderScanner");
+      const { startExpiryScanner } = require("./utils/listingExpiryScanner");
+
+      startReconciliationJob();
+      startNotificationWorker();
+      startReminderScanner();
+      startExpiryScanner();
+    }
   });
 
   process.on("unhandledRejection", (err) => {
     console.log("UNHANDLED REJECTION! 💥 Shutting down...");
     console.log(err.name, err.message);
-    server.close(() => {
+    server.close(async () => {
+      await prisma.$disconnect();
       process.exit(1);
     });
   });
 }
 
 start();
+

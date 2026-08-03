@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: creapy
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./real-app-backend-main
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    environment:
+      # Primary DB connection for Prisma / backend. Do NOT commit secrets; replace placeholders in env or .env files.
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/creapy?schema=public"
+      # Application secrets & env placeholders — set these in your local env or docker-compose.override.yml
+      JWT_SECRET: "${JWT_SECRET:-changeme}"
+      COOKIE_SECRET: "${COOKIE_SECRET:-changeme}"
+      # Add other placeholders as needed, e.g. EMAIL_API_KEY, S3_* etc.
+    volumes:
+      - uploads:/srv/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:5000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build: ./real-app-frontend-main
+    ports:
+      - "3000:80"
+    # Optional: if you want frontend to wait for backend at runtime, add depends_on below
+    # depends_on:
+    #   - backend
+    restart: unless-stopped
+
+  # Optional Redis service. Disabled by default. To enable, remove the leading '#' from the lines below
+  # and consider setting REDIS_URL in backend environment to redis://redis:6379
+  #redis:
+  #  image: redis:7
+  #  restart: unless-stopped
+  #  # Marked optional: use for caching, sessions, or rate-limiting
+
+volumes:
+  pgdata:
+  uploads:

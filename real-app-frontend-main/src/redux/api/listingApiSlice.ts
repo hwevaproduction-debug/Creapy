@@ -1,5 +1,19 @@
 import { apiSlice } from "./apiSlice";
 
+const toEntityArray = (response: any, keys: string[]) => {
+  for (const key of keys) {
+    if (Array.isArray(response?.data?.[key])) {
+      return response.data[key];
+    }
+
+    if (Array.isArray(response?.[key])) {
+      return response[key];
+    }
+  }
+
+  return [];
+};
+
 export const listingApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     createListing: builder.mutation({
@@ -30,6 +44,10 @@ export const listingApiSlice = apiSlice.injectEndpoints({
       },
       providesTags: ["Listing"],
     }),
+    getPublicStats: builder.query({
+      query: () => ({ url: "listings/stats", method: "GET" }),
+      providesTags: ["Listing"],
+    }),
     deleteListing: builder.mutation({
       query: (listingId) => {
         return {
@@ -47,6 +65,14 @@ export const listingApiSlice = apiSlice.injectEndpoints({
           body: data.payload,
         };
       },
+      invalidatesTags: ["Listing"],
+    }),
+    restoreListing: builder.mutation({
+      query: ({ id, days }: { id: string; days: number }) => ({
+        url: `listings/${id}/restore`,
+        method: "POST",
+        body: { days },
+      }),
       invalidatesTags: ["Listing"],
     }),
     searchListings: builder.query({
@@ -80,6 +106,61 @@ export const listingApiSlice = apiSlice.injectEndpoints({
       },
       providesTags: ["Listing"],
     }),
+    getListingDraft: builder.query({
+      query: () => ({
+        url: "listing-drafts/mine",
+        method: "GET",
+      }),
+      transformResponse: (response: any) => {
+        const drafts = toEntityArray(response, ["drafts", "data"]);
+        return drafts[0] || null;
+      },
+      providesTags: [{ type: "ListingDraft", id: "MINE" }],
+    }),
+    updateListingDraft: builder.mutation({
+      async queryFn({ id, payload }, _api, _extraOptions, fetchWithBQ) {
+        const body = { data: payload };
+
+        if (id) {
+          const updateResult = await fetchWithBQ({
+            url: `listing-drafts/${id}`,
+            method: "PUT",
+            body,
+          });
+
+          if (!updateResult.error) {
+            return { data: updateResult.data };
+          }
+        }
+
+        const createResult = await fetchWithBQ({
+          url: "listing-drafts",
+          method: "POST",
+          body,
+        });
+
+        if (createResult.error) {
+          return { error: createResult.error };
+        }
+
+        return { data: createResult.data };
+      },
+      invalidatesTags: [{ type: "ListingDraft", id: "MINE" }],
+    }),
+deleteListingDraft: builder.mutation({
+      query: (id) => ({
+        url: `listing-drafts/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "ListingDraft", id: "MINE" }],
+    }),
+    getRestorationConfig: builder.query<{ status: string; data: { durations: { days: number; label: string }[]; minTokensPerDay: number } }, void>({
+      query: () => ({
+        url: "pricing/restoration-config",
+        method: "GET",
+      }),
+      providesTags: ["Listing"],
+    }),
   }),
 });
 
@@ -88,8 +169,14 @@ export const {
   useGetListingQuery,
   useDeleteListingMutation,
   useUpdateListingMutation,
+  useRestoreListingMutation,
   useGetSingleListingQuery,
+  useGetPublicStatsQuery,
   useSearchListingsQuery,
   useGetHomeHighlightedQuery,
   useGetHomeGroupedByLocationQuery,
+  useGetListingDraftQuery,
+  useUpdateListingDraftMutation,
+  useDeleteListingDraftMutation,
+  useGetRestorationConfigQuery,
 } = listingApiSlice;

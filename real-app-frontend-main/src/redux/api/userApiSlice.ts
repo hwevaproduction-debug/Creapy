@@ -36,6 +36,20 @@ export const userApiSlice = apiSlice.injectEndpoints({
         };
       },
     }),
+    submitVerification: builder.mutation({
+      query: (data) => ({
+        url: "users/submit-verification",
+        method: "POST",
+        body: data,
+      }),
+    }),
+    submitPropertyInterest: builder.mutation({
+      query: (data) => ({
+        url: "leads/property-interest",
+        method: "POST",
+        body: data,
+      }),
+    }),
 
     createSavedSearch: builder.mutation({
       query: (payload) => ({
@@ -63,6 +77,8 @@ export const {
   useGetMeQuery,
   useUpdateMutation,
   useDeleteMutation,
+  useSubmitVerificationMutation,
+  useSubmitPropertyInterestMutation,
   useGetUserQuery,
   useCreateSavedSearchMutation,
   useGetMySavedSearchesQuery,

@@ -7,7 +7,23 @@ const handleCastErrorDB = (err) => {
 };
 
 const handleDuplicateFieldsDB = (err) => {
-  const message = `Duplicate field value: \"${err.keyValue.name}"\. Please use another value!`;
+  const field = Object.keys(err.keyValue)[0];
+  const message =
+    field === "email"
+      ? "Email already in use"
+      : `Duplicate field value: \"${field}"\. Please use another value!`;
+  return new AppError(message, 400);
+};
+
+const handlePrismaDuplicateFieldsDB = (err) => {
+  const target = Array.isArray(err.meta?.target) ? err.meta.target : [];
+  const field = target[0];
+  const message =
+    field === "email"
+      ? "Email already in use"
+      : field
+        ? `Duplicate field value: "${field}". Please use another value!`
+        : "Duplicate field value. Please use another value!";
   return new AppError(message, 400);
 };
 
@@ -27,6 +43,7 @@ const handleJWTExpiredError = () =>
 const sendErrorDev = (err, res) => {
   res.status(err.statusCode).json({
     status: err.status,
+    code: err.code || undefined,
     error: err,
     message: err.message,
     stack: err.stack,
@@ -38,6 +55,7 @@ const sendErrorProd = (err, res) => {
   if (err.isOperational) {
     res.status(err.statusCode).json({
       status: err.status,
+      code: err.code || undefined,
       message: err.message,
     });
     // Programming or other unknown error: don't leak error details
@@ -57,15 +75,16 @@ module.exports = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || "error";
 
+  if (err.code === 11000) err = handleDuplicateFieldsDB(err);
+  if (err.code === "P2002") err = handlePrismaDuplicateFieldsDB(err);
+  if (err.name === "CastError") err = handleCastErrorDB(err);
+  if (err.name === "ValidationError") err = handleValidationErrorDB(err);
+  if (err.name === "JsonWebTokenError") err = handleJWTError();
+  if (err.name === "TokenExpiredError") err = handleJWTExpiredError();
+
   if (process.env.NODE_ENV === "development") {
     sendErrorDev(err, res);
-  } else if (process.env.NODE_ENV === "production") {
-    if (err.name === "CastError") err = handleCastErrorDB(err);
-    if (err.code === 11000) err = handleDuplicateFieldsDB(err);
-    if (err.name === "ValidationError") err = handleValidationErrorDB(err);
-    if (err.name === "JsonWebTokenError") err = handleJWTError();
-    if (err.name === "TokenExpiredError") err = handleJWTExpiredError();
-
+  } else {
     sendErrorProd(err, res);
   }
 };

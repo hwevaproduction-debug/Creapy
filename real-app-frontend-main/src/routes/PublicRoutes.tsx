@@ -1,11 +1,13 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 
 const PublicRoutes = (props: any) => {
+  const location = useLocation();
   if (localStorage.getItem("user")) {
-    return <Navigate to="/" />;
-  } else {
-    return props.children;
+    const locationState = location.state as any;
+    const from = locationState?.from || "/";
+    return <Navigate to={from} replace />;
   }
+  return props.children;
 };
 
 export default PublicRoutes;
