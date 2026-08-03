@@ -3,6 +3,7 @@ const morgan = require("morgan");
 const colors = require("colors");
 const cors = require("cors");
 require("dotenv").config();
+const path = require('path');
 // Custom Imports
 const AppError = require("./utils/appError");
 const globalErrorHandler = require("./controllers/errorController");
@@ -101,6 +102,10 @@ if (process.env.NODE_ENV === "development") {
 app.use("/webhooks", webhookRouter);
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "50mb";
 app.use(express.json({ limit: jsonBodyLimit }));
+
+// Serve uploaded files from disk for development fallback
+const uploadsDir = process.env.UPLOADS_DIR || '/srv/uploads';
+app.use('/uploads', express.static(uploadsDir, { index: false, dotfiles: 'ignore' }));
 
 app.use((req, res, next) => {
   req.requestTime = new Date().toISOString();
