@@ -8,6 +8,13 @@ const s3ClientConfig = {
   requestChecksumCalculation: 'WHEN_REQUIRED',
 };
 
+// Allow custom S3 endpoint (MinIO, LocalStack, etc.)
+if (process.env.S3_ENDPOINT) {
+  s3ClientConfig.endpoint = process.env.S3_ENDPOINT;
+  // For S3-compatible servers like MinIO, use path-style addressing by default
+  s3ClientConfig.forcePathStyle = process.env.S3_FORCE_PATH_STYLE ? process.env.S3_FORCE_PATH_STYLE === 'true' : true;
+}
+
 if (process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY) {
   s3ClientConfig.credentials = {
     accessKeyId: process.env.S3_ACCESS_KEY_ID,
