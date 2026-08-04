@@ -27,6 +27,12 @@ const s3ClientConfig = {
   region: process.env.S3_REGION || process.env.AWS_REGION,
 };
 
+if (process.env.S3_ENDPOINT) {
+  s3ClientConfig.endpoint = process.env.S3_ENDPOINT;
+  // Use path-style addressing for S3-compatible endpoints by default
+  s3ClientConfig.forcePathStyle = process.env.S3_FORCE_PATH_STYLE ? process.env.S3_FORCE_PATH_STYLE === 'true' : true;
+}
+
 if (process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY) {
   s3ClientConfig.credentials = {
     accessKeyId: process.env.S3_ACCESS_KEY_ID,
