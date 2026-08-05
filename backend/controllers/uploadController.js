@@ -1,0 +1,72 @@
+const crypto = require('crypto');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const AppError = require('../utils/appError');
+
+const s3ClientConfig = {
+  region: process.env.S3_REGION || process.env.AWS_REGION,
+  requestChecksumCalculation: 'WHEN_REQUIRED',
+};
+
+// Allow custom S3 endpoint (MinIO, LocalStack, etc.)
+if (process.env.S3_ENDPOINT) {
+  s3ClientConfig.endpoint = process.env.S3_ENDPOINT;
+  // For S3-compatible servers like MinIO, use path-style addressing by default
+  s3ClientConfig.forcePathStyle = process.env.S3_FORCE_PATH_STYLE ? process.env.S3_FORCE_PATH_STYLE === 'true' : true;
+}
+
+if (process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY) {
+  s3ClientConfig.credentials = {
+    accessKeyId: process.env.S3_ACCESS_KEY_ID,
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+  };
+}
+
+const s3 = new S3Client(s3ClientConfig);
+
+exports.getSignedUploadUrl = async (req, res, next) => {
+  try {
+    const { contentType, folder = 'uploads' } = req.query;
+    const normalizedFolder = String(folder || "uploads").toLowerCase();
+
+    if (!contentType) {
+      return res.status(400).json({ status: 'fail', message: 'contentType is required' });
+    }
+
+    if (normalizedFolder === "listings") {
+      if (!req.user || req.user.role !== "landlord") {
+        return res.status(403).json({
+          status: "fail",
+          message: "Landlord role required to publish listings",
+        });
+      }
+    }
+
+    const ext = (contentType.split('/')[1] || 'bin').replace(/[^a-z0-9]/gi, '');
+    const random = crypto.randomBytes(10).toString('hex');
+    const userId = req.user?._id?.toString() || 'anon';
+
+    const key = `${normalizedFolder}/${userId}/${Date.now()}-${random}.${ext}`;
+
+    const command = new PutObjectCommand({
+      Bucket: process.env.S3_BUCKET,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 60 }); // 60 seconds
+
+    if (!process.env.S3_PUBLIC_BASE_URL) {
+      return next(new AppError('S3_PUBLIC_BASE_URL is not configured', 500));
+    }
+
+    const publicUrl = `${process.env.S3_PUBLIC_BASE_URL.replace(/\/$/, '')}/${key}`;
+
+    return res.status(200).json({
+      status: 'success',
+      data: { uploadUrl, key, publicUrl },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
